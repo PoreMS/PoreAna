@@ -5,6 +5,7 @@
 ################################################################################
 
 
+from collections import deque
 from re import X
 import sys
 import math
@@ -63,6 +64,7 @@ class Sample:
         self._is_angle = False
         self._is_diffusion_bin = False
         self._is_diffusion_mc = False
+        self._is_diffusion_vacf = False
 
         # Get molecule ids
         self._atoms = [atom.get_name() for atom in mol.get_atom_list()] if not self._atoms else self._atoms
@@ -671,6 +673,9 @@ class Sample:
         if self._is_diffusion_mc:
             print("Binning and MC-approaches cannot be run in parallel.")
             return
+        if self._is_diffusion_vacf:
+            print("Binning and VACF-approaches cannot be run in parallel.")
+            return
         if self._pore:
             self._is_diffusion_bin = True
         else:
@@ -925,6 +930,9 @@ class Sample:
         if self._is_diffusion_bin:
             print("Binning and MC-approaches cannot be run in parallel.")
             return
+        if self._is_diffusion_vacf:
+            print("VACF and MC-approaches cannot be run in parallel.")
+            return
 
         if direction not in [0,1,2]:
             print("Wrong directional input. Possible inputs are 0 (x-axis), 1 (y-axis), and 2 (z-axis)...")
@@ -1044,6 +1052,114 @@ class Sample:
                     end = idx_list[-1][res_id]
                     data[step][end, start] += 1
 
+
+    ##################
+    # VACF Diffusion #
+    ##################
+    def init_diffusion_vacf(self, link_out: str, len_correration=1e-8, new_time_origin=1e-9, sample_step=1000, len_frame=2e-12, bin_num=20, direction=2):
+        """Enable diffusion sampling routine with the VACF Alogrithm.
+        
+        Parameters
+        ----------
+        link_out : string
+            Link to obj or yml data file            # TODO hdf5???
+        len_frame : float, optional
+            Length of a frame in seconds
+        bin_num : integer, optional
+            Number of bins to be used
+        direction : integer, optional
+            Direction of descretization of the simulation box (**0** (x-axis);
+            **1** (y-axis); **2** (z-axis))
+        """
+        # TODO write documentation
+        # TODO overthink the input variables
+        # TODO implement different bin options
+        # TODO timereversal mapping
+        # TODO do avg_atoms_per_bin or density
+        # Initialize
+        if self._is_diffusion_bin:
+            print("Binning and VACF-approaches cannot be run in parallel.")
+            return
+        if self._is_diffusion_mc:
+            print("MC and VACF-approaches cannot be run in parallel.")
+            return
+        if direction not in [0,1,2]:
+            print("Wrong directional input. Possible inputs are 0 (x-axis), 1 (y-axis), and 2 (z-axis).")
+            return
+        if self._traj.split(".")[-1]!="trr":
+            print("VACF needs a trajectory file with velocities. Please use a .trr file.")
+            return
+        corr_steps = len_correration/len_frame
+        if math.isclose(corr_steps, int(corr_steps), rel_tol=1e-3):
+            print("The correlation time must be a multiple of the time between sampled frames.")
+            return
+        new_time_origin_steps = new_time_origin/len_frame
+        if math.isclose(new_time_origin_steps, int(new_time_origin_steps), rel_tol=1e-3):
+            print("The new time origin must be a multiple of the time between sampled frames.")
+            return
+        
+        # Enable routine
+        self._is_diffusion_vacf = True
+
+        # Calculate bins
+        bins = self._bin_mc(bin_num, direction)["bins"]
+
+        # Create input dictionary
+        self._diff_vacf_inp = {"output": link_out,"bins": bins, "len_correration": len_correration,  
+                               "new_time_origin": new_time_origin, "sample_step": sample_step, 
+                               "len_frame": len_frame, "bin_num": bin_num, "direction": direction, 
+                               "corr_steps": int(corr_steps), "new_time_origin_steps": int(new_time_origin_steps)}
+
+    def _diffusion_vacf_data(self) -> dict:
+        """Create VACF diffusion data structure.
+
+        Returns
+        -------
+        data : dictionary
+            VACF diffusion data structure
+        """
+        # Initialize
+        bin_num = self._diff_vacf_inp["bin_num"]
+        len_correration = self._diff_vacf_inp["len_correration"]
+
+        # Create dictionary
+        data = {}
+
+        # Initialize vacf data
+        for bin in range(bin_num):
+            data[bin] = {}
+            for res_id in self._res_list:
+                data[bin][res_id] = np.zeros((len_correration, 3), float)
+        self._res_list
+        return data
+        
+    def _diffusion_vacf(self, data: dict, res_id: int, com: list[float], vel_com: list[float], vel_list: dict, frame_id: int):
+        # Initialize
+        len_correration = self._diff_vacf_inp["len_correration"]
+        bins = self._diff_vacf_inp["bins"]
+        direction = self._diff_vacf_inp["direction"]
+        corr_steps = self._diff_vacf_inp["corr_steps"]
+        new_time_origin_steps = self._diff_vacf_inp["new_time_origin_steps"]
+        sample_step = self._diff_vacf_inp["sample_step"]
+        len_frame = self._diff_vacf_inp["len_frame"]
+        bin_num = self._diff_vacf_inp["bin_num"]
+
+        # Calculate bin index
+        bin = np.digitize(com[direction], bins)
+
+        # Add com and bin index to global lists
+        vel_list[bin][res_id][-1] = vel_com
+        velos = vel_list[bin][res_id]
+
+        if len(velos) <= velos.maxlen:
+            return
+        # Sample if frame of first velocity in velos is a new time origin
+        if (frame_id-len(velos))%new_time_origin_steps==0:
+            for dim in range(3):
+                for i in range(corr_steps):
+                    data[bin][res_id][i, dim] += velos[0][dim]*velos[i][dim]
+
+
     ############
     # Sampling #
     ############
@@ -1099,6 +1215,12 @@ class Sample:
                 for i in range(len(frame_end)):
                     if frame_end[i] >= self._num_frame:
                         frame_end[i] = frame_end[-1]-max(self._diff_mc_inp["len_step"])
+
+            # Extend window for full autocorrelation function
+            if self._is_diffusion_vacf:
+                # TODO maybe change start for timeresversal mapping?
+                # TODO definetly wrong
+                frame_end = [min(self._num_frame, end+2*self._diff_vacf_inp["len_correration"]) for end in frame_start]
 
             # Create working lists for processors
             frame_np = [list(range(frame_start[i], frame_end[i])) for i in range(np)]
@@ -1207,6 +1329,21 @@ class Sample:
             # Save dictionary to h5-file
             utils.save(results, self._diff_mc_inp["output"])
 
+        if self._is_diffusion_vacf:
+            inp_diff = inp.copy()
+            inp_diff.update(self._diff_vacf_inp)
+            inp_diff.pop("output")
+            data_diff = output[0]["diffusion_vacf"]
+            for bin in range(self._diff_vacf_inp["bin_num"]):
+                data_diff[bin] = data_diff[bin]
+                for out in output[1:]:
+                    data_diff[bin] += out["diffusion_vacf"][bin]
+
+            # Save results in dictionary
+            results = {system["sys"]: system["props"], "inp": inp_diff, "data": data_diff, "type": "diff_vacf"}
+
+            # Save dictionary
+            utils.save(results, self._diff_vacf_inp["output"])
 
     def _sample_helper(self, frame_list, shift, is_pbc, is_broken):
         """Helper function for sampling run.
@@ -1231,6 +1368,16 @@ class Sample:
         box = self._pore_props["box"]["dimensions"] if self._pore else self._box
         res = self._pore_props["box"]["res"] if self._pore else 0
 
+        # Calculate length index and com lists
+        if self._is_diffusion_bin:
+            len_fill = self._diff_bin_inp["len_window"]*self._diff_bin_inp["len_step"]
+        elif self._is_diffusion_mc:
+            len_fill = self._diff_mc_inp["len_step"][-1]+1
+        elif self._is_diffusion_vacf:
+            len_fill = self._diff_vacf_inp["corr_steps"]
+        else:
+            len_fill = 1
+
         if self._is_diffusion_bin:
             com_list = {}
             idx_list = {}
@@ -1241,6 +1388,12 @@ class Sample:
         elif self._is_diffusion_mc:
             com_list = []
             idx_list = []
+        elif self._is_diffusion_vacf:
+            vel_list = {}
+            for bin in range(self._diff_vacf_inp["bin_num"]):
+                vel_list[bin] = {}
+                for res_id in self._res_list:
+                    vel_list[bin][res_id] = deque(maxlen=len_fill)
 
         # Create local data structures
         output = {}
@@ -1252,16 +1405,10 @@ class Sample:
             output["angle"] = self._angle_data()
         if self._is_diffusion_bin:
             output["diffusion_bin"] = self._diffusion_bin_data()
-        if self._is_diffusion_mc:
-            output["diffusion_mc"] = self._diffusion_mc_data()
-
-        # Calculate length index and com lists
-        if self._is_diffusion_bin:
-            len_fill = self._diff_bin_inp["len_window"]*self._diff_bin_inp["len_step"]
         elif self._is_diffusion_mc:
-            len_fill = self._diff_mc_inp["len_step"][-1]+1
-        else:
-            len_fill = 1
+            output["diffusion_mc"] = self._diffusion_mc_data()
+        elif self._is_diffusion_vacf:
+            output["diffusion_vacf"] = self._diffusion_vacf_data()
 
         # Load trajectory
         traj = cf.Trajectory(self._traj)
@@ -1272,6 +1419,10 @@ class Sample:
             # Read frame
             frame = traj.read_step(frame_id)
             positions = frame.positions
+            if self._is_diffusion_vacf:
+                velocities = frame.velocities
+            else:
+                velocities = None # TODO need this line?
 
             # Add new dictionaries and remove unneeded references
             if self._is_diffusion_bin:
@@ -1288,14 +1439,26 @@ class Sample:
                     com_list.pop(0)
                 idx_list.append({})
                 com_list.append({})
+            elif self._is_diffusion_vacf:
+                for bin in range(self._diff_vacf_inp["bin_num"]):
+                    for res_id in self._res_list:
+                        # no need to pop, deque is used
+                        vel_list[bin][res_id].append([0,0,0])
 
             # Run through residues
             for res_id in self._res_list:
-                # Get position vectors
+                # Get position and velocity vectors
                 pos = [[positions[self._res_list[res_id][atom_id]][i]/10+shift[i] for i in range(3)] for atom_id in range(len(self._atoms))]
+                if self._is_diffusion_vacf:
+                    vel = [[velocities[self._res_list[res_id][atom_id]][i]/10 for i in range(3)] for atom_id in range(len(self._atoms))]
+                # TODO                                                    #### need /10?  
 
                 # Calculate centre of mass
                 com_no_pbc = [sum([pos[atom_id][i]*self._masses[atom_id] for atom_id in range(len(self._atoms))])/self._sum_masses for i in range(3)]
+
+                # Calculate velocity of centre of mass
+                if self._is_diffusion_vacf:
+                    vel_com = [sum([vel[atom_id][i]*self._masses[atom_id] for atom_id in range(len(self._atoms))])/self._sum_masses for i in range(3)]
 
                 # Check if molecule is broken
                 if is_broken:
@@ -1356,6 +1519,8 @@ class Sample:
                         self._gyration(output["gyration"], region, dist, com_no_pbc, pos, pore_in)
                     if self._is_angle and (pore_in != 1):
                         self._angle(output["angle"], region, dist, com, pos, pore_in)
+                    if self._is_diffusion_vacf:
+                        self._diffusion_vacf(output["diffusion_vacf"], res_id, com, vel_com, vel_list, frame_id)
                 if self._is_diffusion_bin and (pore_in != 1):
                     self._diffusion_bin(output["diffusion_bin"], region,pore_in, dist, com_list, idx_list, res_id, com)
                 if self._is_diffusion_mc:
