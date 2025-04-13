@@ -86,10 +86,12 @@ class Sample:
         # Get number of frames
         traj = cf.Trajectory(self._traj)
         self._num_frame = traj.nsteps
+        print("Number of frames: ", self._num_frame)
 
         # Get numer of residues
         frame = traj.read()
         num_res = len(frame.topology.atoms)/mol.get_num()
+        print("Number of residues: ", num_res)
 
         # Check number of residues
         if abs(int(num_res)-num_res) >= 1e-5:
@@ -1062,7 +1064,7 @@ class Sample:
         Parameters
         ----------
         link_out : string
-            Link to obj or yml data file            # TODO hdf5???
+            Link to obj or yml data file
         len_frame : float, optional
             Length of a frame in seconds
         bin_num : integer, optional
@@ -1104,6 +1106,9 @@ class Sample:
         # Calculate bins
         bins = self._bin_mc(bin_num, direction)["bins"]
 
+        print("Corr_steps", corr_steps)
+        print("new_time_origin_steps", new_time_origin_steps)
+
         # Create input dictionary
         self._diff_vacf_inp = {"output": link_out,"bins": bins, "len_correration": len_correration,  
                                "new_time_origin": new_time_origin, "sample_step": sample_step, 
@@ -1140,45 +1145,44 @@ class Sample:
 
         return data
 
-    def _diffusion_vacf(self, data: dict, res_id: int, com: list[float], vel_com: list[float], vel_list: dict, frame_id: int):
+    def _diffusion_vacf(self, data: dict, res_id: int, com: list[float], vel_com: list[float], com_list: dict, vel_list: dict, frame_id: int):
         # Initialize
         bins = self._diff_vacf_inp["bins"]
         direction = self._diff_vacf_inp["direction"]
         corr_steps = self._diff_vacf_inp["corr_steps"]
         new_time_origin_steps = self._diff_vacf_inp["new_time_origin_steps"]
 
-        # Calculate bin index
-        bin = np.digitize(com[direction], bins) - 1
-        data[bin]["density"] += 1
-
-        # Add vel
-        vel_list[bin][res_id][-1] = vel_com
-        # TODO why np so slow?
-        # velos = np.array(vel_list[bin][res_id])
-        velos = vel_list[bin][res_id]
-
-        # vel_list.shape = (#res, corr, 3)
-        # filtered_velos.shape = (#bin, #res, corr/new_time_origin, 3)
+        # Update postion and velocity list
+        com_list[res_id][-1] = com
         vel_list[res_id][-1] = vel_com
-        velos = vel_list[res_id]
-        bin_vel_list[bin][res_id][-1] = vel_com
 
-        # if velos.shape[0] < vel_list[bin][res_id].maxlen:
+        velos = vel_list[res_id]
+
+        # Check if velocity list is filled
         if len(velos) < velos.maxlen:
             return
         # Sample if frame of first velocity in velos is a new time origin
         if (frame_id-corr_steps)%new_time_origin_steps==0:
-            for bin in range(len(bins)):
-                for dim in range(3):
-                    data[bin][res_id][:, dim] += bin_vel_list[bin][res_id][0][dim] * np.array(velos)[:, dim]
-            # Increase number of start origins
-            data["start_origins"] += 1
-            # data[bin][res_id] += velos[0] * velos
+            com_0 = com_list[res_id][0]
+            vel_0 = velos[0]
+            
+            # Calculate bin index
+            bin = np.digitize(com_0[direction], bins) - 1
+            data[bin]["density"] += 1
+
+            # For the only bin where s(q_i)=1, increase vacf for average
             for dim in range(3):
+                data[bin][res_id][:, dim] += vel_0[dim] * np.array(velos)[:, dim]
+
+
+        # TODO why np so slow?
+        # velos = np.array(vel_list[bin][res_id])
+
+        # if velos.shape[0] < vel_list[bin][res_id].maxlen:
+        
+            # data[bin][res_id] += velos[0] * velos
                 # for i in range(corr_steps):
                 #     data[bin][res_id][i, dim] += velos[0][dim] * velos[i][dim]
-                data[bin][res_id][:, dim] += velos[0][dim] * np.array(velos)[:, dim]
-
 
     ############
     # Sampling #
@@ -1416,16 +1420,11 @@ class Sample:
             com_list = []
             idx_list = []
         elif self._is_diffusion_vacf:
+            com_list = {}
             vel_list = {}
-            # for res_id in self._res_list:
-            #     vel_list[res_id] = deque(maxlen=len_fill)
-            # new_time_origin_list = {}
-            # for res_id in self._res_list:
-            #     new_time_origin_list[bin][res_id] = deque(maxlen=len_fill)
-            for bin in range(self._diff_vacf_inp["bin_num"]):
-                vel_list[bin] = {}
-                for res_id in self._res_list:
-                    vel_list[bin][res_id] = deque(maxlen=len_fill)
+            for res_id in self._res_list:
+                com_list[res_id] = deque(maxlen=len_fill)
+                vel_list[res_id] = deque(maxlen=len_fill)
 
         # Create local data structures
         output = {}
@@ -1470,10 +1469,10 @@ class Sample:
                 idx_list.append({})
                 com_list.append({})
             elif self._is_diffusion_vacf:
-                for bin in range(self._diff_vacf_inp["bin_num"]):
-                    for res_id in self._res_list:
-                        # no need to pop, deque is used
-                        vel_list[bin][res_id].append([0,0,0])
+                for res_id in self._res_list:
+                    # no need to pop, deque is used
+                    com_list[res_id].append([0,0,0])
+                    vel_list[res_id].append([0,0,0])
 
             # Run through residues
             for res_id in self._res_list:
@@ -1550,7 +1549,7 @@ class Sample:
                     if self._is_angle and (pore_in != 1):
                         self._angle(output["angle"], region, dist, com, pos, pore_in)
                     if self._is_diffusion_vacf:
-                        self._diffusion_vacf(output["diffusion_vacf"], res_id, com, vel_com, vel_list, frame_id)
+                        self._diffusion_vacf(output["diffusion_vacf"], res_id, com, vel_com, com_list, vel_list, frame_id)
                 if self._is_diffusion_bin and (pore_in != 1):
                     self._diffusion_bin(output["diffusion_bin"], region,pore_in, dist, com_list, idx_list, res_id, com)
                 if self._is_diffusion_mc:
