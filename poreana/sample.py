@@ -1089,12 +1089,12 @@ class Sample:
         if self._traj.split(".")[-1]!="trr":
             print("VACF needs a trajectory file with velocities. Please use a .trr file.")
             return
-        corr_steps = len_correration/len_frame
-        if math.isclose(corr_steps, int(corr_steps), rel_tol=1e-3):
+        corr_steps = len_correration/len_frame/sample_step
+        if not math.isclose(corr_steps, int(corr_steps), rel_tol=1e-3):
             print("The correlation time must be a multiple of the time between sampled frames.")
             return
-        new_time_origin_steps = new_time_origin/len_frame
-        if math.isclose(new_time_origin_steps, int(new_time_origin_steps), rel_tol=1e-3):
+        new_time_origin_steps = new_time_origin/len_frame/sample_step
+        if not math.isclose(new_time_origin_steps, int(new_time_origin_steps), rel_tol=1e-3):
             print("The new time origin must be a multiple of the time between sampled frames.")
             return
         
@@ -1120,7 +1120,7 @@ class Sample:
         """
         # Initialize
         bin_num = self._diff_vacf_inp["bin_num"]
-        len_correration = self._diff_vacf_inp["len_correration"]
+        corr_steps = self._diff_vacf_inp["corr_steps"]
 
         # Create dictionary
         data = {}
@@ -1129,35 +1129,55 @@ class Sample:
         for bin in range(bin_num):
             data[bin] = {}
             for res_id in self._res_list:
-                data[bin][res_id] = np.zeros((len_correration, 3), float)
-        self._res_list
+                data[bin][res_id] = np.zeros((corr_steps, 3), float)
+
+        # Initialize density data
+        for bin in range(bin_num):
+            data[bin]["density"] = 0
+
+        # Initialize counting for start origins
+        data["start_origins"] = 0
+
         return data
-        
+
     def _diffusion_vacf(self, data: dict, res_id: int, com: list[float], vel_com: list[float], vel_list: dict, frame_id: int):
         # Initialize
-        len_correration = self._diff_vacf_inp["len_correration"]
         bins = self._diff_vacf_inp["bins"]
         direction = self._diff_vacf_inp["direction"]
         corr_steps = self._diff_vacf_inp["corr_steps"]
         new_time_origin_steps = self._diff_vacf_inp["new_time_origin_steps"]
-        sample_step = self._diff_vacf_inp["sample_step"]
-        len_frame = self._diff_vacf_inp["len_frame"]
-        bin_num = self._diff_vacf_inp["bin_num"]
 
         # Calculate bin index
-        bin = np.digitize(com[direction], bins)
+        bin = np.digitize(com[direction], bins) - 1
+        data[bin]["density"] += 1
 
-        # Add com and bin index to global lists
+        # Add vel
         vel_list[bin][res_id][-1] = vel_com
+        # TODO why np so slow?
+        # velos = np.array(vel_list[bin][res_id])
         velos = vel_list[bin][res_id]
 
-        if len(velos) <= velos.maxlen:
+        # vel_list.shape = (#res, corr, 3)
+        # filtered_velos.shape = (#bin, #res, corr/new_time_origin, 3)
+        vel_list[res_id][-1] = vel_com
+        velos = vel_list[res_id]
+        bin_vel_list[bin][res_id][-1] = vel_com
+
+        # if velos.shape[0] < vel_list[bin][res_id].maxlen:
+        if len(velos) < velos.maxlen:
             return
         # Sample if frame of first velocity in velos is a new time origin
-        if (frame_id-len(velos))%new_time_origin_steps==0:
+        if (frame_id-corr_steps)%new_time_origin_steps==0:
+            for bin in range(len(bins)):
+                for dim in range(3):
+                    data[bin][res_id][:, dim] += bin_vel_list[bin][res_id][0][dim] * np.array(velos)[:, dim]
+            # Increase number of start origins
+            data["start_origins"] += 1
+            # data[bin][res_id] += velos[0] * velos
             for dim in range(3):
-                for i in range(corr_steps):
-                    data[bin][res_id][i, dim] += velos[0][dim]*velos[i][dim]
+                # for i in range(corr_steps):
+                #     data[bin][res_id][i, dim] += velos[0][dim] * velos[i][dim]
+                data[bin][res_id][:, dim] += velos[0][dim] * np.array(velos)[:, dim]
 
 
     ############
@@ -1216,11 +1236,13 @@ class Sample:
                     if frame_end[i] >= self._num_frame:
                         frame_end[i] = frame_end[-1]-max(self._diff_mc_inp["len_step"])
 
-            # Extend window for full autocorrelation function
+            # Shift window to last new time origin and extend it by correlation time
             if self._is_diffusion_vacf:
                 # TODO maybe change start for timeresversal mapping?
-                # TODO definetly wrong
-                frame_end = [min(self._num_frame, end+2*self._diff_vacf_inp["len_correration"]) for end in frame_start]
+                shift_start = [start%self._diff_vacf_inp["new_time_origin_steps"] for start in frame_start]
+                shift_end = [end%self._diff_vacf_inp["new_time_origin_steps"] for end in frame_end]
+                frame_start = [max(0, start-shift_start[i]) for i, start in enumerate(frame_start)]
+                frame_end = [min(self._num_frame, end-shift_end[i]+self._diff_vacf_inp["corr_steps"]) for i, end in enumerate(frame_end)]
 
             # Create working lists for processors
             frame_np = [list(range(frame_start[i], frame_end[i])) for i in range(np)]
@@ -1240,7 +1262,7 @@ class Sample:
 
         # Concatenate output and create pickle object files
         system = {"sys": "pore", "props": self._pore_props} if self._pore else {"sys": "box", "props": {"length" :self._box}}
-        inp = {"num_frame": self._num_frame, "mass": self._mol.get_mass(), "entry": self._entry}
+        inp = {"num_frame": self._num_frame, "mass": self._sum_masses, "entry": self._entry}
 
         if self._is_density:
             inp_dens = inp.copy()
@@ -1337,7 +1359,12 @@ class Sample:
             for bin in range(self._diff_vacf_inp["bin_num"]):
                 data_diff[bin] = data_diff[bin]
                 for out in output[1:]:
-                    data_diff[bin] += out["diffusion_vacf"][bin]
+                    data_diff[bin]["density"] += out["diffusion_vacf"][bin]["density"]
+                    for res_id in self._res_list:
+                        data_diff[bin][res_id] += out["diffusion_vacf"][bin][res_id]
+
+            for out in output[1:]:
+                data_diff["start_origins"] += out["diffusion_vacf"]["start_origins"]
 
             # Save results in dictionary
             results = {system["sys"]: system["props"], "inp": inp_diff, "data": data_diff, "type": "diff_vacf"}
@@ -1390,6 +1417,11 @@ class Sample:
             idx_list = []
         elif self._is_diffusion_vacf:
             vel_list = {}
+            # for res_id in self._res_list:
+            #     vel_list[res_id] = deque(maxlen=len_fill)
+            # new_time_origin_list = {}
+            # for res_id in self._res_list:
+            #     new_time_origin_list[bin][res_id] = deque(maxlen=len_fill)
             for bin in range(self._diff_vacf_inp["bin_num"]):
                 vel_list[bin] = {}
                 for res_id in self._res_list:
@@ -1421,8 +1453,6 @@ class Sample:
             positions = frame.positions
             if self._is_diffusion_vacf:
                 velocities = frame.velocities
-            else:
-                velocities = None # TODO need this line?
 
             # Add new dictionaries and remove unneeded references
             if self._is_diffusion_bin:
