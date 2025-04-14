@@ -1058,7 +1058,7 @@ class Sample:
     ##################
     # VACF Diffusion #
     ##################
-    def init_diffusion_vacf(self, link_out: str, len_correration=1e-8, new_time_origin=1e-9, sample_step=1000, len_frame=2e-12, bin_num=20, direction=2):
+    def init_diffusion_vacf(self, link_out: str, len_correration=1e-11, new_time_origin=1e-12, sample_step=20, len_frame=1e-15, bin_num=20, direction=2):
         """Enable diffusion sampling routine with the VACF Alogrithm.
         
         Parameters
@@ -1077,7 +1077,6 @@ class Sample:
         # TODO overthink the input variables
         # TODO implement different bin options
         # TODO timereversal mapping
-        # TODO do avg_atoms_per_bin or density
         # Initialize
         if self._is_diffusion_bin:
             print("Binning and VACF-approaches cannot be run in parallel.")
@@ -1092,11 +1091,11 @@ class Sample:
             print("VACF needs a trajectory file with velocities. Please use a .trr file.")
             return
         corr_steps = len_correration/len_frame/sample_step
-        if not math.isclose(corr_steps, int(corr_steps), rel_tol=1e-3):
+        if not math.isclose(corr_steps, round(corr_steps), rel_tol=1e-3):
             print("The correlation time must be a multiple of the time between sampled frames.")
             return
         new_time_origin_steps = new_time_origin/len_frame/sample_step
-        if not math.isclose(new_time_origin_steps, int(new_time_origin_steps), rel_tol=1e-3):
+        if not math.isclose(new_time_origin_steps, round(new_time_origin_steps), rel_tol=1e-3):
             print("The new time origin must be a multiple of the time between sampled frames.")
             return
         
@@ -1113,7 +1112,8 @@ class Sample:
         self._diff_vacf_inp = {"output": link_out,"bins": bins, "len_correration": len_correration,  
                                "new_time_origin": new_time_origin, "sample_step": sample_step, 
                                "len_frame": len_frame, "bin_num": bin_num, "direction": direction, 
-                               "corr_steps": int(corr_steps), "new_time_origin_steps": int(new_time_origin_steps)}
+                               "corr_steps": round(corr_steps), "new_time_origin_steps": round(new_time_origin_steps),
+                               "num_res": len(self._res_list)}
 
     def _diffusion_vacf_data(self) -> dict:
         """Create VACF diffusion data structure.
@@ -1139,9 +1139,6 @@ class Sample:
         # Initialize density data
         for bin in range(bin_num):
             data[bin]["density"] = 0
-
-        # Initialize counting for start origins
-        data["start_origins"] = 0
 
         return data
 
@@ -1366,9 +1363,6 @@ class Sample:
                     data_diff[bin]["density"] += out["diffusion_vacf"][bin]["density"]
                     for res_id in self._res_list:
                         data_diff[bin][res_id] += out["diffusion_vacf"][bin][res_id]
-
-            for out in output[1:]:
-                data_diff["start_origins"] += out["diffusion_vacf"]["start_origins"]
 
             # Save results in dictionary
             results = {system["sys"]: system["props"], "inp": inp_diff, "data": data_diff, "type": "diff_vacf"}
