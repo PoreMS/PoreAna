@@ -1073,8 +1073,6 @@ class Sample:
             Direction of descretization of the simulation box (**0** (x-axis);
             **1** (y-axis); **2** (z-axis))
         """
-        # TODO write documentation
-        # TODO overthink the input variables
         # TODO implement different bin options
         # TODO timereversal mapping
         # Initialize
@@ -1105,8 +1103,8 @@ class Sample:
         # Calculate bins
         bins = self._bin_mc(bin_num, direction)["bins"]
 
-        print("Corr_steps", corr_steps)
-        print("new_time_origin_steps", new_time_origin_steps)
+        print("Corr_steps", round(corr_steps))
+        print("new_time_origin_steps", round(new_time_origin_steps))
 
         # Create input dictionary
         self._diff_vacf_inp = {"output": link_out,"bins": bins, "len_correration": len_correration,  
@@ -1435,6 +1433,8 @@ class Sample:
         elif self._is_diffusion_vacf:
             output["diffusion_vacf"] = self._diffusion_vacf_data()
 
+        # velos = np.zeros((frame_list[-1]+1, len(self._res_list), 3), float)
+
         # Load trajectory
         traj = cf.Trajectory(self._traj)
         frame_form = "%"+str(len(str(self._num_frame)))+"i"
@@ -1471,17 +1471,22 @@ class Sample:
             # Run through residues
             for res_id in self._res_list:
                 # Get position and velocity vectors
-                pos = [[positions[self._res_list[res_id][atom_id]][i]/10+shift[i] for i in range(3)] for atom_id in range(len(self._atoms))]
+                pos = [[positions[self._res_list[res_id][atom_id]][i]/10+shift[i] 
+                        for i in range(3)] for atom_id in range(len(self._atoms))]
                 if self._is_diffusion_vacf:
-                    vel = [[velocities[self._res_list[res_id][atom_id]][i]/10 for i in range(3)] for atom_id in range(len(self._atoms))]
-                # TODO                                                    #### need /10?  
+                    vel = [[velocities[self._res_list[res_id][atom_id]][i]*100 
+                            for i in range(3)] for atom_id in range(len(self._atoms))]
+                # TODO WTF why A and not nm???                         A/ps -> m/s
 
                 # Calculate centre of mass
-                com_no_pbc = [sum([pos[atom_id][i]*self._masses[atom_id] for atom_id in range(len(self._atoms))])/self._sum_masses for i in range(3)]
+                com_no_pbc = [sum([pos[atom_id][i]*self._masses[atom_id] for atom_id 
+                                   in range(len(self._atoms))])/self._sum_masses for i in range(3)]
 
                 # Calculate velocity of centre of mass
                 if self._is_diffusion_vacf:
-                    vel_com = [sum([vel[atom_id][i]*self._masses[atom_id] for atom_id in range(len(self._atoms))])/self._sum_masses for i in range(3)]
+                    vel_com = [sum([vel[atom_id][i]*self._masses[atom_id] for atom_id 
+                                    in range(len(self._atoms))])/self._sum_masses for i in range(3)]
+                    # velos[frame_id][res_id] = vel_com
 
                 # Check if molecule is broken
                 if is_broken:
@@ -1553,5 +1558,7 @@ class Sample:
             if (frame_id+1)%10==0 or frame_id==0 or frame_id==self._num_frame-1:
                 sys.stdout.write("Finished frame "+frame_form%(frame_id+1)+"/"+frame_form%self._num_frame+"...\r")
                 sys.stdout.flush()
+
+        # np.save(self._traj.split(".")[0]+"_velos.npy", velos)
         print()
         return output
