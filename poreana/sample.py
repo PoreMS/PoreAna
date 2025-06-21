@@ -86,12 +86,10 @@ class Sample:
         # Get number of frames
         traj = cf.Trajectory(self._traj)
         self._num_frame = traj.nsteps
-        print("Number of frames: ", self._num_frame)
 
         # Get numer of residues
         frame = traj.read()
         num_res = len(frame.topology.atoms)/mol.get_num()
-        print("Number of residues: ", num_res)
 
         # Check number of residues
         if abs(int(num_res)-num_res) >= 1e-5:
@@ -176,7 +174,6 @@ class Sample:
 
         bins = [0 for x in range(bin_num+1)]
         return {"width": width, "bins": bins}
-
 
     def _bin_in_const_A(self, bin_num):
         """This function creates a bin structure for the interior of the
@@ -1058,22 +1055,41 @@ class Sample:
     ##################
     # VACF Diffusion #
     ##################
-    def init_diffusion_vacf(self, link_out: str, len_correration=1e-11, new_time_origin=1e-12, sample_step=20, len_frame=1e-15, bin_num=20, direction=2):
+    def init_diffusion_vacf(self, link_out: str, len_correration=5e-10, new_time_origin=2e-13, sample_step=20, len_frame=1e-15, bin_num=20, direction=2):
         """Enable diffusion sampling routine with the VACF Alogrithm.
+        
+        This function samples the local velocity autocorrelation function for
+        the diffusion calculation. The local diffusion coefficient in a direction
+        :math:`\\alpha` is calculated by
+        .. math::
+            D_{\\alpha,l} = \\frac{1}{N}\\sum_{i=1}^{N}\\int_0^{\\infty} \\langle v_{\\alpha,i,l}(0)v_{\\alpha,i}(t)\\rangle dt
+
+        with :math:`N` as the number of molecules, :math:`v_{\\alpha,i}` as the
+        velocity of molecule :math:`i` in direction :math:`\\alpha` and
+        :math:`v_{\\alpha,i,l}` as :math:`\\frac{N}{N_l}\\langle v_{\\alpha,i}(0)v_{\\alpha,i}(t)S_{q,i}(0)\\rangle
+        with :math:`N_l` as the average number of molecules in the bin.
+
+        The VACF is sampled for a correlation time and choosing a new time origin
+        after a certain time. 
         
         Parameters
         ----------
         link_out : string
-            Link to obj or yml data file
+            Link to obj data file
+        len_correration : float, optional
+            Length of the correlation time in seconds
+        new_time_origin : float, optional
+            Length between new time origins in seconds
+        sample_step : integer, optional
+            Step size of the sampling in your simulation in frames
         len_frame : float, optional
-            Length of a frame in seconds
+            Length of a frame in your simulation in seconds
         bin_num : integer, optional
             Number of bins to be used
         direction : integer, optional
             Direction of descretization of the simulation box (**0** (x-axis);
             **1** (y-axis); **2** (z-axis))
         """
-        # TODO implement different bin options
         # TODO timereversal mapping
         # Initialize
         if self._is_diffusion_bin:
@@ -1088,13 +1104,10 @@ class Sample:
         if self._traj.split(".")[-1]!="trr":
             print("VACF needs a trajectory file with velocities. Please use a .trr file.")
             return
-        corr_steps = len_correration/len_frame/sample_step
-        if not math.isclose(corr_steps, round(corr_steps), rel_tol=1e-3):
-            print("The correlation time must be a multiple of the time between sampled frames.")
-            return
-        new_time_origin_steps = new_time_origin/len_frame/sample_step
-        if not math.isclose(new_time_origin_steps, round(new_time_origin_steps), rel_tol=1e-3):
-            print("The new time origin must be a multiple of the time between sampled frames.")
+        corr_steps = int(round(len_correration/len_frame/sample_step))
+        new_time_origin_steps = int(round(new_time_origin/len_frame/sample_step))
+        if corr_steps < 1 or new_time_origin_steps < 1:
+            print("VACF needs a correlation time longer than one frame. Please increase len_correration and/or new_time_origin.")
             return
         
         # Enable routine
@@ -1103,14 +1116,11 @@ class Sample:
         # Calculate bins
         bins = self._bin_mc(bin_num, direction)["bins"]
 
-        print("Corr_steps", round(corr_steps))
-        print("new_time_origin_steps", round(new_time_origin_steps))
-
         # Create input dictionary
         self._diff_vacf_inp = {"output": link_out,"bins": bins, "len_correration": len_correration,  
                                "new_time_origin": new_time_origin, "sample_step": sample_step, 
                                "len_frame": len_frame, "bin_num": bin_num, "direction": direction, 
-                               "corr_steps": round(corr_steps), "new_time_origin_steps": round(new_time_origin_steps),
+                               "corr_steps": corr_steps, "new_time_origin_steps": new_time_origin_steps,
                                "num_res": len(self._res_list)}
 
     def _diffusion_vacf_data(self) -> dict:
@@ -1140,7 +1150,34 @@ class Sample:
 
         return data
 
-    def _diffusion_vacf(self, data: dict, res_id: int, com: list[float], vel_com: list[float], com_list: dict, vel_list: dict, frame_id: int):
+    def _diffusion_vacf(self, data: dict, res_id: int, com: list[float], vel_com: list[float], com_list: list[deque[list[float]]], vel_list: list[deque[list[float]]], frame_id: int):
+        """
+        This function samples the local velocity autocorrelation function and 
+        the density of molecules in spatial bins for the diffusion calculation.
+
+        This function updates the position and velocity history for a given 
+        molecule and, when the velocity history is fully populated and the 
+        first frame is a new time origin, samples the VACF. The VACF is binned 
+        according to the molecule's center of mass along a specified direction, 
+        and the results are accumulated in the provided data dictionary. 
+
+        Parameters
+        ----------
+        data : dictionary
+            Data dictionary containing bins for VACF diffusion. Each bin stores density and VACF accumulators.
+        res_id : integer
+            Index of the current residue (molecule) being processed.
+        com : list[float]
+            Center of mass of current molecule
+        vel_com : list[float]
+            Velocity of the center of mass of current molecule
+        com_list : list[deque[list[float]]]
+            List of deques, each storing the center of mass history for all molecules for the correlation time.
+        vel_list : list[deque[list[float]]]
+            List of deques, each storing the velocity history for all molecules for the correlation time.
+        frame_id : integer
+            Index of the current frame.
+        """
         # Initialize
         bins = self._diff_vacf_inp["bins"]
         direction = self._diff_vacf_inp["direction"]
@@ -1412,11 +1449,8 @@ class Sample:
             com_list = []
             idx_list = []
         elif self._is_diffusion_vacf:
-            com_list = {}
-            vel_list = {}
-            for res_id in self._res_list:
-                com_list[res_id] = deque(maxlen=len_fill)
-                vel_list[res_id] = deque(maxlen=len_fill)
+            com_list = [deque(maxlen=len_fill) for _ in range(len(self._res_list))]
+            vel_list = [deque(maxlen=len_fill) for _ in range(len(self._res_list))]
 
         # Create local data structures
         output = {}
@@ -1432,8 +1466,6 @@ class Sample:
             output["diffusion_mc"] = self._diffusion_mc_data()
         elif self._is_diffusion_vacf:
             output["diffusion_vacf"] = self._diffusion_vacf_data()
-
-        # velos = np.zeros((frame_list[-1]+1, len(self._res_list), 3), float)
 
         # Load trajectory
         traj = cf.Trajectory(self._traj)
@@ -1486,7 +1518,6 @@ class Sample:
                 if self._is_diffusion_vacf:
                     vel_com = [sum([vel[atom_id][i]*self._masses[atom_id] for atom_id 
                                     in range(len(self._atoms))])/self._sum_masses for i in range(3)]
-                    # velos[frame_id][res_id] = vel_com
 
                 # Check if molecule is broken
                 if is_broken:
@@ -1559,6 +1590,5 @@ class Sample:
                 sys.stdout.write("Finished frame "+frame_form%(frame_id+1)+"/"+frame_form%self._num_frame+"...\r")
                 sys.stdout.flush()
 
-        # np.save(self._traj.split(".")[0]+"_velos.npy", velos)
         print()
         return output

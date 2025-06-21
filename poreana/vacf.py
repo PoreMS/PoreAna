@@ -1,13 +1,13 @@
 import math
 import numpy as np
-from scipy.integrate import cumulative_simpson
+from scipy.integrate import cumulative_trapezoid
 
 import poreana.utils as utils
 
 def vacf(link_data):
     """
     Calculate the velocity autocorrelation function (VACF) from the given data.
-    The VACF is calculated using the cumulative Simpson rule for integration.
+    The VACF is calculated using the cumulative trapezoid rule for integration.
 
     Parameters
     ----------
@@ -45,22 +45,20 @@ def vacf(link_data):
 
     vacf_data = np.zeros((bin_num, num_res, corr_steps, 3))
     for bin in range(bin_num):
-        # vacf_data[bin] = np.array([data[bin][res_id] for res_id in data[bin] if isinstance(res_id, int)])
-        # vacf_data[bin] *= num_res / data[bin]["density"]
-        vacf_data[bin] = np.array([data[bin][res_id] for res_id in data[bin] if isinstance(res_id, int)]) / num_new_time_origins
-        vacf_data[bin] *= num_res / avg_res_per_bin[bin]
+        vacf_data[bin] = np.array([data[bin][res_id] for res_id in data[bin] if isinstance(res_id, int)])
+        vacf_data[bin] *= num_res / data[bin]["density"]
     
     integrated = np.zeros(vacf_data.shape)
 
     for bin in range(bin_num):
         for res_id in range(num_res):
             for dim in range(3):
-                integrated[bin, res_id, :, dim] = cumulative_simpson(
+                integrated[bin, res_id, :, dim] = cumulative_trapezoid(
                     vacf_data[bin, res_id, :, dim], dx=len_frame * sample_step, initial=0)
 
     return integrated
 """
-        vacf * num_res                                          vacf * num_res
-erg = -------------------------------------------------- = ----------------------------------------------
-        num_new_time_origins * avg_res_per_bin                  res_per_bin
+       N   \langle v_i,l(0) v_i(t) \rangle      num_res * sum_vacf                         vacf * num_res  
+erg = -------------------------------------- = ---------------------------------------- = -----------------
+       N_l                                      avg_res_per_bin * num_new_time_origins     sum_res_per_bin 
 """
