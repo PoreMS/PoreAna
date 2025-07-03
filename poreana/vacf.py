@@ -37,10 +37,10 @@ def vacf(link_data):
     num_res = inp["num_res"]
 
     num_new_time_origins = sum([data[bin]["density"] for bin in range(bin_num)]) / num_res
-    print("Averaged over ", num_new_time_origins, " new time origins.")
+    # print("Averaged over ", num_new_time_origins, " new time origins.")
 
     avg_res_per_bin = [data[bin]["density"] / num_new_time_origins for bin in range(bin_num)]
-    print("Average number of residues per bin:", avg_res_per_bin)
+    # print("Average number of residues per bin:", avg_res_per_bin)
     avg_res_per_bin = np.where(avg_res_per_bin == 0, np.nan, avg_res_per_bin)
 
     vacf_data = np.zeros((bin_num, num_res, corr_steps, 3))

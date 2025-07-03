@@ -1186,17 +1186,16 @@ class Sample:
 
         # Update postion and velocity list
         com_list[res_id][-1] = com
-        vel_list[res_id][-1] = vel_com
+        # vel_list[res_id][-1] = vel_com
 
-        velos = vel_list[res_id]
+        velos = np.array(vel_list[res_id])
 
         # Check if velocity list is filled
-        if len(velos) < velos.maxlen:
+        if velos.shape[0] < vel_list[res_id].maxlen:
             return
         # Sample if frame of first velocity in velos is a new time origin
         if (frame_id-corr_steps)%new_time_origin_steps==0:
             com_0 = com_list[res_id][0]
-            vel_0 = velos[0]
             
             # Calculate bin index
             bin = np.digitize(com_0[direction], bins) - 1
@@ -1204,17 +1203,7 @@ class Sample:
 
             # For the only bin where s(q_i)=1, increase vacf for average
             for dim in range(3):
-                data[bin][res_id][:, dim] += vel_0[dim] * np.array(velos)[:, dim]
-
-
-        # TODO why np so slow?
-        # velos = np.array(vel_list[bin][res_id])
-
-        # if velos.shape[0] < vel_list[bin][res_id].maxlen:
-        
-            # data[bin][res_id] += velos[0] * velos
-                # for i in range(corr_steps):
-                #     data[bin][res_id][i, dim] += velos[0][dim] * velos[i][dim]
+                data[bin][res_id] += velos[0] * velos
 
     ############
     # Sampling #
@@ -1586,9 +1575,9 @@ class Sample:
                     self._diffusion_mc(output["diffusion_mc"], idx_list, com, res_id, frame_list, frame_id)
 
             # Progress
-            if (frame_id+1)%10==0 or frame_id==0 or frame_id==self._num_frame-1:
-                sys.stdout.write("Finished frame "+frame_form%(frame_id+1)+"/"+frame_form%self._num_frame+"...\r")
-                sys.stdout.flush()
+            # if (frame_id+1)%10==0 or frame_id==0 or frame_id==self._num_frame-1:
+            #     sys.stdout.write("Finished frame "+frame_form%(frame_id+1)+"/"+frame_form%self._num_frame+"...\r")
+            #     sys.stdout.flush()
 
-        print()
+        # print()
         return output
