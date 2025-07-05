@@ -1139,14 +1139,10 @@ class Sample:
         data = {}
 
         # Initialize vacf data
-        for bin in range(bin_num):
-            data[bin] = {}
-            for res_id in self._res_list:
-                data[bin][res_id] = np.zeros((corr_steps, 3), float)
+        data["vacf_data"] = np.zeros((bin_num, len(self._res_list), corr_steps, 3), float)
 
         # Initialize density data
-        for bin in range(bin_num):
-            data[bin]["density"] = 0
+        data["density"] = np.zeros(bin_num, int)
 
         return data
 
@@ -1186,24 +1182,28 @@ class Sample:
 
         # Update postion and velocity list
         com_list[res_id][-1] = com
-        # vel_list[res_id][-1] = vel_com
+        vel_list[res_id][-1] = vel_com
 
-        velos = np.array(vel_list[res_id])
+        # velos = np.array(vel_list[res_id])
+        velos = vel_list[res_id]
 
         # Check if velocity list is filled
-        if velos.shape[0] < vel_list[res_id].maxlen:
+        # if velos.shape[0] < vel_list[res_id].maxlen:
+        if len(velos) < velos.maxlen:
             return
         # Sample if frame of first velocity in velos is a new time origin
         if (frame_id-corr_steps)%new_time_origin_steps==0:
             com_0 = com_list[res_id][0]
+            vel_0 = velos[0]
             
             # Calculate bin index
             bin = np.digitize(com_0[direction], bins) - 1
-            data[bin]["density"] += 1
+            data["density"][bin] += 1
 
             # For the only bin where s(q_i)=1, increase vacf for average
+            # data["vacf_data"][bin, res_id] += velos[0] * velos
             for dim in range(3):
-                data[bin][res_id] += velos[0] * velos
+                data["vacf_data"][bin, res_id, :, dim] += vel_0[dim] * np.array(velos)[:, dim]
 
     ############
     # Sampling #
@@ -1381,12 +1381,9 @@ class Sample:
             inp_diff.update(self._diff_vacf_inp)
             inp_diff.pop("output")
             data_diff = output[0]["diffusion_vacf"]
-            for bin in range(self._diff_vacf_inp["bin_num"]):
-                data_diff[bin] = data_diff[bin]
-                for out in output[1:]:
-                    data_diff[bin]["density"] += out["diffusion_vacf"][bin]["density"]
-                    for res_id in self._res_list:
-                        data_diff[bin][res_id] += out["diffusion_vacf"][bin][res_id]
+            for out in output[1:]:
+                data_diff["density"] += out["diffusion_vacf"]["density"]
+                data_diff["vacf_data"] += out["diffusion_vacf"]["vacf_data"]
 
             # Save results in dictionary
             results = {system["sys"]: system["props"], "inp": inp_diff, "data": data_diff, "type": "diff_vacf"}
@@ -1489,95 +1486,96 @@ class Sample:
                     com_list[res_id].append([0,0,0])
                     vel_list[res_id].append([0,0,0])
 
-            # Run through residues
-            for res_id in self._res_list:
-                # Get position and velocity vectors
-                pos = [[positions[self._res_list[res_id][atom_id]][i]/10+shift[i] 
-                        for i in range(3)] for atom_id in range(len(self._atoms))]
-                if self._is_diffusion_vacf:
-                    vel = [[velocities[self._res_list[res_id][atom_id]][i]*100 
+            if self._is_angle or self._is_density or self._is_gyration or self._is_diffusion_bin or self._is_diffusion_mc or self._is_diffusion_vacf:
+                # Run through residues
+                for res_id in self._res_list:
+                    # Get position and velocity vectors
+                    pos = [[positions[self._res_list[res_id][atom_id]][i]/10+shift[i] 
                             for i in range(3)] for atom_id in range(len(self._atoms))]
-                # TODO WTF why A and not nm???                         A/ps -> m/s
+                    if self._is_diffusion_vacf:
+                        vel = [[velocities[self._res_list[res_id][atom_id]][i]*100 
+                                for i in range(3)] for atom_id in range(len(self._atoms))]
+                    # TODO WTF why A and not nm???                         A/ps -> m/s
 
-                # Calculate centre of mass
-                com_no_pbc = [sum([pos[atom_id][i]*self._masses[atom_id] for atom_id 
-                                   in range(len(self._atoms))])/self._sum_masses for i in range(3)]
-
-                # Calculate velocity of centre of mass
-                if self._is_diffusion_vacf:
-                    vel_com = [sum([vel[atom_id][i]*self._masses[atom_id] for atom_id 
+                    # Calculate centre of mass
+                    com_no_pbc = [sum([pos[atom_id][i]*self._masses[atom_id] for atom_id 
                                     in range(len(self._atoms))])/self._sum_masses for i in range(3)]
 
-                # Check if molecule is broken
-                if is_broken:
-                    for i in range(3):
-                        if abs(com_no_pbc[i]-pos[0][i])>box[i]/3:
-                            print("Sample - Broken molecule found - ResID: "+"%5i"%res_id+", AtomID: "+"%5i"%atom_id)
-
-                # Apply periodic boundary conditions
-                if is_pbc:
-                    com = [com_no_pbc[i]-math.floor(com_no_pbc[i]/box[i])*box[i] for i in range(3)]
-                else:
-                    com = com_no_pbc
-
-                # Calculate distance towards center axis
-                if self._pore:
-                    dist = {}
-                    for pore_id in self._pore.keys():
-                        if pore_id[:5]=="shape":
-                            if self._pore_props[pore_id]["type"] in ["CYLINDER","CONE"]:
-                                dist[pore_id] = geometry.length(geometry.vector([self._pore_props[pore_id]["focal"][0], self._pore_props[pore_id]["focal"][1]], [com[0],com[1]]))
-                                #print("dist",dist,com,self._pore_props[pore_id]["focal"])
-                            elif self._pore_props[pore_id]["type"]=="SLIT":
-                                dist[pore_id] = abs(self._pore_props[pore_id]["focal"][1]-com[1])
-                else:
-                    dist = 0
-
-                # Set region - in-interior, ex-exterior
-                region = ""
-                pore_in = 1
-                if self._pore and com[2] > res+self._entry and com[2] < box[2]-res-self._entry:
-                    region = "in"
-                    for pore_id in self._pore.keys():
-                        if pore_id[:5]=="shape":
-                            z_min = res  + self._pore_props[pore_id]["focal"][2]-self._pore_props[pore_id]["length"]/2+self._entry
-                            z_max = res  + self._pore_props[pore_id]["focal"][2]+self._pore_props[pore_id]["length"]/2-self._entry
-
-                            if ((z_min<com[2]<z_max) and (dist[pore_id]<(self._pore_props[pore_id]["diam"]*1.01)/2)):
-                                pore_in = pore_id
-
-                elif not self._pore or com[2] < res or com[2] > box[2]-res:
-                    region = "ex"
-                    pore_in = 0
-
-
-                # Remove window filling instances except from first processor
-                if self._is_diffusion_bin:
-                    for pore_id in self._pore.keys():
-                        if pore_id[:5]=="shape":
-                            is_sample = len(com_list[pore_id])==len_fill or frame_id<=len_fill
-                else:
-                    is_sample = True
-
-                # Sampling routines
-                if is_sample:
-                    if (self._is_density) and (pore_in != 1):
-                        self._density(output["density"], region, dist, com, pore_in)
-                    if self._is_gyration and (pore_in != 1):
-                        self._gyration(output["gyration"], region, dist, com_no_pbc, pos, pore_in)
-                    if self._is_angle and (pore_in != 1):
-                        self._angle(output["angle"], region, dist, com, pos, pore_in)
+                    # Calculate velocity of centre of mass
                     if self._is_diffusion_vacf:
-                        self._diffusion_vacf(output["diffusion_vacf"], res_id, com, vel_com, com_list, vel_list, frame_id)
-                if self._is_diffusion_bin and (pore_in != 1):
-                    self._diffusion_bin(output["diffusion_bin"], region,pore_in, dist, com_list, idx_list, res_id, com)
-                if self._is_diffusion_mc:
-                    self._diffusion_mc(output["diffusion_mc"], idx_list, com, res_id, frame_list, frame_id)
+                        vel_com = [sum([vel[atom_id][i]*self._masses[atom_id] for atom_id 
+                                        in range(len(self._atoms))])/self._sum_masses for i in range(3)]
 
-            # Progress
-            # if (frame_id+1)%10==0 or frame_id==0 or frame_id==self._num_frame-1:
-            #     sys.stdout.write("Finished frame "+frame_form%(frame_id+1)+"/"+frame_form%self._num_frame+"...\r")
-            #     sys.stdout.flush()
+                    # Check if molecule is broken
+                    if is_broken:
+                        for i in range(3):
+                            if abs(com_no_pbc[i]-pos[0][i])>box[i]/3:
+                                print("Sample - Broken molecule found - ResID: "+"%5i"%res_id+", AtomID: "+"%5i"%atom_id)
+
+                    # Apply periodic boundary conditions
+                    if is_pbc:
+                        com = [com_no_pbc[i]-math.floor(com_no_pbc[i]/box[i])*box[i] for i in range(3)]
+                    else:
+                        com = com_no_pbc
+
+                    # Calculate distance towards center axis
+                    if self._pore:
+                        dist = {}
+                        for pore_id in self._pore.keys():
+                            if pore_id[:5]=="shape":
+                                if self._pore_props[pore_id]["type"] in ["CYLINDER","CONE"]:
+                                    dist[pore_id] = geometry.length(geometry.vector([self._pore_props[pore_id]["focal"][0], self._pore_props[pore_id]["focal"][1]], [com[0],com[1]]))
+                                    #print("dist",dist,com,self._pore_props[pore_id]["focal"])
+                                elif self._pore_props[pore_id]["type"]=="SLIT":
+                                    dist[pore_id] = abs(self._pore_props[pore_id]["focal"][1]-com[1])
+                    else:
+                        dist = 0
+
+                    # Set region - in-interior, ex-exterior
+                    region = ""
+                    pore_in = 1
+                    if self._pore and com[2] > res+self._entry and com[2] < box[2]-res-self._entry:
+                        region = "in"
+                        for pore_id in self._pore.keys():
+                            if pore_id[:5]=="shape":
+                                z_min = res  + self._pore_props[pore_id]["focal"][2]-self._pore_props[pore_id]["length"]/2+self._entry
+                                z_max = res  + self._pore_props[pore_id]["focal"][2]+self._pore_props[pore_id]["length"]/2-self._entry
+
+                                if ((z_min<com[2]<z_max) and (dist[pore_id]<(self._pore_props[pore_id]["diam"]*1.01)/2)):
+                                    pore_in = pore_id
+
+                    elif not self._pore or com[2] < res or com[2] > box[2]-res:
+                        region = "ex"
+                        pore_in = 0
+
+
+                    # Remove window filling instances except from first processor
+                    if self._is_diffusion_bin:
+                        for pore_id in self._pore.keys():
+                            if pore_id[:5]=="shape":
+                                is_sample = len(com_list[pore_id])==len_fill or frame_id<=len_fill
+                    else:
+                        is_sample = True
+
+                    # Sampling routines
+                    if is_sample:
+                        if (self._is_density) and (pore_in != 1):
+                            self._density(output["density"], region, dist, com, pore_in)
+                        if self._is_gyration and (pore_in != 1):
+                            self._gyration(output["gyration"], region, dist, com_no_pbc, pos, pore_in)
+                        if self._is_angle and (pore_in != 1):
+                            self._angle(output["angle"], region, dist, com, pos, pore_in)
+                        if self._is_diffusion_vacf:
+                            self._diffusion_vacf(output["diffusion_vacf"], res_id, com, vel_com, com_list, vel_list, frame_id)
+                    if self._is_diffusion_bin and (pore_in != 1):
+                        self._diffusion_bin(output["diffusion_bin"], region,pore_in, dist, com_list, idx_list, res_id, com)
+                    if self._is_diffusion_mc:
+                        self._diffusion_mc(output["diffusion_mc"], idx_list, com, res_id, frame_list, frame_id)
+
+                # Progress
+                # if (frame_id+1)%10==0 or frame_id==0 or frame_id==self._num_frame-1:
+                #     sys.stdout.write("Finished frame "+frame_form%(frame_id+1)+"/"+frame_form%self._num_frame+"...\r")
+                #     sys.stdout.flush()
 
         # print()
         return output
