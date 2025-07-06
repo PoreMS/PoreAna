@@ -65,6 +65,7 @@ class Sample:
         self._is_diffusion_bin = False
         self._is_diffusion_mc = False
         self._is_diffusion_vacf = False
+        self._is_numpy = False
 
         # Get molecule ids
         self._atoms = [atom.get_name() for atom in mol.get_atom_list()] if not self._atoms else self._atoms
@@ -76,6 +77,7 @@ class Sample:
                 self._masses = mol.get_masses()
             elif len(self._atoms) == 1:
                 self._masses = [1]
+        self._masses = np.array(self._masses, float)
         self._sum_masses = sum(self._masses)
 
         # Check atom mass consistency
@@ -1216,10 +1218,87 @@ class Sample:
                 # for i in range(corr_steps):
                 #     data[bin][res_id][i, dim] += velos[0][dim] * velos[i][dim]
 
+    ##################
+    # Numpy Sampling #
+    ##################
+    def init_numpy(self, link_out, positions=True, velocities=True):
+        """Enable numpy sampling routine.
+
+        This function enables the numpy sampling routine. It is used to
+        sample the positions and velocities of the molecules in the system. The
+        output is stored in a .npz data file. The shape of the data is 
+        (num_frames, num_molecules, 3) for positions and velocities.
+
+        Parameters
+        ----------
+        link_out : string
+            Link to numpy data file
+        positions : bool, optional
+            True to sample positions of the molecules, default is True
+        velocities : bool, optional
+            True to sample velocities of the molecules, default is True
+        """
+        if self._is_diffusion_bin or self._is_diffusion_mc or self._is_diffusion_vacf:
+            print("Numpy sampling cannot be run in parallel with diffusion sampling.")
+            return
+        if velocities and self._traj.split(".")[-1]!="trr":
+            print("You need a trajectory file with velocities. Please use a .trr file.")
+            return
+        # Enable routine
+        self._is_numpy = True
+
+        # Create input dictionary
+        self._numpy_inp = {"output": link_out, "positions": positions, "velocities": velocities}
+
+    def _numpy_data(self):
+        """Create numpy data structure.
+
+        Returns
+        -------
+        data : dictionary
+            Numpy data structure
+        """
+        # Initialize
+        data = {}
+
+        # Add positions and velocities
+        if self._numpy_inp["positions"]:
+            data["positions"] = np.zeros((self._num_frame, len(self._res_list), 3), float)
+        if self._numpy_inp["velocities"]:
+            data["velocities"] = np.zeros((self._num_frame, len(self._res_list), 3), float)
+
+        return data
+    
+    def _numpy(self, data, positions, velocities, frame_id):
+        """This function samples the positions and velocities of the molecules
+        in the system. The output is stored in a numpy data file.
+
+        Parameters
+        ----------
+        data : dictionary
+            Data dictionary containing positions and velocities
+        positions : numpy.ndarray
+            List of atom positions of current frame
+        velocities : numpy.ndarray
+            List of atom velocities of current frame
+        frame_id : integer
+            Current frame id
+        """
+        # Add positions and velocities to data dictionary
+        if self._numpy_inp["positions"]:
+            pos = np.array(positions).reshape((len(self._res_list), len(self._atoms), 3)) / 10 # Convert to nm
+            pos_com = np.sum(pos * self._masses[np.newaxis,: , np.newaxis], axis=1) / self._sum_masses
+            data["positions"][frame_id] = pos_com
+
+        if self._numpy_inp["velocities"]:
+            vel = np.array(velocities).reshape((len(self._res_list), len(self._atoms), 3)) * 100 # Convert to m/s
+            vel_com = np.sum(vel * self._masses[np.newaxis,: , np.newaxis], axis=1) / self._sum_masses
+            data["velocities"][frame_id] = vel_com
+
     ############
     # Sampling #
     ############
-    def sample(self, shift=[0, 0, 0], np=0, is_pbc=True, is_broken=False, is_parallel=True):
+    def sample(self, shift=[0, 0, 0], num_cores=0, is_pbc=True, is_broken=False, is_parallel=True):
         """This function runs all enabled sampling routines. The output is
         stored in form of pickle files for later calculation using methods
         provided in the package.
@@ -1246,7 +1325,7 @@ class Sample:
             return
 
         # Get number of cores
-        np = np if np and np<=mp.cpu_count() else mp.cpu_count()
+        num_cores = num_cores if num_cores and num_cores<=mp.cpu_count() else mp.cpu_count()
 
         # Error message
         if is_parallel and self._is_angle:
@@ -1256,11 +1335,11 @@ class Sample:
         # Run sampling helper
         if is_parallel:
             # Divide number of frames on processors
-            frame_num = math.floor(self._num_frame/np)
+            frame_num = math.floor(self._num_frame/num_cores)
 
             # Define bounds
-            frame_start = [frame_num*i for i in range(np)]
-            frame_end = [frame_num*(i+1) if i<np-1 else self._num_frame for i in range(np)]
+            frame_start = [frame_num*i for i in range(num_cores)]
+            frame_end = [frame_num*(i+1) if i<num_cores-1 else self._num_frame for i in range(num_cores)]
 
             # Substract window filling for bin diffusion
             if self._is_diffusion_bin:
@@ -1281,10 +1360,10 @@ class Sample:
                 frame_end = [min(self._num_frame, end-shift_end[i]+self._diff_vacf_inp["corr_steps"]) for i, end in enumerate(frame_end)]
 
             # Create working lists for processors
-            frame_np = [list(range(frame_start[i], frame_end[i])) for i in range(np)]
+            frame_np = [list(range(frame_start[i], frame_end[i])) for i in range(num_cores)]
 
             # Run parallel search
-            pool = mp.Pool(processes=np)
+            pool = mp.Pool(processes=num_cores)
             results = [pool.apply_async(self._sample_helper, args=(frame_list, shift, is_pbc, is_broken,)) for frame_list in frame_np]
             pool.close()
             pool.join()
@@ -1405,6 +1484,17 @@ class Sample:
             # Save dictionary
             utils.save(results, self._diff_vacf_inp["output"])
 
+        if self._is_numpy:
+            data_numpy = output[0]["numpy"].copy()
+            for out in output[1:]:
+                if self._numpy_inp["positions"]:
+                    data_numpy["positions"] += out["numpy"]["positions"]
+                if self._numpy_inp["velocities"]:
+                    data_numpy["velocities"] += out["numpy"]["velocities"]
+
+            # Save results as numpy file
+            np.savez(self._numpy_inp["output"], **data_numpy)
+
     def _sample_helper(self, frame_list, shift, is_pbc, is_broken):
         """Helper function for sampling run.
 
@@ -1466,6 +1556,8 @@ class Sample:
             output["diffusion_mc"] = self._diffusion_mc_data()
         elif self._is_diffusion_vacf:
             output["diffusion_vacf"] = self._diffusion_vacf_data()
+        if self._is_numpy:
+            output["numpy"] = self._numpy_data()
 
         # Load trajectory
         traj = cf.Trajectory(self._traj)
@@ -1476,7 +1568,7 @@ class Sample:
             # Read frame
             frame = traj.read_step(frame_id)
             positions = frame.positions
-            if self._is_diffusion_vacf:
+            if self._is_diffusion_vacf or self._is_numpy:
                 velocities = frame.velocities
 
             # Add new dictionaries and remove unneeded references
@@ -1523,7 +1615,7 @@ class Sample:
                 if is_broken:
                     for i in range(3):
                         if abs(com_no_pbc[i]-pos[0][i])>box[i]/3:
-                            print("Sample - Broken molecule found - ResID: "+"%5i"%res_id+", AtomID: "+"%5i"%atom_id)
+                            print("Sample - Broken molecule found - ResID: "+"%5i"%res_id)
 
                 # Apply periodic boundary conditions
                 if is_pbc:
@@ -1584,6 +1676,8 @@ class Sample:
                     self._diffusion_bin(output["diffusion_bin"], region,pore_in, dist, com_list, idx_list, res_id, com)
                 if self._is_diffusion_mc:
                     self._diffusion_mc(output["diffusion_mc"], idx_list, com, res_id, frame_list, frame_id)
+            if self._is_numpy:
+                self._numpy(output["numpy"], positions, velocities, frame_id)
 
             # Progress
             if (frame_id+1)%10==0 or frame_id==0 or frame_id==self._num_frame-1:

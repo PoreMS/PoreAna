@@ -1125,3 +1125,65 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
 #     plt.xlabel(r"Box length (m)")
 #     plt.ylabel(r"radial Diffusion ($\mathrm{m^2s^{-1}}$)")
 #     plt.legend(legend)
+
+
+################
+# Diffusion VACF
+################
+def diffusion_from_numpy(link, frame_length=20e-15, mean_over_steps=1, is_print=True, is_plot=True, **kwargs):
+    """This function calculates the diffusion coefficient from a numpy file
+    containing the velocities of a system. The diffusion coefficient is
+    calculated using the Velocity Autocorrelation Function (VACF).
+
+    Parameters
+    ----------
+    link : string
+        Link to the numpy file containing the velocity data.
+    frame_length : float, optional
+        Time between 2 frames in seconds (default is 20e-15).
+    mean_over_steps : int, optional
+        Number of steps at the end to average the diffusion coefficient over (default is 1, no average).
+    print : bool, optional
+        If True, print the diffusion coefficient (default is True).
+    plot : bool, optional
+        If True, integrated velocity autocorrelation function is plotted (default is True).
+    kwargs : dict, optional
+        Additional keyword arguments for plotting.
+
+    Returns
+    -------
+    diffusion : np.ndarray
+        Diffusion coefficient in m^2/s in x, y and z direction.
+    vacf : np.ndarray
+        Cumulative integrated Velocity Autocorrelation Function (VACF) in m^2/s for each residue and dimension.
+    """
+    # Load velocity data from numpy file
+    data = np.load(link)
+    velocities = data['velocities']
+
+    vacf = np.zeros(velocities.shape)
+    for residue in range(velocities.shape[1]):
+        for dim in range(3):
+            # Calculate the Velocity Autocorrelation Function (VACF)
+            vacf[:, residue, dim] = sp.signal.correlate(velocities[:, residue, dim], velocities[:, residue, dim], 
+                                                        mode='full')[velocities.shape[0]-1:] / velocities.shape[0]
+    # Calculate the diffusion coefficient from the VACF
+    integrated_vacf = sp.integrate.cumulative_trapezoid(vacf, dx=frame_length, initial=0, axis=0)
+
+    if is_plot:
+        plt.plot(integrated_vacf[:, :, 0].mean(axis=1), label='x-direction', **kwargs)
+        plt.plot(integrated_vacf[:, :, 1].mean(axis=1), label='y-direction', **kwargs)
+        plt.plot(integrated_vacf[:, :, 2].mean(axis=1), label='z-direction', **kwargs)
+        plt.plot(integrated_vacf.mean(axis=(1, 2)), label='mean', color='black', **kwargs)
+
+    if is_print:
+        diffusion_mean = integrated_vacf.mean(axis=(1, 2))
+        diffusion_x = integrated_vacf[:, :, 0].mean(axis=1)
+        diffusion_y = integrated_vacf[:, :, 1].mean(axis=1)
+        diffusion_z = integrated_vacf[:, :, 2].mean(axis=1)
+        print(f"Diffusion Coefficient (x): {np.mean(diffusion_x[-mean_over_steps:])} m^2/s")
+        print(f"Diffusion Coefficient (y): {np.mean(diffusion_y[-mean_over_steps:])} m^2/s")
+        print(f"Diffusion Coefficient (z): {np.mean(diffusion_z[-mean_over_steps:])} m^2/s")
+        print(f"Total Diffusion: {np.mean(diffusion_mean[-mean_over_steps:])} m^2/s")
+
+    return np.array([diffusion_x, diffusion_y, diffusion_z]), integrated_vacf
