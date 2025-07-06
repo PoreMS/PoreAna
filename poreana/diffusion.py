@@ -1161,7 +1161,7 @@ def correlate_velocity_from_npz_file(link_in, link_out):
                                                               mode='full')[velocities.shape[0]-1:] / velocities.shape[0]
     np.save(link_out, vacf)
 
-def diffusion_from_vacf_file(link, frame_length=20e-15, mean_over_time=0, is_print=True, is_plot=True, **kwargs):
+def total_diffusion_from_vacf_npy_file(link, frame_length=20e-15, mean_over_time=0, is_print=True, is_plot=True, **kwargs):
     """This function calculates the diffusion coefficient from a vacf numpy file
     containing the vacf of a system. The diffusion coefficient is
     calculated by integrating the VACF.
@@ -1204,7 +1204,6 @@ def diffusion_from_vacf_file(link, frame_length=20e-15, mean_over_time=0, is_pri
         plt.ylabel('Integrated VACF (m^2/s)')
 
     mean_over_steps = int(mean_over_time / frame_length)+1 if mean_over_time > 0 else 1
-    print(f"Mean over last {mean_over_steps} steps: {mean_over_time} s") if is_print else None
 
     if is_print:
         diffusion_mean = integrated_vacf.mean(axis=(1, 2))
@@ -1217,3 +1216,55 @@ def diffusion_from_vacf_file(link, frame_length=20e-15, mean_over_time=0, is_pri
         print(f"Diffusion Coefficient (z): {np.mean(diffusion_z[-mean_over_steps:])} m^2/s")
 
     return np.array([diffusion_x, diffusion_y, diffusion_z]), integrated_vacf
+
+def bin_diffusion_vacf(link_data):
+    """
+    Calculate the velocity autocorrelation function (VACF) from the given data.
+    The VACF is calculated using the cumulative trapezoid rule for integration.
+
+    Parameters
+    ----------
+    link_data : str
+        The path to the data file containing the VACF data.
+    Returns
+    -------
+    integrated : np.ndarray
+        The integrated VACF data, with shape (bin_num, num_res, corr_steps, 3).
+    """
+    sample = utils.load(link_data)
+
+    data = sample["data"]
+
+    inp = sample["inp"]
+    num_frame = inp["num_frame"]
+    mass = inp["mass"]
+    bins = inp["bins"]
+    len_correration = inp["len_correration"]
+    new_time_origin = inp["new_time_origin"]
+    sample_step = inp["sample_step"]
+    len_frame = inp["len_frame"]
+    bin_num = inp["bin_num"]
+    direction = inp["direction"]
+    corr_steps = inp["corr_steps"]
+    new_time_origin_steps = inp["new_time_origin_steps"]
+    num_res = inp["num_res"]
+
+    num_new_time_origins = np.sum(data["density"]) / num_res
+    print("Averaged over ", num_new_time_origins, " new time origins.")
+
+    vacf_data = data["vacf_data"].copy() * num_res / data["density"][:, np.newaxis, np.newaxis, np.newaxis]
+    
+    integrated = sp.integrate.cumulative_trapezoid(
+        vacf_data, dx=len_frame * sample_step, axis=1, initial=0)
+    
+    # To make it more readable
+    integrated = integrated.swapaxes(1, 2)
+
+    return integrated
+"""
+       N   \langle v_i,l(0) v_i(t) \rangle      num_res * sum_vacf                         vacf * num_res  
+erg = -------------------------------------- = ---------------------------------------- = -----------------
+       N_l                                      avg_res_per_bin * num_new_time_origins     sum_res_per_bin 
+"""
+
+# TODO dont forget the mean not nan !!!

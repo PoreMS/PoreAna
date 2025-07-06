@@ -14,7 +14,6 @@ import poreana.freeenergy as freeenergy
 import poreana.tables as tables
 import poreana.gyration as gyration
 import poreana.angle as angle
-import poreana.vacf as vacf
 import poreana.geometry as geom
 import poreana.utils as utils
 
@@ -23,5 +22,5 @@ __all__ = [
     "Sample",
     "Model", "CosineModel", "StepModel", "MC",
     "adsorption", "density", "diffusion", "freeenergy",
-    "gyration", "angle", "geom", "utils", "tables", "vacf"
+    "gyration", "angle", "geom", "utils", "tables"
 ]

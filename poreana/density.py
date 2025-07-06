@@ -355,3 +355,27 @@ def mean(density, is_print=True, int_limit=2.5):
             print("Mean Density ("+pore_id+"): "+"%.3f" % num_dens_weight[pore_id]+" #/nm^3; "+"%.3f" % dens_weight[pore_id]+" kg/m^3")
 
     return {"num_dens": num_dens_weight, "dens": dens_weight}
+
+def density_from_vacf(link_data):
+    """
+    Calculate the density from given VACF data.
+    The density is returned as the average number of residues per bin.
+
+    Parameters
+    ----------
+    link_data : str
+        The path to the data file containing the VACF data.
+    
+    Returns
+    -------
+    avg_res_per_bin : np.ndarray
+        The average number of residues per bin, with shape (bin_num,).
+    """
+    sample = utils.load(link_data)
+    data = sample["data"]
+    inp = sample["inp"]
+    num_res = inp["num_res"]
+
+    num_new_time_origins = np.sum(data["density"]) / num_res
+    avg_res_per_bin = data["density"] / num_new_time_origins
+    return avg_res_per_bin

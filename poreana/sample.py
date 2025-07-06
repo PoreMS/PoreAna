@@ -1622,12 +1622,9 @@ class Sample:
             elif self._is_numpy:
                 self._numpy(output["numpy"], positions, velocities, frame_id)
 
-
             # Progress
-            if (frame_id+1)%10==0 or frame_id==0 or frame_id==self._num_frame-1:
-                sys.stdout.write("Finished frame "+frame_form%(frame_id+1)+"/"+frame_form%self._num_frame+"...\r")
+            if frame_list[0] == 0 and (frame_id+1)%100==0 or frame_id==0:
+                sys.stdout.write("Finished frame "+frame_form%(frame_id+1)+"/"+frame_form%frame_list[-1]+" on one Core ...\r")
                 sys.stdout.flush()
-
-        print()
 
         return output
