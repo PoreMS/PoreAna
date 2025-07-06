@@ -65,13 +65,13 @@ def vacf(link_data):
     num_new_time_origins = np.sum(data["density"]) / num_res
     print("Averaged over ", num_new_time_origins, " new time origins.")
 
-    vacf_data = np.zeros((bin_num, num_res, corr_steps, 3))
     vacf_data = data["vacf_data"].copy() * num_res / data["density"][:, np.newaxis, np.newaxis, np.newaxis]
     
     integrated = cumulative_trapezoid(
-        vacf_data, dx=len_frame * sample_step, axis=2, initial=0)
-
-    # integrated = np.where(np.isnan(integrated), 0, integrated)
+        vacf_data, dx=len_frame * sample_step, axis=1, initial=0)
+    
+    # To make it more readable
+    integrated = integrated.swapaxes(1, 2)
 
     return integrated
 """

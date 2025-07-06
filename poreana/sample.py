@@ -76,6 +76,7 @@ class Sample:
                 self._masses = mol.get_masses()
             elif len(self._atoms) == 1:
                 self._masses = [1]
+        self._masses = np.array(self._masses, float)
         self._sum_masses = sum(self._masses)
 
         # Check atom mass consistency
@@ -1139,71 +1140,30 @@ class Sample:
         data = {}
 
         # Initialize vacf data
-        data["vacf_data"] = np.zeros((bin_num, len(self._res_list), corr_steps, 3), float)
+        data["vacf_data"] = np.zeros((bin_num, corr_steps, len(self._res_list), 3), float)
 
         # Initialize density data
         data["density"] = np.zeros(bin_num, int)
 
         return data
 
-    def _diffusion_vacf(self, data: dict, res_id: int, com: list[float], vel_com: list[float], com_list: list[deque[list[float]]], vel_list: list[deque[list[float]]], frame_id: int):
-        """
-        This function samples the local velocity autocorrelation function and 
-        the density of molecules in spatial bins for the diffusion calculation.
-
-        This function updates the position and velocity history for a given 
-        molecule and, when the velocity history is fully populated and the 
-        first frame is a new time origin, samples the VACF. The VACF is binned 
-        according to the molecule's center of mass along a specified direction, 
-        and the results are accumulated in the provided data dictionary. 
-
-        Parameters
-        ----------
-        data : dictionary
-            Data dictionary containing bins for VACF diffusion. Each bin stores density and VACF accumulators.
-        res_id : integer
-            Index of the current residue (molecule) being processed.
-        com : list[float]
-            Center of mass of current molecule
-        vel_com : list[float]
-            Velocity of the center of mass of current molecule
-        com_list : list[deque[list[float]]]
-            List of deques, each storing the center of mass history for all molecules for the correlation time.
-        vel_list : list[deque[list[float]]]
-            List of deques, each storing the velocity history for all molecules for the correlation time.
-        frame_id : integer
-            Index of the current frame.
-        """
-        # Initialize
+    def _diffusion_vacf(self, data: dict, frame_id: int, positions: np.ndarray, vel_list: np.ndarray, pointer: int):
         bins = self._diff_vacf_inp["bins"]
         direction = self._diff_vacf_inp["direction"]
         corr_steps = self._diff_vacf_inp["corr_steps"]
         new_time_origin_steps = self._diff_vacf_inp["new_time_origin_steps"]
 
-        # Update postion and velocity list
-        com_list[res_id][-1] = com
-        vel_list[res_id][-1] = vel_com
+        pos = np.array(positions[:, direction]).reshape((len(self._res_list), len(self._atoms))) / 10 # Convert to nm
+        com = np.sum(pos * self._masses[np.newaxis, :], axis=1) / self._sum_masses
 
-        # velos = np.array(vel_list[res_id])
-        velos = vel_list[res_id]
-
-        # Check if velocity list is filled
-        # if velos.shape[0] < vel_list[res_id].maxlen:
-        if len(velos) < velos.maxlen:
-            return
-        # Sample if frame of first velocity in velos is a new time origin
         if (frame_id-corr_steps)%new_time_origin_steps==0:
-            com_0 = com_list[res_id][0]
-            vel_0 = velos[0]
-            
-            # Calculate bin index
-            bin = np.digitize(com_0[direction], bins) - 1
-            data["density"][bin] += 1
+            for bin_id in range(len(bins)-1):
+                mask = (com >= bins[bin_id]) & (com < bins[bin_id + 1])
+                vel_0 = vel_list[pointer, mask, :]
+                velos = np.concatenate((vel_list[pointer:, mask, :], vel_list[:pointer, mask, :]))
+                data["vacf_data"][bin_id, :, :, :][:, mask, :] += vel_0 * velos    # It is not the same as [bin_id, :, mask, :]
 
-            # For the only bin where s(q_i)=1, increase vacf for average
-            # data["vacf_data"][bin, res_id] += velos[0] * velos
-            for dim in range(3):
-                data["vacf_data"][bin, res_id, :, dim] += vel_0[dim] * np.array(velos)[:, dim]
+                data["density"][bin_id] += np.sum(mask)
 
     ############
     # Sampling #
@@ -1435,8 +1395,9 @@ class Sample:
             com_list = []
             idx_list = []
         elif self._is_diffusion_vacf:
-            com_list = [deque(maxlen=len_fill) for _ in range(len(self._res_list))]
-            vel_list = [deque(maxlen=len_fill) for _ in range(len(self._res_list))]
+            vel_list = np.empty((len_fill, len(self._res_list), 3), float)
+            pointer = 0
+            filled_up = False
 
         # Create local data structures
         output = {}
@@ -1481,12 +1442,16 @@ class Sample:
                 idx_list.append({})
                 com_list.append({})
             elif self._is_diffusion_vacf:
-                for res_id in self._res_list:
-                    # no need to pop, deque is used
-                    com_list[res_id].append([0,0,0])
-                    vel_list[res_id].append([0,0,0])
+                vel = np.array(velocities).reshape((len(self._res_list), len(self._atoms), 3)) * 100 # Convert A/ps to m/s
+                vel_com = np.sum(vel * self._masses[np.newaxis,: , np.newaxis], axis=1) / self._sum_masses
+                vel_list[pointer] = vel_com
+                pointer += 1
+                if pointer >= len_fill:
+                    pointer = 0
+                    if not filled_up:
+                        filled_up = True
 
-            if self._is_angle or self._is_density or self._is_gyration or self._is_diffusion_bin or self._is_diffusion_mc or self._is_diffusion_vacf:
+            if self._is_angle or self._is_density or self._is_gyration or self._is_diffusion_bin or self._is_diffusion_mc:
                 # Run through residues
                 for res_id in self._res_list:
                     # Get position and velocity vectors
@@ -1510,7 +1475,7 @@ class Sample:
                     if is_broken:
                         for i in range(3):
                             if abs(com_no_pbc[i]-pos[0][i])>box[i]/3:
-                                print("Sample - Broken molecule found - ResID: "+"%5i"%res_id+", AtomID: "+"%5i"%atom_id)
+                                print("Sample - Broken molecule found - ResID: "+"%5i"%res_id)
 
                     # Apply periodic boundary conditions
                     if is_pbc:
@@ -1565,12 +1530,13 @@ class Sample:
                             self._gyration(output["gyration"], region, dist, com_no_pbc, pos, pore_in)
                         if self._is_angle and (pore_in != 1):
                             self._angle(output["angle"], region, dist, com, pos, pore_in)
-                        if self._is_diffusion_vacf:
-                            self._diffusion_vacf(output["diffusion_vacf"], res_id, com, vel_com, com_list, vel_list, frame_id)
                     if self._is_diffusion_bin and (pore_in != 1):
                         self._diffusion_bin(output["diffusion_bin"], region,pore_in, dist, com_list, idx_list, res_id, com)
                     if self._is_diffusion_mc:
                         self._diffusion_mc(output["diffusion_mc"], idx_list, com, res_id, frame_list, frame_id)
+            elif self._is_diffusion_vacf:
+                if filled_up:
+                    self._diffusion_vacf(output["diffusion_vacf"], frame_id, positions, vel_list, pointer)
 
                 # Progress
                 # if (frame_id+1)%10==0 or frame_id==0 or frame_id==self._num_frame-1:
