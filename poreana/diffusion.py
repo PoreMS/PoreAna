@@ -1217,7 +1217,7 @@ def total_diffusion_from_vacf_npy_file(link, frame_length=20e-15, mean_over_time
 
     return np.array([diffusion_x, diffusion_y, diffusion_z]), integrated_vacf
 
-def bin_diffusion_vacf(link_data):
+def integrate_bin_diffusion_vacf(link_data):
     """
     Calculate the velocity autocorrelation function (VACF) from the given data.
     The VACF is calculated using the cumulative trapezoid rule for integration.
@@ -1267,4 +1267,65 @@ erg = -------------------------------------- = ---------------------------------
        N_l                                      avg_res_per_bin * num_new_time_origins     sum_res_per_bin 
 """
 
-# TODO dont forget the mean not nan !!!
+def plot_vacf_per_bin(link_data, is_legend, **kwargs):
+    """
+    Plot the integrated velocity autocorrelation function (VACF) per bin.
+    
+    Parameters
+    ----------
+    link_data : str
+        The path to the data file containing the VACF data.
+    is_legend : bool
+        If True, display the legend in the plot (default is True).
+    **kwargs : dict, optional
+        Additional keyword arguments for plotting, such as line style, color, etc.
+    """
+    sample = utils.load(link_data)
+
+    integrated = integrate_bin_diffusion_vacf(link_data)
+
+    for bin in range(integrated.shape[0]):
+        plt.plot(np.arange(integrated.shape[2]) * sample["inp"]["len_frame"] * sample["inp"]["sample_step"],
+                 integrated[bin, :, :, :].mean(axis=(0,2)), label=f'Bin {bin}', **kwargs)
+    plt.plot(np.arange(integrated.shape[2]) * sample["inp"]["len_frame"] * sample["inp"]["sample_step"],
+             np.nanmean(integrated, axis=(0,1,3)), label='Mean', color='black', **kwargs)
+    plt.xlabel('Time (s)')
+    plt.ylabel('Integrated VACF (m^2/s)')
+    if is_legend:
+        plt.legend()
+
+def plot_diffusion_per_bin(link_data, mean_over_time=0, is_legend=True, **kwargs):
+    """
+    Plot the diffusion coefficient per bin from the integrated VACF data.
+    
+    Parameters
+    ----------
+    link_data : str
+        The path to the data file containing the VACF data.
+    mean_over_time : float, optional
+        Number of steps at the end to average the diffusion coefficient over (default is 0, no average).
+    is_legend : bool, optional
+        If True, display the legend in the plot (default is True).
+    kwargs : dict, optional
+        Additional keyword arguments for plotting, such as line style, color, etc.
+    """
+    sample = utils.load(link_data)
+
+    integrated = integrate_bin_diffusion_vacf(link_data)
+
+    mean_over_steps = int(mean_over_time / sample["inp"]["len_frame"] / sample["inp"]["sample_step"]) + 1 if mean_over_time > 0 else 1
+    print(f"Mean over last {mean_over_steps} steps.")
+    diffison = np.nanmean(integrated[:, :, -mean_over_steps:, :], axis=(1, 2))
+
+    plt.plot(np.arange(1, integrated.shape[0]+1),
+             diffison[:, 0], label='x-direction', marker='x', **kwargs)
+    plt.plot(np.arange(1, integrated.shape[0]+1),
+             diffison[:, 1], label='y-direction', marker='x', **kwargs)
+    plt.plot(np.arange(1, integrated.shape[0]+1),
+             diffison[:, 2], label='z-direction', marker='x', **kwargs)
+    plt.plot(np.arange(1, integrated.shape[0]+1),
+             diffison.mean(axis=1), label='mean', color='black', marker='o', **kwargs)
+    plt.xlabel('Bin')
+    plt.ylabel('Diffusion Coefficient (m^2/s)')
+    if is_legend:
+        plt.legend()
