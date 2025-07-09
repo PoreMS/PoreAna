@@ -1057,7 +1057,7 @@ class Sample:
     ##################
     # VACF Diffusion #
     ##################
-    def init_diffusion_vacf(self, link_out: str, len_correration=5e-10, new_time_origin=2e-13, sample_step=20, len_frame=1e-15, bin_num=20, direction=2):
+    def init_diffusion_vacf(self, link_out: str, len_correration=5e-10, new_time_origin=2e-13, sample_step=20, len_frame=1e-15, bin_num=20, direction=2, sample_each_residue=False):
         """Enable diffusion sampling routine with the VACF Alogrithm.
         
         This function samples the local velocity autocorrelation function for
@@ -1091,6 +1091,8 @@ class Sample:
         direction : integer, optional
             Direction of descretization of the simulation box (**0** (x-axis);
             **1** (y-axis); **2** (z-axis))
+        sample_each_residue : bool, optional
+            If True, the VACF is sampled for each residue separately, default is False
         """
         # TODO timereversal mapping
         # Initialize
@@ -1123,7 +1125,7 @@ class Sample:
                                "new_time_origin": new_time_origin, "sample_step": sample_step, 
                                "len_frame": len_frame, "bin_num": bin_num, "direction": direction, 
                                "corr_steps": corr_steps, "new_time_origin_steps": new_time_origin_steps,
-                               "num_res": len(self._res_list)}
+                               "num_res": len(self._res_list), "sample_each_residue": sample_each_residue}
 
     def _diffusion_vacf_data(self) -> dict:
         """Create VACF diffusion data structure.
@@ -1136,12 +1138,16 @@ class Sample:
         # Initialize
         bin_num = self._diff_vacf_inp["bin_num"]
         corr_steps = self._diff_vacf_inp["corr_steps"]
+        sample_each_residue = self._diff_vacf_inp["sample_each_residue"]
 
         # Create dictionary
         data = {}
 
         # Initialize vacf data
-        data["vacf_data"] = np.zeros((bin_num, corr_steps, len(self._res_list), 3), float)
+        if sample_each_residue:
+            data["vacf_data"] = np.zeros((bin_num, corr_steps, len(self._res_list), 3), float)
+        else:
+            data["vacf_data"] = np.zeros((bin_num, corr_steps, 1, 3), float)
 
         # Initialize density data
         data["density"] = np.zeros(bin_num, int)
@@ -1149,21 +1155,64 @@ class Sample:
         return data
 
     def _diffusion_vacf(self, data: dict, frame_id: int, positions: np.ndarray, vel_list: np.ndarray, pointer: int):
+        """
+        This function samples the local velocity autocorrelation function for
+        the diffusion calculation. The local diffusion coefficient in a direction
+        :math:`\\alpha` is calculated by
+        .. math::
+            D_{\\alpha,l} = \\frac{1}{N}\\sum_{i=1}^{N}\\int_0^{\\infty} \\langle v_{\\alpha,i,l}(0)v_{\\alpha,i}(t)\\rangle dt
+        
+        with :math:`N` as the number of molecules, :math:`v_{\\alpha,i}` as the
+        velocity of molecule :math:`i` in direction :math:`\\alpha` and
+        :math:`v_{\\alpha,i,l}` as :math:`\\frac{N}{N_l}\\langle v_{\\alpha,i}(0)v_{\\alpha,i}(t)S_{q,i}(0)\\rangle
+        with :math:`N_l` as the average number of molecules in the bin.
+        
+        The VACF is sampled for a correlation time and choosing a new time origin
+        after a certain time. The VACF is sampled for each bin and the average
+        number of molecules in the bin is calculated.
+        
+        Parameters
+        ----------
+        data : dictionary
+            Data dictionary containing bins for VACF diffusion
+        frame_id : integer
+            Current frame id
+        positions : numpy.ndarray
+            List of atom positions of current frame
+        vel_list : numpy.ndarray
+            List of molecule velocities of all frames of correlation time
+        pointer : integer
+            Pointer to the current frame in the velocity list
+        """
         bins = self._diff_vacf_inp["bins"]
         direction = self._diff_vacf_inp["direction"]
         corr_steps = self._diff_vacf_inp["corr_steps"]
         new_time_origin_steps = self._diff_vacf_inp["new_time_origin_steps"]
+        sample_each_residue = self._diff_vacf_inp["sample_each_residue"]
 
         pos = np.array(positions[:, direction]).reshape((len(self._res_list), len(self._atoms))) / 10 # Convert to nm
         com = np.sum(pos * self._masses[np.newaxis, :], axis=1) / self._sum_masses
 
         if (frame_id-corr_steps)%new_time_origin_steps==0:
-            for bin_id in range(len(bins)-1):
-                mask = (com >= bins[bin_id]) & (com < bins[bin_id + 1])
-                vel_0 = vel_list[pointer, mask, :]
-                velos = np.concatenate((vel_list[pointer:, mask, :], vel_list[:pointer, mask, :]))
-                data["vacf_data"][bin_id, :, :, :][:, mask, :] += vel_0 * velos    # It is not the same as [bin_id, :, mask, :]
-
+            # Vectorized VACF binning for speed
+            com_bins = np.digitize(com, bins) - 1  # bin indices for each molecule
+            for bin_id in range(len(bins) - 1):
+                mask = (com_bins == bin_id)
+                if not np.any(mask):
+                    continue
+                # Get velocities for molecules in this bin (v(0) part in the equation)
+                vel0 = vel_list[pointer, mask, :]  # shape: (num_mol_in_bin, 3)
+                # Build the velocity time series for these molecules (v(t) part in the equation)
+                velos = np.concatenate((vel_list[pointer:, mask, :], vel_list[:pointer, mask, :]), axis=0)  # (corr_steps, num_mol_in_bin, 3)
+                # Compute VACF: for each time lag, multiply vel0 by velos at that lag
+                # Broadcasting: (num_mol_in_bin, 3) * (corr_steps, num_mol_in_bin, 3) -> (corr_steps, num_mol_in_bin, 3)
+                vacf = vel0[np.newaxis, :, :] * velos  # (corr_steps, num_mol_in_bin, 3)
+                # Sum over molecules in bin, keep axis for residue/sample_each_residue
+                if sample_each_residue:
+                    res_indices = np.where(mask)[0]
+                    data["vacf_data"][bin_id, :, :, :][:, res_indices, :] += vacf
+                else:
+                    data["vacf_data"][bin_id, :, 0, :] += np.sum(vacf, axis=1)
                 data["density"][bin_id] += np.sum(mask)
 
     ##################
@@ -1484,7 +1533,7 @@ class Sample:
             com_list = []
             idx_list = []
         elif self._is_diffusion_vacf:
-            vel_list = np.empty((len_fill, len(self._res_list), 3), float)
+            vel_list = np.zeros((len_fill, len(self._res_list), 3), float)
             pointer = 0
             filled_up = False
 

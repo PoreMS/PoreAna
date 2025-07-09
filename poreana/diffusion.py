@@ -1253,6 +1253,9 @@ def integrate_bin_diffusion_vacf(link_data):
     print("Averaged over ", num_new_time_origins, " new time origins.")
 
     vacf_data = data["vacf_data"].copy() * num_res / data["density"][:, np.newaxis, np.newaxis, np.newaxis]
+
+    # Normalize if sample_each_residue is False
+    vacf_data = vacf_data * (data["vacf_data"].shape[2] / num_res)
     
     integrated = sp.integrate.cumulative_trapezoid(
         vacf_data, dx=len_frame * sample_step, axis=1, initial=0)
@@ -1317,15 +1320,15 @@ def plot_diffusion_per_bin(link_data, mean_over_time=0, is_legend=True, **kwargs
     print(f"Mean over last {mean_over_steps} steps.")
     diffison = np.nanmean(integrated[:, :, -mean_over_steps:, :], axis=(1, 2))
 
-    plt.plot(np.arange(1, integrated.shape[0]+1),
+    plt.plot(np.linspace(0, sample["inp"]["bins"][-1], integrated.shape[0]),
              diffison[:, 0], label='x-direction', marker='x', **kwargs)
-    plt.plot(np.arange(1, integrated.shape[0]+1),
+    plt.plot(np.linspace(0, sample["inp"]["bins"][-1], integrated.shape[0]),
              diffison[:, 1], label='y-direction', marker='x', **kwargs)
-    plt.plot(np.arange(1, integrated.shape[0]+1),
+    plt.plot(np.linspace(0, sample["inp"]["bins"][-1], integrated.shape[0]),
              diffison[:, 2], label='z-direction', marker='x', **kwargs)
-    plt.plot(np.arange(1, integrated.shape[0]+1),
+    plt.plot(np.linspace(0, sample["inp"]["bins"][-1], integrated.shape[0]),
              diffison.mean(axis=1), label='mean', color='black', marker='o', **kwargs)
-    plt.xlabel('Bin')
+    plt.xlabel('Box Length (nm)')
     plt.ylabel('Diffusion Coefficient (m^2/s)')
     if is_legend:
         plt.legend()
