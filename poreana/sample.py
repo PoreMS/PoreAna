@@ -1150,7 +1150,10 @@ class Sample:
             data["vacf_data"] = np.zeros((bin_num, corr_steps, 1, 3), float)
 
         # Initialize density data
-        data["density"] = np.zeros(bin_num, int)
+        if sample_each_residue:
+            data["density"] = np.zeros((bin_num, len(self._res_list)), int)
+        else:
+            data["density"] = np.zeros((bin_num, 1), int)
 
         return data
 
@@ -1211,9 +1214,10 @@ class Sample:
                 if sample_each_residue:
                     res_indices = np.where(mask)[0]
                     data["vacf_data"][bin_id, :, :, :][:, res_indices, :] += vacf
+                    data["density"][bin_id, res_indices] += 1
                 else:
                     data["vacf_data"][bin_id, :, 0, :] += np.sum(vacf, axis=1)
-                data["density"][bin_id] += np.sum(mask)
+                    data["density"][bin_id, 0] += np.sum(mask)
 
     ##################
     # Numpy Sampling #

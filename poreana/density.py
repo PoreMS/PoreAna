@@ -377,5 +377,5 @@ def density_from_vacf(link_data):
     num_res = inp["num_res"]
 
     num_new_time_origins = np.sum(data["density"]) / num_res
-    avg_res_per_bin = data["density"] / num_new_time_origins
+    avg_res_per_bin = data["density"].sum(axis=1) / num_new_time_origins
     return avg_res_per_bin

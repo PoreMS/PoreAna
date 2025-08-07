@@ -1252,7 +1252,7 @@ def integrate_bin_diffusion_vacf(link_data):
     num_new_time_origins = np.sum(data["density"]) / num_res
     print("Averaged over ", num_new_time_origins, " new time origins.")
 
-    vacf_data = data["vacf_data"].copy() * num_res / data["density"][:, np.newaxis, np.newaxis, np.newaxis]
+    vacf_data = data["vacf_data"].copy() * num_res / data["density"][:, np.newaxis, :, np.newaxis]
 
     # Normalize if sample_each_residue is False
     vacf_data = vacf_data * (data["vacf_data"].shape[2] / num_res)
