@@ -11,6 +11,7 @@ import scipy as sp
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import poreana as pa
 import matplotlib.pyplot as plt
 
 import poreana.utils as utils
@@ -1139,7 +1140,7 @@ def correlate_velocity_from_npz_file(link_in, link_out):
     Parameters
     ----------
     link_in : string
-        Link to the numpy file containing the velocity data.
+        Link to the numpy npz file containing the velocity data, created by the `poreana.sample.init_numpy_file` function.
     link_out : string
         Link to the numpy file where the VACF will be saved.
 
@@ -1158,10 +1159,10 @@ def correlate_velocity_from_npz_file(link_in, link_out):
         for dim in range(3):
             # Calculate the Velocity Autocorrelation Function (VACF)
             vacf[:, residue, dim] = sp.signal.correlate(velocities[:, residue, dim], velocities[:, residue, dim], 
-                                                              mode='full')[velocities.shape[0]-1:] / velocities.shape[0]
+                                                        mode='full')[velocities.shape[0]-1:] / velocities.shape[0]
     np.save(link_out, vacf)
 
-def total_diffusion_from_vacf_npy_file(link, frame_length=20e-15, mean_over_time=0, is_print=True, is_plot=True, **kwargs):
+def total_diffusion_from_vacf_npy_file(link, frame_length=20e-15, len_correration=1e-10, mean_over_time=0, is_print=True, is_plot=True, **kwargs):
     """This function calculates the diffusion coefficient from a vacf numpy file
     containing the vacf of a system. The diffusion coefficient is
     calculated by integrating the VACF.
@@ -1169,11 +1170,13 @@ def total_diffusion_from_vacf_npy_file(link, frame_length=20e-15, mean_over_time
     Parameters
     ----------
     link : string
-        Link to the numpy file containing the velocity autocorrelation function (VACF) data.
+        Link to the numpy file containing the velocity autocorrelation function (VACF) data, created by the `correlate_velocity_from_npz_file` function.
     frame_length : float, optional
         Time between 2 frames in seconds (default is 20e-15).
+    len_correration : float, optional
+        Length of the correlation in seconds (default is 1e-10).
     mean_over_time : float, optional
-        Number of steps at the end to average the diffusion coefficient over 
+        Time at the end to average the diffusion coefficient over 
         (default is 0, no average -> last value of vacf).
     print : bool, optional
         If True, print the diffusion coefficient (default is True).
@@ -1190,7 +1193,7 @@ def total_diffusion_from_vacf_npy_file(link, frame_length=20e-15, mean_over_time
         Cumulative integrated Velocity Autocorrelation Function (VACF) in m^2/s for each residue and dimension.
     """
     # Load velocity data from numpy file
-    vacf = np.load(link)
+    vacf = np.load(link)[:int(len_correration // frame_length + 1), :, :]
     
     # Calculate the diffusion coefficient from the VACF
     integrated_vacf = sp.integrate.cumulative_trapezoid(vacf, dx=frame_length, initial=0, axis=0)
@@ -1225,7 +1228,8 @@ def integrate_bin_diffusion_vacf(link_data):
     Parameters
     ----------
     link_data : str
-        The path to the data file containing the VACF data.
+        The path to the data file containing the VACF data, 
+        created by the `poreana.sample.init_diffusion_vacf` function.
     Returns
     -------
     integrated : np.ndarray
@@ -1252,11 +1256,8 @@ def integrate_bin_diffusion_vacf(link_data):
     num_new_time_origins = np.sum(data["density"]) / num_res
     print("Averaged over ", num_new_time_origins, " new time origins.")
 
-    vacf_data = data["vacf_data"].copy() * num_res / data["density"][:, np.newaxis, :, np.newaxis]
+    vacf_data = data["vacf_data"].copy() / data["density"][:, np.newaxis, :, np.newaxis]
 
-    # Normalize if sample_each_residue is False
-    vacf_data = vacf_data * (data["vacf_data"].shape[2] / num_res)
-    
     integrated = sp.integrate.cumulative_trapezoid(
         vacf_data, dx=len_frame * sample_step, axis=1, initial=0)
     
@@ -1264,11 +1265,6 @@ def integrate_bin_diffusion_vacf(link_data):
     integrated = integrated.swapaxes(1, 2)
 
     return integrated
-"""
-       N   \langle v_i,l(0) v_i(t) \rangle      num_res * sum_vacf                         vacf * num_res  
-erg = -------------------------------------- = ---------------------------------------- = -----------------
-       N_l                                      avg_res_per_bin * num_new_time_origins     sum_res_per_bin 
-"""
 
 def plot_vacf_per_bin(link_data, is_legend, **kwargs):
     """
@@ -1297,7 +1293,7 @@ def plot_vacf_per_bin(link_data, is_legend, **kwargs):
     if is_legend:
         plt.legend()
 
-def plot_diffusion_per_bin(link_data, mean_over_time=0, is_legend=True, **kwargs):
+def plot_diffusion_per_bin(link_data, mean_over_time=0, is_legend=True, remove_low_density_bins=0.0, **kwargs):
     """
     Plot the diffusion coefficient per bin from the integrated VACF data.
     
@@ -1306,9 +1302,11 @@ def plot_diffusion_per_bin(link_data, mean_over_time=0, is_legend=True, **kwargs
     link_data : str
         The path to the data file containing the VACF data.
     mean_over_time : float, optional
-        Number of steps at the end to average the diffusion coefficient over (default is 0, no average).
+        Time at the end to average the diffusion coefficient over (default is 0, no average).
     is_legend : bool, optional
         If True, display the legend in the plot (default is True).
+    remove_low_density_bins : float, optional
+        Threshold for removing bins with low density (default is 0.0, no removal).
     kwargs : dict, optional
         Additional keyword arguments for plotting, such as line style, color, etc.
     """
@@ -1319,6 +1317,12 @@ def plot_diffusion_per_bin(link_data, mean_over_time=0, is_legend=True, **kwargs
     mean_over_steps = int(mean_over_time / sample["inp"]["len_frame"] / sample["inp"]["sample_step"]) + 1 if mean_over_time > 0 else 1
     print(f"Mean over last {mean_over_steps} steps.")
     diffison = np.nanmean(integrated[:, :, -mean_over_steps:, :], axis=(1, 2))
+
+    density = pa.density.density_from_vacf(link_data)
+
+    mask = density < remove_low_density_bins
+    diffison[mask] = np.nan
+    print(f"Removed {np.sum(mask)} bins with low density.")
 
     plt.plot(np.linspace(0, sample["inp"]["bins"][-1], integrated.shape[0]),
              diffison[:, 0], label='x-direction', marker='x', **kwargs)

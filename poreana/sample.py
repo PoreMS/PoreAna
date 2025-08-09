@@ -677,6 +677,9 @@ class Sample:
         if self._is_diffusion_vacf:
             print("Binning and VACF-approaches cannot be run in parallel.")
             return
+        if self._is_numpy:
+            print("Binning and numpy-approaches cannot be run in parallel.")
+            return
         if self._pore:
             self._is_diffusion_bin = True
         else:
@@ -934,6 +937,9 @@ class Sample:
         if self._is_diffusion_vacf:
             print("VACF and MC-approaches cannot be run in parallel.")
             return
+        if self._is_numpy:
+            print("Numpy and MC-approaches cannot be run in parallel.")
+            return
 
         if direction not in [0,1,2]:
             print("Wrong directional input. Possible inputs are 0 (x-axis), 1 (y-axis), and 2 (z-axis)...")
@@ -1057,19 +1063,21 @@ class Sample:
     ##################
     # VACF Diffusion #
     ##################
-    def init_diffusion_vacf(self, link_out: str, len_correration=5e-10, new_time_origin=2e-13, sample_step=20, len_frame=1e-15, bin_num=20, direction=2, sample_each_residue=False):
+    def init_diffusion_vacf(self, link_out: str, len_correration=2e-11, new_time_origin=2e-13, sample_step=20, len_frame=1e-15, bin_num=32, direction=2, sample_each_residue=False):
         """Enable diffusion sampling routine with the VACF Alogrithm.
         
         This function samples the local velocity autocorrelation function for
         the diffusion calculation. The local diffusion coefficient in a direction
         :math:`\\alpha` is calculated by
         .. math::
-            D_{\\alpha,l} = \\frac{1}{N}\\sum_{i=1}^{N}\\int_0^{\\infty} \\langle v_{\\alpha,i,l}(0)v_{\\alpha,i}(t)\\rangle dt
+            D_{\\alpha,l} = \\frac{1}{N_l}\\sum_{i=1}^{N}\\int_0^{\\infty} \\langle v_{\\alpha,i,l}(0)v_{\\alpha,i}(t)\\rangle dt
 
-        with :math:`N` as the number of molecules, :math:`v_{\\alpha,i}` as the
-        velocity of molecule :math:`i` in direction :math:`\\alpha` and
-        :math:`v_{\\alpha,i,l}` as :math:`\\frac{N}{N_l}\\langle v_{\\alpha,i}(0)v_{\\alpha,i}(t)S_{q,i}(0)\\rangle
-        with :math:`N_l` as the average number of molecules in the bin.
+        with :math:`N_l` as the average number of molecules in the local region, 
+        :math:`v_{\\alpha,i}` as the velocity of molecule :math:`i` in direction 
+        :math:`\\alpha` and :math:`v_{\\alpha,i,l}(t)` as :math:`v_{\\alpha,i}(t)S_{q,i}(t)`
+        with :math:`S_{q,i}` as a swich function that is 1 if the molecule
+        :math:`i` is in the local region and 0 otherwise. The local region
+        is defined by a binning of the simulation box in the chosen direction.
 
         The VACF is sampled for a correlation time and choosing a new time origin
         after a certain time. 
@@ -1081,7 +1089,7 @@ class Sample:
         len_correration : float, optional
             Length of the correlation time in seconds
         new_time_origin : float, optional
-            Length between new time origins in seconds
+            Time between new time origins in seconds
         sample_step : integer, optional
             Step size of the sampling in your simulation in frames
         len_frame : float, optional
@@ -1094,13 +1102,15 @@ class Sample:
         sample_each_residue : bool, optional
             If True, the VACF is sampled for each residue separately, default is False
         """
-        # TODO timereversal mapping
         # Initialize
         if self._is_diffusion_bin:
             print("Binning and VACF-approaches cannot be run in parallel.")
             return
         if self._is_diffusion_mc:
             print("MC and VACF-approaches cannot be run in parallel.")
+            return
+        if self._is_numpy:
+            print("VACF-approaches cannot be run in parallel with numpy approaches.")
             return
         if direction not in [0,1,2]:
             print("Wrong directional input. Possible inputs are 0 (x-axis), 1 (y-axis), and 2 (z-axis).")
@@ -1111,7 +1121,7 @@ class Sample:
         corr_steps = int(round(len_correration/len_frame/sample_step))
         new_time_origin_steps = int(round(new_time_origin/len_frame/sample_step))
         if corr_steps < 1 or new_time_origin_steps < 1:
-            print("VACF needs a correlation time longer than one frame. Please increase len_correration and/or new_time_origin.")
+            print("VACF needs a correlation time longer than one frame. Please adjust len_correration and/or new_time_origin.")
             return
         
         # Enable routine
@@ -1159,20 +1169,12 @@ class Sample:
 
     def _diffusion_vacf(self, data: dict, frame_id: int, positions: np.ndarray, vel_list: np.ndarray, pointer: int):
         """
-        This function samples the local velocity autocorrelation function for
-        the diffusion calculation. The local diffusion coefficient in a direction
-        :math:`\\alpha` is calculated by
-        .. math::
-            D_{\\alpha,l} = \\frac{1}{N}\\sum_{i=1}^{N}\\int_0^{\\infty} \\langle v_{\\alpha,i,l}(0)v_{\\alpha,i}(t)\\rangle dt
-        
-        with :math:`N` as the number of molecules, :math:`v_{\\alpha,i}` as the
-        velocity of molecule :math:`i` in direction :math:`\\alpha` and
-        :math:`v_{\\alpha,i,l}` as :math:`\\frac{N}{N_l}\\langle v_{\\alpha,i}(0)v_{\\alpha,i}(t)S_{q,i}(0)\\rangle
-        with :math:`N_l` as the average number of molecules in the bin.
-        
-        The VACF is sampled for a correlation time and choosing a new time origin
-        after a certain time. The VACF is sampled for each bin and the average
-        number of molecules in the bin is calculated.
+        This function samples the local velocity autocorrelation function (VACF) for
+        the diffusion calculation.
+
+        It uses a given buffer of velocities for a correlation time to sample the VACF
+        if the current frame is a new time origin. The VACF is sampled for each bin
+        forward and backward in time.
         
         Parameters
         ----------
@@ -1183,7 +1185,8 @@ class Sample:
         positions : numpy.ndarray
             List of atom positions of current frame
         vel_list : numpy.ndarray
-            List of molecule velocities of all frames of correlation time
+            List of molecule velocities of all buffered frames
+            shape: (2*corr_steps-1, num_molecules, 3)
         pointer : integer
             Pointer to the current frame in the velocity list
         """
@@ -1197,23 +1200,27 @@ class Sample:
         com = np.sum(pos * self._masses[np.newaxis, :], axis=1) / self._sum_masses
 
         if (frame_id-corr_steps)%new_time_origin_steps==0:
-            # Vectorized VACF binning for speed
             com_bins = np.digitize(com, bins) - 1  # bin indices for each molecule
+            # Pointer is at frame_id-(2*corr_steps-1) -> shift by +corr_steps-1 is middle of buffer which is t=0, mask is for t=0
+            pointer = (pointer + corr_steps - 1) % vel_list.shape[0]  # Adjust pointer to t=0
+            # Create forward and backward indices for correlation steps
+            forward_index = (np.arange(corr_steps) + pointer) % vel_list.shape[0]  # Indices for backward velocities
+            backward_index = (np.arange(corr_steps)[::-1] + pointer + corr_steps) % vel_list.shape[0]  # Indices for forward velocities
             for bin_id in range(len(bins) - 1):
                 mask = (com_bins == bin_id)
                 if not np.any(mask):
                     continue
-                # Get velocities for molecules in this bin (v(0) part in the equation)
+                # Get filtered velocities for molecules in this bin (v_l(0) part in the equation)
                 vel0 = vel_list[pointer, mask, :]  # shape: (num_mol_in_bin, 3)
-                # Build the velocity time series for these molecules (v(t) part in the equation)
-                velos = np.concatenate((vel_list[pointer:, mask, :], vel_list[:pointer, mask, :]), axis=0)  # (corr_steps, num_mol_in_bin, 3)
-                # Compute VACF: for each time lag, multiply vel0 by velos at that lag
-                # Broadcasting: (num_mol_in_bin, 3) * (corr_steps, num_mol_in_bin, 3) -> (corr_steps, num_mol_in_bin, 3)
-                vacf = vel0[np.newaxis, :, :] * velos  # (corr_steps, num_mol_in_bin, 3)
-                # Sum over molecules in bin, keep axis for residue/sample_each_residue
+                # Build the velocity forward time series for these molecules (v(t) part in the equation)
+                forward_velos = vel_list[forward_index][:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3)
+                # Build the velocity backward time series for these molecules (v(t) part in the equation)
+                backward_velos = vel_list[backward_index][:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3)
+                # Concatenate forward and backward
+                vacf = (vel0[np.newaxis, :, :] * forward_velos + vel0[np.newaxis, :, :] * backward_velos) / 2  # shape: (corr_steps, num_mol_in_bin, 3)
                 if sample_each_residue:
                     res_indices = np.where(mask)[0]
-                    data["vacf_data"][bin_id, :, :, :][:, res_indices, :] += vacf
+                    data["vacf_data"][bin_id, :, :, :][:, res_indices, :] += vacf # It is not the same as [bin_id, :, res_indices, :]
                     data["density"][bin_id, res_indices] += 1
                 else:
                     data["vacf_data"][bin_id, :, 0, :] += np.sum(vacf, axis=1)
@@ -1222,18 +1229,18 @@ class Sample:
     ##################
     # Numpy Sampling #
     ##################
-    def init_numpy(self, link_out, positions=True, velocities=True):
+    def init_numpy_file(self, link_out, positions=True, velocities=True):
         """Enable numpy sampling routine.
 
         This function enables the numpy sampling routine. It is used to
-        sample the positions and velocities of the molecules in the system. The
+        sample the positions and/or velocities of the molecules in the system. The
         output is stored in a .npz data file. The shape of the data is 
         (num_frames, num_molecules, 3) for positions and velocities.
 
         Parameters
         ----------
         link_out : string
-            Link to numpy data file
+            Name to numpy data file
         positions : bool, optional
             True to sample positions of the molecules, default is True
         velocities : bool, optional
@@ -1354,10 +1361,9 @@ class Sample:
 
             # Shift window to last new time origin and extend it by correlation time
             if self._is_diffusion_vacf:
-                # TODO maybe change start for timeresversal mapping?
                 shift_start = [start%self._diff_vacf_inp["new_time_origin_steps"] for start in frame_start]
                 shift_end = [end%self._diff_vacf_inp["new_time_origin_steps"] for end in frame_end]
-                frame_start = [max(0, start-shift_start[i]) for i, start in enumerate(frame_start)]
+                frame_start = [max(0, start-shift_start[i]-self._diff_vacf_inp["corr_steps"]+1) for i, start in enumerate(frame_start)]
                 frame_end = [min(self._num_frame, end-shift_end[i]+self._diff_vacf_inp["corr_steps"]) for i, end in enumerate(frame_end)]
 
             # Create working lists for processors
@@ -1522,7 +1528,7 @@ class Sample:
         elif self._is_diffusion_mc:
             len_fill = self._diff_mc_inp["len_step"][-1]+1
         elif self._is_diffusion_vacf:
-            len_fill = self._diff_vacf_inp["corr_steps"]
+            len_fill = 2 * self._diff_vacf_inp["corr_steps"] - 1
         else:
             len_fill = 1
 

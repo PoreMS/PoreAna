@@ -361,10 +361,13 @@ def density_from_vacf(link_data):
     Calculate the density from given VACF data.
     The density is returned as the average number of residues per bin.
 
+    The sum of all bins is equal to the total number of residues in the system.
+
     Parameters
     ----------
     link_data : str
-        The path to the data file containing the VACF data.
+        The path to the data file containing the VACF data, created by the
+        :func:`poreana.sample.init_diffusion_vacf` function.
     
     Returns
     -------
@@ -373,9 +376,35 @@ def density_from_vacf(link_data):
     """
     sample = utils.load(link_data)
     data = sample["data"]
-    inp = sample["inp"]
-    num_res = inp["num_res"]
+    num_res = sample["inp"]["num_res"]
 
     num_new_time_origins = np.sum(data["density"]) / num_res
     avg_res_per_bin = data["density"].sum(axis=1) / num_new_time_origins
+    return avg_res_per_bin
+
+def density_from_vacf_per_residue(link_data):
+    """
+    Calculate the density from given VACF data for each residue.
+    The density is returned as the average number of residues per bin.
+
+    The sum of all bins for one residue is equal to one. The sum of all residues
+    in one bin is equal to the result of :func:`density_from_vacf`.
+
+    Parameters
+    ----------
+    link_data : str
+        The path to the data file containing the VACF data, created by the
+        :func:`poreana.sample.init_diffusion_vacf` function.
+    
+    Returns
+    -------
+    avg_res_per_bin : np.ndarray
+        The average number of residues per bin, with shape (bin_num, num_res).
+    """
+    sample = utils.load(link_data)
+    data = sample["data"]
+    num_res = sample["inp"]["num_res"]
+
+    num_new_time_origins = np.sum(data["density"]) / num_res
+    avg_res_per_bin = data["density"] / num_new_time_origins
     return avg_res_per_bin
