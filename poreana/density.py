@@ -356,10 +356,11 @@ def mean(density, is_print=True, int_limit=2.5):
 
     return {"num_dens": num_dens_weight, "dens": dens_weight}
 
-def density_from_vacf(link_data):
+def density_from_vacf(link_data, plot_axis=None, convert_to_kg_m3=False, **kwargs):
     """
-    Calculate the density from given VACF data.
-    The density is returned as the average number of residues per bin.
+    Calculate the density from given VACF data. The density is returned as the 
+    average number of residues per bin. Optionally, it can be plotted on the 
+    provided axis.
 
     The sum of all bins is equal to the total number of residues in the system.
 
@@ -368,6 +369,10 @@ def density_from_vacf(link_data):
     link_data : str
         The path to the data file containing the VACF data, created by the
         :func:`poreana.sample.init_diffusion_vacf` function.
+    plot_axis : matplotlib.axes.Axes, optional
+        The axis on which to plot the density. If None, no plot is created.
+    convert_to_kg_m3 : bool, optional
+        If True, convert the density to kg/m^3 using the mass of the residues.
     
     Returns
     -------
@@ -380,6 +385,33 @@ def density_from_vacf(link_data):
 
     num_new_time_origins = np.sum(data["density"]) / num_res
     avg_res_per_bin = data["density"].sum(axis=1) / num_new_time_origins
+
+    if convert_to_kg_m3:
+        area = np.prod([sample["box"]["length"][i] for i in range(3) if i != sample["inp"]["direction"]])
+        volume = area * np.array([sample["inp"]["bins"][i+1] - sample["inp"]["bins"][i] for i in range(len(sample["inp"]["bins"]) - 1)])
+        avg_res_per_bin *= sample["inp"]["mass"] / volume / 0.6022
+
+    if plot_axis is not None:
+        bin_centers = [(sample["inp"]["bins"][i] + sample["inp"]["bins"][i+1]) / 2 for i in range(len(sample["inp"]["bins"]) - 1)]
+        plot_kwargs = dict(kwargs)
+        plot_kwargs.pop("color", None)
+        plot_kwargs.pop("marker", None)
+        plot_kwargs.pop("label", None)
+        plot_axis.plot(
+            bin_centers,
+            avg_res_per_bin,
+            marker=kwargs.get("marker", "o"),
+            color=kwargs.get("color", "black"),
+            label=kwargs.get("label", "Density"),
+            **plot_kwargs
+        )
+        plot_axis.set_xlabel('Bin Center (nm)')
+        if convert_to_kg_m3:
+            plot_axis.set_ylabel('Density (kg/m^3)', color=kwargs.get("color", "black"))
+        else:
+            plot_axis.set_ylabel('Average Residues per Bin', color=kwargs.get("color", "black"))
+        plot_axis.tick_params(axis='y', labelcolor=kwargs.get("color", "black"))
+
     return avg_res_per_bin
 
 def density_from_vacf_per_residue(link_data):

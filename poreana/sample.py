@@ -1686,4 +1686,5 @@ class Sample:
                 sys.stdout.write("Finished frame "+frame_form%(frame_id+1)+"/"+frame_form%frame_list[-1]+" on one Core ...\r")
                 sys.stdout.flush()
 
+        print("Finished on one Core for frames "+frame_form%(frame_list[0])+"-"+frame_form%frame_list[-1])
         return output
