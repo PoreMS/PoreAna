@@ -93,6 +93,11 @@ class Sample:
         frame = traj.read()
         num_res = len(frame.topology.atoms)/mol.get_num()
 
+        if self._box == []:
+            # Get box length from trajectory
+            c = frame.cell
+            self._box = list(np.array(c.lengths) / 10)
+
         # Check number of residues
         if abs(int(num_res)-num_res) >= 1e-5:
             print("Number of atoms is inconsistent with number of residues.")
