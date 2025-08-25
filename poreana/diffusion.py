@@ -941,25 +941,26 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
 
         # Plot fitted diffusion profile
         if is_plot:
-            sns.lineplot(x=bins, y=diff_profile_fit, **kwargs)   # m^2/s
+            plt.plot(bins, diff_profile_fit, **kwargs)   # m^2/s
+            # sns.lineplot(x=bins, y=diff_profile_fit, **kwargs)   # m^2/s
             if is_error:
                 if "label" in kwargs:
                     del kwargs["label"]
                 plt.fill_between(bins, [(diff_profile_fit[i]-diff_error_bin[i]) for i in range(len(diff_profile_fit))], [(diff_profile_fit[i]+diff_error_bin[i]) for i in range(len(diff_profile_fit))],alpha=0.3, **kwargs)
                 
-    # Set legend for lag times
-    if is_plot:
-        if not infty_profile and len(len_step) >= 2:
-            legend.append("$\\Delta t_{\\alpha} \\rightarrow \\infty$ ps")
-        if (not is_error) and infty_profile:
-            legend.append("$\\Delta t_{\\alpha} \\rightarrow \\infty$ ps")
-        # Set plot properties
-        # Plot axis title for a entire system
-        plt.ylabel(r"Diff. coeff. ($10^{-9} \ \mathrm{m^2s^{-1}}$)")
-        plt.xlabel(r"Box length (nm)")
-        plt.xlim([min(bins),max(bins)])
-        if legend:
-            plt.legend(legend)
+    # # Set legend for lag times
+    # if is_plot:
+    #     if not infty_profile and len(len_step) >= 2:
+    #         legend.append("$\\Delta t_{\\alpha} \\rightarrow \\infty$ ps")
+    #     if (not is_error) and infty_profile:
+    #         legend.append("$\\Delta t_{\\alpha} \\rightarrow \\infty$ ps")
+    #     # Set plot properties
+    #     # Plot axis title for a entire system
+    #     plt.ylabel(r"Diff. coeff. ($10^{-9} \ \mathrm{m^2s^{-1}}$)")
+    #     plt.xlabel(r"Box length (nm)")
+    #     plt.xlim([min(bins),max(bins)])
+    #     if legend:
+    #         plt.legend(legend)
 
 
     return diff_profile_fit, diff_profiles, bins
@@ -1131,7 +1132,7 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
 ################
 # Diffusion VACF
 ################
-def correlate_velocity_from_npz_file(link_in, link_out):
+def correlate_velocity_from_npz_file(link_in, link_out, frame_length=20e-15, len_correration=1e-8):
     """This function calculates the Velocity Autocorrelation Function (VACF)
     from a numpy file containing the velocities of a system. The VACF is
     calculated for each residue and dimension, and the results are saved to a
@@ -1143,6 +1144,10 @@ def correlate_velocity_from_npz_file(link_in, link_out):
         Link to the numpy npz file containing the velocity data, created by the `poreana.sample.init_numpy_file` function.
     link_out : string
         Name of the numpy file where the VACF will be saved.
+    frame_length : float, optional
+        Time between 2 frames in seconds (default is 20e-15).
+    len_correration : float, optional
+        Length of the correlation that is saved in seconds (default is 1e-8).
 
     Returns
     -------
@@ -1160,9 +1165,9 @@ def correlate_velocity_from_npz_file(link_in, link_out):
             # Calculate the Velocity Autocorrelation Function (VACF)
             vacf[:, residue, dim] = sp.signal.correlate(velocities[:, residue, dim], velocities[:, residue, dim], 
                                                         mode='full')[velocities.shape[0]-1:] / velocities.shape[0]
-    np.save(link_out, vacf)
+    np.save(link_out, vacf[:int(len_correration // frame_length + 1), :, :])
 
-def total_diffusion_from_vacf_npy_file(link, frame_length=20e-15, len_correration=1e-10, mean_over_time=0, is_print=True, is_plot=True, **kwargs):
+def diffusion_from_npy_file_vacf(link, frame_length=20e-15, len_correration=1e-10, mean_over_time=0, is_print=True, is_plot=True, **kwargs):
     """This function calculates the diffusion coefficient from a vacf numpy file
     containing the vacf of a system. The diffusion coefficient is
     calculated by integrating the VACF.
@@ -1253,9 +1258,6 @@ def integrate_bin_diffusion_vacf(link_data):
     new_time_origin_steps = inp["new_time_origin_steps"]
     num_res = inp["num_res"]
 
-    num_new_time_origins = np.sum(data["density"]) / num_res
-    print("Averaged over ", num_new_time_origins, " new time origins.")
-
     vacf_data = data["vacf_data"].copy() / data["density"][:, np.newaxis, :, np.newaxis]
 
     integrated = sp.integrate.cumulative_trapezoid(
@@ -1266,7 +1268,7 @@ def integrate_bin_diffusion_vacf(link_data):
 
     return integrated
 
-def plot_correlation_per_bin(link_data, plot_axis, plot_mean=True, **kwargs):
+def plot_correlation_per_bin(link_data, plot_axis, plot_mean=True, bin_selection=[], **kwargs):
     """
     Plot the integrated velocity autocorrelation function (VACF) per bin.
     
@@ -1278,6 +1280,8 @@ def plot_correlation_per_bin(link_data, plot_axis, plot_mean=True, **kwargs):
         The axis on which to plot the integrated VACF.
     plot_mean : bool, optional
         If True, plot the mean integrated VACF across all bins (default is True).
+    bin_selection : list, optional
+        List of bin indices to plot. If empty, all bins are plotted (default is [])
     kwargs : dict, optional
         Additional keyword arguments for plotting, such as line style, color, etc.
     """
@@ -1285,17 +1289,23 @@ def plot_correlation_per_bin(link_data, plot_axis, plot_mean=True, **kwargs):
 
     integrated = integrate_bin_diffusion_vacf(link_data)
 
-    for bin in range(integrated.shape[0]):
+    selected_bins = bin_selection if bin_selection else range(integrated.shape[0])
+
+    plot_kwargs = kwargs.copy()
+    plot_kwargs.pop('label', None) 
+
+    for bin in selected_bins:
         plot_axis.plot(np.arange(integrated.shape[2]) * sample["inp"]["len_frame"] * sample["inp"]["sample_step"] * 1e12,
-                       1e9 * integrated[bin, :, :, :].mean(axis=(0, 2)), label=kwargs.get('label', f'Bin {bin}'), **kwargs)
+                       1e9 * integrated[bin, :, :, :].mean(axis=(0, 2)), label=kwargs.get('label', f'Bin {bin}'), **plot_kwargs)
     if plot_mean:
+        plot_kwargs.pop('color', None)
         mean = np.nansum(np.nanmean(integrated, axis=(1, 3)) * pa.density.density_from_vacf(link_data)[:, np.newaxis], axis=0) / sample["inp"]["num_res"]
         plot_axis.plot(np.arange(integrated.shape[2]) * sample["inp"]["len_frame"] * sample["inp"]["sample_step"] * 1e12,
-                       1e9 * mean, label=kwargs.get('label', 'Mean'), color=kwargs.get('color', 'black'), **kwargs)
+                       1e9 * mean, label=kwargs.get('label', 'Mean'), color=kwargs.get('color', 'black'), **plot_kwargs)
     plot_axis.set_xlabel('Time (ps)')
     plot_axis.set_ylabel(r'Integrated vel. correlation ($10^{-9} \ \mathrm{m^2s^{-1}}$)')
 
-def diffusion_per_bin(link_data, mean_over_time=0, remove_low_density_bins=0.0, plot_axis=None, plot_mean=True, plot_xyz=True, **kwargs):
+def diffusion_per_bin(link_data, mean_over_time=0, remove_low_density_bins=0.0, plot_axis=None, plot_selection='xyzm', **kwargs):
     """
     Plot the diffusion coefficient per bin from the integrated VACF data.
     
@@ -1304,7 +1314,7 @@ def diffusion_per_bin(link_data, mean_over_time=0, remove_low_density_bins=0.0, 
     link_data : str
         The path to the data file containing the VACF data.
     mean_over_time : float, optional
-        Time at the end to average the diffusion coefficient over. 
+        Time in s at the end to average the diffusion coefficient over. 
         (default is 0, no average).
     remove_low_density_bins : float, optional
         Threshold as minimum average number of particles per bin to calculate 
@@ -1312,10 +1322,9 @@ def diffusion_per_bin(link_data, mean_over_time=0, remove_low_density_bins=0.0, 
         (default is 0.0, no removal).
     plot_axis : matplotlib.axes.Axes, optional
         The axis on which to plot the diffusion coefficient. If None, no plotting is done.
-    plot_mean : bool, optional
-        If True, plot the mean diffusion coefficient across all bins (default is True).
-    plot_xyz : bool, optional
-        If True, plot the diffusion coefficient for each x, y, and z direction (default is True).
+    plot_selection : str, optional
+        Selection of directions of diffusion to plot.
+        Options are 'x', 'y', 'z', 'm' (mean), or combinations. Default is 'xyzm' (all directions and mean).
     kwargs : dict, optional
         Additional keyword arguments for plotting, such as line style, color, etc.
 
@@ -1343,24 +1352,19 @@ def diffusion_per_bin(link_data, mean_over_time=0, remove_low_density_bins=0.0, 
     diffusion *= 1e9
 
     if plot_axis is not None:
-        if plot_xyz:
-            plot_kwargs = kwargs.copy()
-            plot_kwargs.setdefault('marker', 'x')
-            label = str(plot_kwargs.pop('label', ""))
-            plot_kwargs['label'] = label + " " + 'diffusion x-direction'
-            plot_axis.plot([(sample["inp"]["bins"][i] + sample["inp"]["bins"][i+1]) / 2 for i in range(len(sample["inp"]["bins"]) - 1)],
-                           diffusion[:, 0], **plot_kwargs)
-            plot_kwargs['label'] = label + " " + 'diffusion y-direction'
-            plot_axis.plot([(sample["inp"]["bins"][i] + sample["inp"]["bins"][i+1]) / 2 for i in range(len(sample["inp"]["bins"]) - 1)],
-                           diffusion[:, 1], **plot_kwargs)
-            plot_kwargs['label'] = label + " " + 'diffusion z-direction'
-            plot_axis.plot([(sample["inp"]["bins"][i] + sample["inp"]["bins"][i+1]) / 2 for i in range(len(sample["inp"]["bins"]) - 1)],
-                           diffusion[:, 2], **plot_kwargs)
-        if plot_mean:
+        for direction in ['x', 'y', 'z']:
+            if direction in plot_selection:
+                plot_kwargs = kwargs.copy()
+                plot_kwargs.setdefault('marker', 'x')
+                label = str(plot_kwargs.pop('label', ""))
+                plot_kwargs['label'] = label + f" diffusion {direction}-direction"
+                plot_axis.plot([(sample["inp"]["bins"][i] + sample["inp"]["bins"][i+1]) / 2 for i in range(len(sample["inp"]["bins"]) - 1)],
+                               diffusion[:, 'xyz'.index(direction)], **plot_kwargs)
+        if 'm' in plot_selection or 'mean' in plot_selection:
             plot_kwargs = kwargs.copy()
             plot_kwargs.setdefault('marker', 'o')
             plot_kwargs.setdefault('color', 'black')
-            plot_kwargs['label'] = str(plot_kwargs.pop('label', "")) + " " + 'mean diffusion'
+            plot_kwargs['label'] = str(plot_kwargs.pop('label', "")) + " mean diffusion"
             plot_axis.plot([(sample["inp"]["bins"][i] + sample["inp"]["bins"][i+1]) / 2 for i in range(len(sample["inp"]["bins"]) - 1)],
                            diffusion.mean(axis=1), **plot_kwargs)
         plot_axis.set_xlabel('Bin Center (nm)')
