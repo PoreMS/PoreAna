@@ -1268,7 +1268,7 @@ def integrate_bin_diffusion_vacf(link_data):
 
     return integrated
 
-def plot_correlation_per_bin(link_data, plot_axis, plot_mean=True, bin_selection=[], **kwargs):
+def plot_correlation_per_bin(link_data, plot_axis, plot_mean=True, bin_selection=None, **kwargs):
     """
     Plot the integrated velocity autocorrelation function (VACF) per bin.
     
@@ -1281,7 +1281,7 @@ def plot_correlation_per_bin(link_data, plot_axis, plot_mean=True, bin_selection
     plot_mean : bool, optional
         If True, plot the mean integrated VACF across all bins (default is True).
     bin_selection : list, optional
-        List of bin indices to plot. If empty, all bins are plotted (default is [])
+        List of bin indices to plot. If empty, no bins are plotted (default is None)
     kwargs : dict, optional
         Additional keyword arguments for plotting, such as line style, color, etc.
     """
@@ -1289,7 +1289,11 @@ def plot_correlation_per_bin(link_data, plot_axis, plot_mean=True, bin_selection
 
     integrated = integrate_bin_diffusion_vacf(link_data)
 
-    selected_bins = bin_selection if bin_selection else range(integrated.shape[0])
+    if bin_selection is not None and not isinstance(bin_selection, list):
+        print("bin_selection must be a list of bin indices or None.")
+        return
+
+    selected_bins = bin_selection if bin_selection is not None else range(integrated.shape[0])
 
     plot_kwargs = kwargs.copy()
     plot_kwargs.pop('label', None) 
