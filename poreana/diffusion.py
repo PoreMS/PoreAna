@@ -1403,7 +1403,7 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
             plot_kwargs = kwargs.copy()
             plot_kwargs.setdefault('marker', 'o')
             plot_kwargs.setdefault('color', 'black')
-            plot_kwargs['label'] = str(plot_kwargs.pop('label', "")) + " mean diffusion"
+            plot_kwargs['label'] = str(plot_kwargs.pop('label', "")) + " total diffusion"
             plot_axis.plot([(sample["inp"]["bins"][i] + sample["inp"]["bins"][i+1]) / 2 for i in range(len(sample["inp"]["bins"]) - 1)],
                            diffusion.mean(axis=1), **plot_kwargs)
         plot_axis.set_xlabel('Bin Center (nm)')

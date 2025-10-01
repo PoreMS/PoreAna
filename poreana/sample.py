@@ -1172,7 +1172,7 @@ class Sample:
 
         return data
 
-    def _diffusion_vacf(self, data: dict, frame_id: int, positions: np.ndarray, vel_list: np.ndarray, pointer: int):
+    def _diffusion_vacf(self, data: dict, frame_id: int, pos_list: np.ndarray, pos_pointer: int, vel_list: np.ndarray, vel_pointer: int):
         """
         This function samples the local velocity autocorrelation function (VACF) for
         the diffusion calculation.
@@ -1187,12 +1187,15 @@ class Sample:
             Data dictionary containing bins for VACF diffusion
         frame_id : integer
             Current frame id
-        positions : numpy.ndarray
-            List of atom positions of current frame
+        pos_list : numpy.ndarray
+            List of molecule positions of all buffered frames
+            shape: (corr_steps, num_molecules, 3)
+        pos_pointer : integer
+            Pointer to the current frame in the position list
         vel_list : numpy.ndarray
             List of molecule velocities of all buffered frames
             shape: (2*corr_steps-1, num_molecules, 3)
-        pointer : integer
+        vel_pointer : integer
             Pointer to the current frame in the velocity list
         """
         bins = self._diff_vacf_inp["bins"]
@@ -1201,22 +1204,21 @@ class Sample:
         new_time_origin_steps = self._diff_vacf_inp["new_time_origin_steps"]
         sample_each_residue = self._diff_vacf_inp["sample_each_residue"]
 
-        pos = np.array(positions[:, direction]).reshape((len(self._res_list), len(self._atoms))) / 10 # Convert to nm
-        com = np.sum(pos * self._masses[np.newaxis, :], axis=1) / self._sum_masses
+        pos = pos_list[pos_pointer, :, direction] # shape: (num_molecules); positions of v(0)
 
         if (frame_id-corr_steps)%new_time_origin_steps==0:
-            com_bins = np.digitize(com, bins) - 1  # bin indices for each molecule
+            com_bins = np.digitize(pos, bins) - 1  # bin indices for each molecule
             # Pointer is at frame_id-(2*corr_steps-1) -> shift by +corr_steps-1 is middle of buffer which is t=0, mask is for t=0
-            pointer = (pointer + corr_steps - 1) % vel_list.shape[0]  # Adjust pointer to t=0
+            vel_pointer = (vel_pointer + corr_steps - 1) % vel_list.shape[0]  # Adjust pointer to t=0
             # Create forward and backward indices for correlation steps
-            forward_index = (np.arange(corr_steps) + pointer) % vel_list.shape[0]  # Indices for backward velocities
-            backward_index = (np.arange(corr_steps)[::-1] + pointer + corr_steps) % vel_list.shape[0]  # Indices for forward velocities
+            forward_index = (np.arange(corr_steps) + vel_pointer) % vel_list.shape[0]  # Indices for backward velocities
+            backward_index = (np.arange(corr_steps)[::-1] + vel_pointer + corr_steps) % vel_list.shape[0]  # Indices for forward velocities
             for bin_id in range(len(bins) - 1):
                 mask = (com_bins == bin_id)
                 if not np.any(mask):
                     continue
                 # Get filtered velocities for molecules in this bin (v_l(0) part in the equation)
-                vel0 = vel_list[pointer, mask, :]  # shape: (num_mol_in_bin, 3)
+                vel0 = vel_list[vel_pointer, mask, :]  # shape: (num_mol_in_bin, 3)
                 # Build the velocity forward time series for these molecules (v(t) part in the equation)
                 forward_velos = vel_list[forward_index][:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3)
                 # Build the velocity backward time series for these molecules (v(t) part in the equation)
@@ -1533,7 +1535,8 @@ class Sample:
         elif self._is_diffusion_mc:
             len_fill = self._diff_mc_inp["len_step"][-1]+1
         elif self._is_diffusion_vacf:
-            len_fill = 2 * self._diff_vacf_inp["corr_steps"] - 1
+            len_fill_vel = 2 * self._diff_vacf_inp["corr_steps"] - 1
+            len_fill_pos = self._diff_vacf_inp["corr_steps"]
         else:
             len_fill = 1
 
@@ -1548,8 +1551,10 @@ class Sample:
             com_list = []
             idx_list = []
         elif self._is_diffusion_vacf:
-            vel_list = np.zeros((len_fill, len(self._res_list), 3), float)
-            pointer = 0
+            pos_list = np.zeros((len_fill_pos, len(self._res_list), 3), float)
+            vel_list = np.zeros((len_fill_vel, len(self._res_list), 3), float)
+            pos_pointer = 0
+            vel_pointer = 0
             filled_up = False
 
         # Create local data structures
@@ -1597,12 +1602,18 @@ class Sample:
                 idx_list.append({})
                 com_list.append({})
             elif self._is_diffusion_vacf:
+                pos = np.array(positions).reshape((len(self._res_list), len(self._atoms), 3)) / 10 # Convert to nm
+                com = np.sum(pos * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
+                pos_list[pos_pointer] = com
+                pos_pointer += 1
+                if pos_pointer >= len_fill_pos:
+                    pos_pointer = 0
                 vel = np.array(velocities).reshape((len(self._res_list), len(self._atoms), 3)) * 100 # Convert A/ps to m/s
-                vel_com = np.sum(vel * self._masses[np.newaxis,: , np.newaxis], axis=1) / self._sum_masses
-                vel_list[pointer] = vel_com
-                pointer += 1
-                if pointer >= len_fill:
-                    pointer = 0
+                vel_com = np.sum(vel * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
+                vel_list[vel_pointer] = vel_com
+                vel_pointer += 1
+                if vel_pointer >= len_fill_vel:
+                    vel_pointer = 0
                     if not filled_up:
                         filled_up = True
 
@@ -1682,13 +1693,13 @@ class Sample:
                         self._diffusion_mc(output["diffusion_mc"], idx_list, com, res_id, frame_list, frame_id)
             elif self._is_diffusion_vacf:
                 if filled_up:
-                    self._diffusion_vacf(output["diffusion_vacf"], frame_id, positions, vel_list, pointer)
+                    self._diffusion_vacf(output["diffusion_vacf"], frame_id, pos_list, pos_pointer, vel_list, vel_pointer)
             elif self._is_numpy:
                 self._numpy(output["numpy"], positions, velocities, frame_id)
 
             # Progress
             if frame_list[0] == 0 and (frame_id+1)%100==0 or frame_id==0:
-                sys.stdout.write("Finished frame "+frame_form%(frame_id+1)+"/"+frame_form%frame_list[-1]+" on one Core ...\r")
+                sys.stdout.write("Finished frame "+frame_form%(frame_id+1)+"/"+frame_form%frame_list[-1]+" of one Core ...\r")
                 sys.stdout.flush()
 
         print("Finished on one Core for frames "+frame_form%(frame_list[0])+"-"+frame_form%frame_list[-1])
