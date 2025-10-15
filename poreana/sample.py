@@ -46,8 +46,10 @@ class Sample:
         List of atom masses, leave empty to read molecule object masses
     entry : float, optional
         Remove pore entrance from calculation
+    frame_end : int, optional
+        Set an end of trajectory analysis to stop the analysis earlier 
     """
-    def __init__(self, system, link_traj, mol, atoms=[], masses=[], entry=0.5):
+    def __init__(self, system, link_traj, mol, atoms=[], masses=[], entry=0.5, frame_end = -1):
         # Initialize
         self._pore = utils.load(system, file_type="yml") if isinstance(system, str) else None
         self._box = system if isinstance(system, list) else []
@@ -83,7 +85,11 @@ class Sample:
 
         # Get number of frames
         traj = cf.Trajectory(self._traj)
-        self._num_frame = traj.nsteps
+        if frame_end == -1:
+            self._num_frame = traj.nsteps
+        else:
+            self._num_frame = frame_end
+
 
         # Get numer of residues
         frame = traj.read()
