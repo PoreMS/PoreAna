@@ -134,6 +134,7 @@ def bins(link_data, area=[[10, 90], [10, 90]], target_dens=0, is_print=True):
 
     else:
         box = sample["box"]["length"]
+        res = None
 
     # Calculate bin volume
     volume = {}
@@ -147,6 +148,7 @@ def bins(link_data, area=[[10, 90], [10, 90]], target_dens=0, is_print=True):
             elif pore_props[pore_id]["pore_type"]=="SLIT" and inp["avg_slit"]:
                 volume[pore_id]["in"] = [box[0]*(box[2]-2*res-2*entry)*(width[pore_id]["in"][i+1]-width[pore_id]["in"][i])*2 for i in range(0, bin_num+1)]
             elif pore_props[pore_id]["pore_type"]=="SLIT" and not inp["avg_slit"]:
+                print(res,entry)
                 volume[pore_id]["in"] = [box[0]*(box[2]-2*res-2*entry)*(width[pore_id]["in"][i+1]-width[pore_id]["in"][i]) for i in range(0, bin_num+1)]
 
             ## Exterior  ###Update fehlt hier noch 
@@ -172,21 +174,24 @@ def bins(link_data, area=[[10, 90], [10, 90]], target_dens=0, is_print=True):
     for pore_id in pore_props.keys(): 
         num_dens[pore_id] = {}
         num_dens[pore_id]["in"] = [bins[pore_id]["in"][i]/volume[pore_id]["in"][i]/num_frame for i in range(bin_num+1)] if is_pore else []
-    num_dens["ex"] = [bins["ex"][i]/volume["ex"][i]/num_frame for i in range(bin_num+1)]
+    if res != 0:
+        num_dens["ex"] = [bins["ex"][i]/volume["ex"][i]/num_frame for i in range(bin_num+1)]
 
     # Calculate the mean in the selected area
     mean = {}
     for pore_id in pore_props.keys(): 
         mean[pore_id] = {}
         mean[pore_id]["in"] = np.mean(num_dens[pore_id]["in"][area[0][0]:area[0][1]]) if is_pore else []
-    mean["ex"] = np.mean(num_dens["ex"][area[1][0]:area[1][1]])
+    if res != 0:
+        mean["ex"] = np.mean(num_dens["ex"][area[1][0]:area[1][1]])
 
     # Calculate Density
     dens = {}
     for pore_id in pore_props.keys(): 
         dens[pore_id] = {}
         dens[pore_id]["in"] = mass*10/6.022*mean[pore_id]["in"] if is_pore else []
-    dens["ex"] = mass*10/6.022*mean["ex"]
+    if res != 0:
+        dens["ex"] = mass*10/6.022*mean["ex"]
 
     # Calculate difference to target density
     if is_pore:
@@ -199,7 +204,8 @@ def bins(link_data, area=[[10, 90], [10, 90]], target_dens=0, is_print=True):
         if is_pore:
             for pore_id in pore_props.keys(): 
                 print("Density inside " +  pore_id + " = "+"%5.3f"%mean[pore_id]["in"]+" #/nm^3 ; "+"%7.3f"%dens[pore_id]["in"]+" kg/m^3")
-            print("Density outside Pore Area = "+"%5.3f"%mean["ex"]+" #/nm^3 ; "+"%7.3f"%dens["ex"]+" kg/m^3")
+            if res != 0:
+                print("Density outside Pore Area = "+"%5.3f"%mean["ex"]+" #/nm^3 ; "+"%7.3f"%dens["ex"]+" kg/m^3")
         else:
             print("Density = "+"%5.3f"%mean["ex"]+" #/nm^3 ; "+"%7.3f"%dens["ex"]+" kg/m^3")
         if target_dens:
