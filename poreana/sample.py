@@ -1698,8 +1698,8 @@ class Sample:
                 self._numpy(output["numpy"], positions, velocities, frame_id)
 
             # Progress
-            if frame_list[0] == 0 and (frame_id+1)%100==0 or frame_id==0:
-                sys.stdout.write("Finished frame "+frame_form%(frame_id+1)+"/"+frame_form%frame_list[-1]+" of one Core ...\r")
+            if frame_list[0] == 0 and (frame_id)%100==0 or frame_id==0:
+                sys.stdout.write("Finished frame "+frame_form%(frame_id)+"/"+frame_form%frame_list[-1]+" on one Core ...\r")
                 sys.stdout.flush()
 
         print("Finished on one Core for frames "+frame_form%(frame_list[0])+"-"+frame_form%frame_list[-1])

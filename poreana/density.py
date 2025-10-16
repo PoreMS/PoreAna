@@ -420,9 +420,10 @@ def density_from_bins(link_data, convert="", plot_axis=None, **kwargs):
             average_density_per_bin, 
             color=kwargs.get("color", "black"), 
             label=kwargs.get("label", "Density"),
-            **plot_kwargs)
-        plot_axis.set_xlabel('Box length (nm)')
-        plot_axis.set_ylabel("Density ($\mathrm{" + fr'{convert}' + "}$)")
+            **plot_kwargs
+        )
+        plot_axis.set_xlabel("xyz"[inp["direction"]] + " / nm")
+        plot_axis.set_ylabel("Density / $\mathrm{" + fr'{convert}' + "}$")
 
     return average_density_per_bin
 
@@ -491,8 +492,8 @@ def density_from_vacf(link_data, convert="", plot_axis=None, **kwargs):
             label=kwargs.get("label", "Density"),
             **plot_kwargs
         )
-        plot_axis.set_xlabel('Bin Center (nm)')
-        plot_axis.set_ylabel("Density ($\mathrm{" + fr'{convert}' + "}$)")
+        plot_axis.set_xlabel("xyz"[sample["inp"]["direction"]] + " / nm")
+        plot_axis.set_ylabel("Density / $\mathrm{" + fr'{convert}' + "}$")
 
     return average_density_per_bin
 

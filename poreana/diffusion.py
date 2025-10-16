@@ -1277,6 +1277,9 @@ def integrate_bin_diffusion_vacf(link_data):
     new_time_origin_steps = inp["new_time_origin_steps"]
     num_res = inp["num_res"]
 
+    sample_datapoints = np.sum(data["density"])
+    print(f"Sampled {2*sample_datapoints} data points (including time reversal) over {sample_datapoints/num_res} frames.")
+
     vacf_data = data["vacf_data"].copy() / data["density"][:, np.newaxis, :, np.newaxis]
 
     integrated = sp.integrate.cumulative_trapezoid(
@@ -1325,8 +1328,8 @@ def plot_correlation_per_bin(link_data, plot_axis, plot_mean=True, bin_selection
         mean = np.nansum(np.nanmean(integrated, axis=(1, 3)) * pa.density.density_from_vacf(link_data)[:, np.newaxis], axis=0) / sample["inp"]["num_res"]
         plot_axis.plot(np.arange(integrated.shape[2]) * sample["inp"]["len_frame"] * sample["inp"]["sample_step"] * 1e12,
                        1e9 * mean, label=kwargs.get('label', 'Mean'), color=kwargs.get('color', 'black'), **plot_kwargs)
-    plot_axis.set_xlabel('Time (ps)')
-    plot_axis.set_ylabel(r'Integrated vel. correlation ($10^{-9} \ \mathrm{m^2s^{-1}}$)')
+    plot_axis.set_xlabel('t / ps')
+    plot_axis.set_ylabel(r'Integrated vel. correlation / $10^{-9} \ \mathrm{m^2s^{-1}}$')
 
 def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.0, plot_axis=None, plot_selection='xyzm', **kwargs):
     """
@@ -1396,18 +1399,18 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
                 plot_kwargs = kwargs.copy()
                 plot_kwargs.setdefault('marker', 'x')
                 label = str(plot_kwargs.pop('label', ""))
-                plot_kwargs['label'] = label + f" diffusion {direction}-direction"
+                plot_kwargs['label'] = label + f" diffusion {direction}-direction" if label else None
                 plot_axis.plot([(sample["inp"]["bins"][i] + sample["inp"]["bins"][i+1]) / 2 for i in range(len(sample["inp"]["bins"]) - 1)],
                                diffusion[:, 'xyz'.index(direction)], **plot_kwargs)
         if 'm' in plot_selection or 'mean' in plot_selection:
             plot_kwargs = kwargs.copy()
             plot_kwargs.setdefault('marker', 'o')
             plot_kwargs.setdefault('color', 'black')
-            plot_kwargs['label'] = str(plot_kwargs.pop('label', "")) + " total diffusion"
+            plot_kwargs['label'] = str(plot_kwargs.pop('label', "")) + " total diffusion" if label else None
             plot_axis.plot([(sample["inp"]["bins"][i] + sample["inp"]["bins"][i+1]) / 2 for i in range(len(sample["inp"]["bins"]) - 1)],
                            diffusion.mean(axis=1), **plot_kwargs)
-        plot_axis.set_xlabel('Bin Center (nm)')
-        plot_axis.set_ylabel(r"Diffusion coefficient ($10^{-9}$ m${^2}$ s$^{-1}$)")
+        plot_axis.set_xlabel("xyz"[sample["inp"]["direction"]] + " / nm")
+        plot_axis.set_ylabel(r"Diffusion coefficient / $10^{-9}$ m${^2}$ s$^{-1}$")
 
     # Mean diffusion across all bins, weighted by density
     mean_diffusion = np.nansum(diffusion * pa.density.density_from_vacf(link_data)[:, np.newaxis], axis=0) / sample["inp"]["num_res"]
