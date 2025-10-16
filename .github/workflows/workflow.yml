@@ -26,6 +26,7 @@ jobs:
     - name: Run tests
       run: |
         pytest -s --cov=poreana tests/
-    - name: Upload Coverage to Codecov
-      uses: codecov/codecov-action@v1
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+
       
