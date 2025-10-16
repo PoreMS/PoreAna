@@ -5,7 +5,7 @@
 [![PyPI Version](https://img.shields.io/badge/PyPI-0.2.3-orange)](https://pypi.org/project/PoreAna/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/Ajax23/PoreAna/blob/master/LICENSE)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14056630.svg)](https://doi.org/10.5281/zenodo.14056630)
-[![Build Status](https://github.com/Ajax23/PoreAna/actions/workflows/workflow.yml/badge.svg)](https://github.com/Ajax23/PoreAna/actions/workflows/workflow.yml)
+[![Build Status](https://github.com/PoreMS/PoreAna/actions/workflows/workflow.yml/badge.svg)](https://github.com/PoreMS/PoreAna/actions/workflows/workflow.yml)
 [![codecov](https://codecov.io/gh/Ajax23/PoreAna/branch/master/graph/badge.svg)](https://codecov.io/gh/Ajax23/PoreAna)
 
 ## Documentation
