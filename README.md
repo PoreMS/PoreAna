@@ -1,18 +1,18 @@
-<img src="https://github.com/Ajax23/PoreAna/blob/master/docsrc/pics/logo_text_sub.svg" width="60%">
+<img src="https://github.com/PoreMS/PoreAna/blob/master/docsrc/pics/logo_text_sub.svg" width="60%">
 
 --------------------------------------
 
 [![PyPI Version](https://img.shields.io/badge/PyPI-0.2.3-orange)](https://pypi.org/project/PoreAna/)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/Ajax23/PoreAna/blob/master/LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/PoreMS/PoreAna/blob/master/LICENSE)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14056630.svg)](https://doi.org/10.5281/zenodo.14056630)
 [![Build Status](https://github.com/PoreMS/PoreAna/actions/workflows/workflow.yml/badge.svg)](https://github.com/PoreMS/PoreAna/actions/workflows/workflow.yml)
-[![codecov](https://codecov.io/gh/Ajax23/PoreAna/branch/master/graph/badge.svg)](https://codecov.io/gh/Ajax23/PoreAna)
+[![codecov](https://codecov.io/gh/PoreMS/PoreAna/branch/master/graph/badge.svg)](https://codecov.io/gh/PoreMS/PoreAna)
 
 ## Documentation
 
-Online documentation is available at [ajax23.github.io/PoreAna](http://ajax23.github.io/PoreAna).
+Online documentation is available at [ajax23.github.io/PoreAna](https://porems.github.io/PoreAna/).
 
-The docs include an example for analyzing [density](http://ajax23.github.io/PoreAna/density.html) and [diffusion](http://ajax23.github.io/PoreAna/diffusion.html), and an [API reference](http://ajax23.github.io/PoreAna/api.html).
+The docs include an example for analyzing [density](https://porems.github.io/PoreAna/density.html) and [diffusion](http://porems.github.io/PoreAna/diffusion.html), and an [API reference](http://porems.github.io/PoreAna/api.html).
 
 
 ## Dependencies
@@ -26,9 +26,9 @@ Installation requires [numpy](https://pypi.org/project/numpy/), [pandas](https:/
 
 You may instead want to use the development version from GitHub:
 
-    pip install git+https://github.com/ajax23/PoreAna.git#egg=poreana
+    pip install git+https://github.com/porems/PoreAna.git#egg=poreana
 
-    pip install git+https://github.com/ajax23/PoreAna.git@develop#egg=poreana
+    pip install git+https://github.com/porems/PoreAna.git@develop#egg=poreana
 
 Or download the repository and install in the top directory via:
 
@@ -42,11 +42,12 @@ To test PoreAna, run the test in the test directory.
 
 ## Development
 
-PoreAna development takes place on Github: [www.github.com/Ajax23/PoreAna](https://github.com/Ajax23/PoreAna)
+PoreAna development takes place on Github: [www.github.com/porems/PoreAna](https://github.com/porems/PoreAna)
 
-Please submit any reproducible bugs you encounter to the [issue tracker](https://github.com/Ajax23/PoreAna/issues).
+Please submit any reproducible bugs you encounter to the [issue tracker](https://github.com/porems/PoreAna/issues).
 
 
 ## How to Cite PoreAna
 
 When citing PoreAna please use the current **Zenodo DOI** corresponding to the used PoreAna version. (Current DOI is listed in the badges.)
+
