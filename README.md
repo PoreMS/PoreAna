@@ -10,7 +10,7 @@
 
 ## Documentation
 
-Online documentation is available at [ajax23.github.io/PoreAna](https://porems.github.io/PoreAna/).
+Online documentation is available at [porems.github.io/PoreAna](https://porems.github.io/PoreAna/).
 
 The docs include an example for analyzing [density](https://porems.github.io/PoreAna/density.html) and [diffusion](http://porems.github.io/PoreAna/diffusion.html), and an [API reference](http://porems.github.io/PoreAna/api.html).
 
