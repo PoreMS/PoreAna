@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [3.7, 3.8, 3.9]
+        python-version: [3.11,3.12,3.13]
 
     steps:
     - uses: actions/checkout@v2
@@ -28,3 +28,4 @@ jobs:
         pytest -s --cov=poreana tests/
     - name: Upload Coverage to Codecov
       uses: codecov/codecov-action@v1
+      
