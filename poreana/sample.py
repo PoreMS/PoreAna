@@ -5,6 +5,7 @@
 ################################################################################
 
 
+from collections import deque
 from re import X
 import sys
 import math
@@ -65,6 +66,8 @@ class Sample:
         self._is_angle = False
         self._is_diffusion_bin = False
         self._is_diffusion_mc = False
+        self._is_diffusion_vacf = False
+        self._is_numpy = False
 
         # Get molecule ids
         self._atoms = [atom.get_name() for atom in mol.get_atom_list()] if not self._atoms else self._atoms
@@ -76,6 +79,7 @@ class Sample:
                 self._masses = mol.get_masses()
             elif len(self._atoms) == 1:
                 self._masses = [1]
+        self._masses = np.array(self._masses, float)
         self._sum_masses = sum(self._masses)
 
         # Check atom mass consistency
@@ -94,6 +98,11 @@ class Sample:
         # Get numer of residues
         frame = traj.read()
         num_res = len(frame.topology.atoms)/mol.get_num()
+
+        if self._box == []:
+            # Get box length from trajectory
+            c = frame.cell
+            self._box = list(np.array(c.lengths) / 10)
 
         # Check number of residues
         if abs(int(num_res)-num_res) >= 1e-5:
@@ -178,7 +187,6 @@ class Sample:
 
         bins = [0 for x in range(bin_num+1)]
         return {"width": width, "bins": bins}
-
 
     def _bin_in_const_A(self, bin_num):
         """This function creates a bin structure for the interior of the
@@ -677,6 +685,12 @@ class Sample:
         if self._is_diffusion_mc:
             print("Binning and MC-approaches cannot be run in parallel.")
             return
+        if self._is_diffusion_vacf:
+            print("Binning and VACF-approaches cannot be run in parallel.")
+            return
+        if self._is_numpy:
+            print("Binning and numpy-approaches cannot be run in parallel.")
+            return
         if self._pore:
             self._is_diffusion_bin = True
         else:
@@ -931,6 +945,12 @@ class Sample:
         if self._is_diffusion_bin:
             print("Binning and MC-approaches cannot be run in parallel.")
             return
+        if self._is_diffusion_vacf:
+            print("VACF and MC-approaches cannot be run in parallel.")
+            return
+        if self._is_numpy:
+            print("Numpy and MC-approaches cannot be run in parallel.")
+            return
 
         if direction not in [0,1,2]:
             print("Wrong directional input. Possible inputs are 0 (x-axis), 1 (y-axis), and 2 (z-axis)...")
@@ -1050,10 +1070,256 @@ class Sample:
                     end = idx_list[-1][res_id]
                     data[step][end, start] += 1
 
+
+    ##################
+    # VACF Diffusion #
+    ##################
+    def init_diffusion_vacf(self, link_out: str, len_correration=2e-11, new_time_origin=2e-13, sample_step=20, len_frame=1e-15, bin_num=32, direction=2, sample_each_residue=False):
+        """Enable diffusion sampling routine with the VACF Alogrithm.
+        
+        This function samples the local velocity autocorrelation function for
+        the diffusion calculation. The local diffusion coefficient in a direction
+        :math:`\\alpha` is calculated by
+        .. math::
+            D_{\\alpha,l} = \\frac{1}{N_l}\\sum_{i=1}^{N}\\int_0^{\\infty} \\langle v_{\\alpha,i,l}(0)v_{\\alpha,i}(t)\\rangle dt
+
+        with :math:`N_l` as the average number of molecules in the local region, 
+        :math:`v_{\\alpha,i}` as the velocity of molecule :math:`i` in direction 
+        :math:`\\alpha` and :math:`v_{\\alpha,i,l}(t)` as :math:`v_{\\alpha,i}(t)S_{q,i}(t)`
+        with :math:`S_{q,i}` as a swich function that is 1 if the molecule
+        :math:`i` is in the local region and 0 otherwise. The local region
+        is defined by a binning of the simulation box in the chosen direction.
+
+        The VACF is sampled for a correlation time and choosing a new time origin
+        after a certain time. 
+        
+        Parameters
+        ----------
+        link_out : string
+            Link to obj data file
+        len_correration : float, optional
+            Length of the correlation time in seconds
+        new_time_origin : float, optional
+            Time between new time origins in seconds
+        sample_step : integer, optional
+            Step size of the sampling in your simulation in frames
+        len_frame : float, optional
+            Length of a frame in your simulation in seconds
+        bin_num : integer, optional
+            Number of bins to be used
+        direction : integer, optional
+            Direction of descretization of the simulation box (**0** (x-axis);
+            **1** (y-axis); **2** (z-axis))
+        sample_each_residue : bool, optional
+            If True, the VACF is sampled for each residue separately, default is False
+        """
+        # Initialize
+        if self._is_diffusion_bin:
+            print("Binning and VACF-approaches cannot be run in parallel.")
+            return
+        if self._is_diffusion_mc:
+            print("MC and VACF-approaches cannot be run in parallel.")
+            return
+        if self._is_numpy:
+            print("VACF-approaches cannot be run in parallel with numpy approaches.")
+            return
+        if direction not in [0,1,2]:
+            print("Wrong directional input. Possible inputs are 0 (x-axis), 1 (y-axis), and 2 (z-axis).")
+            return
+        if self._traj.split(".")[-1]!="trr":
+            print("VACF needs a trajectory file with velocities. Please use a .trr file.")
+            return
+        corr_steps = int(round(len_correration/len_frame/sample_step))
+        new_time_origin_steps = int(round(new_time_origin/len_frame/sample_step))
+        if corr_steps < 1 or new_time_origin_steps < 1:
+            print("VACF needs a correlation time longer than one frame. Please adjust len_correration and/or new_time_origin.")
+            return
+        
+        # Enable routine
+        self._is_diffusion_vacf = True
+
+        # Calculate bins
+        bins = self._bin_mc(bin_num, direction)["bins"]
+
+        # Create input dictionary
+        self._diff_vacf_inp = {"output": link_out,"bins": bins, "len_correration": len_correration,  
+                               "new_time_origin": new_time_origin, "sample_step": sample_step, 
+                               "len_frame": len_frame, "bin_num": bin_num, "direction": direction, 
+                               "corr_steps": corr_steps, "new_time_origin_steps": new_time_origin_steps,
+                               "num_res": len(self._res_list), "sample_each_residue": sample_each_residue}
+
+    def _diffusion_vacf_data(self) -> dict:
+        """Create VACF diffusion data structure.
+
+        Returns
+        -------
+        data : dictionary
+            VACF diffusion data structure
+        """
+        # Initialize
+        bin_num = self._diff_vacf_inp["bin_num"]
+        corr_steps = self._diff_vacf_inp["corr_steps"]
+        sample_each_residue = self._diff_vacf_inp["sample_each_residue"]
+
+        # Create dictionary
+        data = {}
+
+        # Initialize vacf data
+        if sample_each_residue:
+            data["vacf_data"] = np.zeros((bin_num, corr_steps, len(self._res_list), 3), float)
+        else:
+            data["vacf_data"] = np.zeros((bin_num, corr_steps, 1, 3), float)
+
+        # Initialize density data
+        if sample_each_residue:
+            data["density"] = np.zeros((bin_num, len(self._res_list)), int)
+        else:
+            data["density"] = np.zeros((bin_num, 1), int)
+
+        return data
+
+    def _diffusion_vacf(self, data: dict, frame_id: int, pos_list: np.ndarray, pos_pointer: int, vel_list: np.ndarray, vel_pointer: int):
+        """
+        This function samples the local velocity autocorrelation function (VACF) for
+        the diffusion calculation.
+
+        It uses a given buffer of velocities for a correlation time to sample the VACF
+        if the current frame is a new time origin. The VACF is sampled for each bin
+        forward and backward in time.
+        
+        Parameters
+        ----------
+        data : dictionary
+            Data dictionary containing bins for VACF diffusion
+        frame_id : integer
+            Current frame id
+        pos_list : numpy.ndarray
+            List of molecule positions of all buffered frames
+            shape: (corr_steps, num_molecules, 3)
+        pos_pointer : integer
+            Pointer to the current frame in the position list
+        vel_list : numpy.ndarray
+            List of molecule velocities of all buffered frames
+            shape: (2*corr_steps-1, num_molecules, 3)
+        vel_pointer : integer
+            Pointer to the current frame in the velocity list
+        """
+        bins = self._diff_vacf_inp["bins"]
+        direction = self._diff_vacf_inp["direction"]
+        corr_steps = self._diff_vacf_inp["corr_steps"]
+        new_time_origin_steps = self._diff_vacf_inp["new_time_origin_steps"]
+        sample_each_residue = self._diff_vacf_inp["sample_each_residue"]
+
+        pos = pos_list[pos_pointer, :, direction] # shape: (num_molecules); positions of v(0)
+
+        if (frame_id-corr_steps)%new_time_origin_steps==0:
+            com_bins = np.digitize(pos, bins) - 1  # bin indices for each molecule
+            # Pointer is at frame_id-(2*corr_steps-1) -> shift by +corr_steps-1 is middle of buffer which is t=0, mask is for t=0
+            vel_pointer = (vel_pointer + corr_steps - 1) % vel_list.shape[0]  # Adjust pointer to t=0
+            # Create forward and backward indices for correlation steps
+            forward_index = (np.arange(corr_steps) + vel_pointer) % vel_list.shape[0]  # Indices for backward velocities
+            backward_index = (np.arange(corr_steps)[::-1] + vel_pointer + corr_steps) % vel_list.shape[0]  # Indices for forward velocities
+            for bin_id in range(len(bins) - 1):
+                mask = (com_bins == bin_id)
+                if not np.any(mask):
+                    continue
+                # Get filtered velocities for molecules in this bin (v_l(0) part in the equation)
+                vel0 = vel_list[vel_pointer, mask, :]  # shape: (num_mol_in_bin, 3)
+                # Build the velocity forward time series for these molecules (v(t) part in the equation)
+                forward_velos = vel_list[forward_index][:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3)
+                # Build the velocity backward time series for these molecules (v(t) part in the equation)
+                backward_velos = vel_list[backward_index][:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3)
+                # Concatenate forward and backward
+                vacf = (vel0[np.newaxis, :, :] * forward_velos + vel0[np.newaxis, :, :] * backward_velos) / 2  # shape: (corr_steps, num_mol_in_bin, 3)
+                if sample_each_residue:
+                    res_indices = np.where(mask)[0]
+                    data["vacf_data"][bin_id, :, :, :][:, res_indices, :] += vacf # It is not the same as [bin_id, :, res_indices, :]
+                    data["density"][bin_id, res_indices] += 1
+                else:
+                    data["vacf_data"][bin_id, :, 0, :] += np.sum(vacf, axis=1)
+                    data["density"][bin_id, 0] += np.sum(mask)
+
+    ##################
+    # Numpy Sampling #
+    ##################
+    def init_numpy_file(self, link_out, positions=True, velocities=True):
+        """Enable numpy sampling routine.
+
+        This function enables the numpy sampling routine. It is used to
+        sample the positions and/or velocities of the molecules in the system. The
+        output is stored in a .npz data file. The shape of the data is 
+        (num_frames, num_molecules, 3) for positions and velocities.
+
+        Parameters
+        ----------
+        link_out : string
+            Name to numpy data file
+        positions : bool, optional
+            True to sample positions of the molecules, default is True
+        velocities : bool, optional
+            True to sample velocities of the molecules, default is True
+        """
+        if self._is_diffusion_bin or self._is_diffusion_mc or self._is_diffusion_vacf:
+            print("Numpy sampling cannot be run in parallel with diffusion sampling.")
+            return
+        if velocities and self._traj.split(".")[-1]!="trr":
+            print("You need a trajectory file with velocities. Please use a .trr file.")
+            return
+        # Enable routine
+        self._is_numpy = True
+
+        # Create input dictionary
+        self._numpy_inp = {"output": link_out, "positions": positions, "velocities": velocities}
+
+    def _numpy_data(self):
+        """Create numpy data structure.
+
+        Returns
+        -------
+        data : dictionary
+            Numpy data structure
+        """
+        # Initialize
+        data = {}
+
+        # Add positions and velocities
+        if self._numpy_inp["positions"]:
+            data["positions"] = np.zeros((self._num_frame, len(self._res_list), 3), float)
+        if self._numpy_inp["velocities"]:
+            data["velocities"] = np.zeros((self._num_frame, len(self._res_list), 3), float)
+
+        return data
+    
+    def _numpy(self, data, positions, velocities, frame_id):
+        """This function samples the positions and velocities of the molecules
+        in the system. The output is stored in a numpy data file.
+
+        Parameters
+        ----------
+        data : dictionary
+            Data dictionary containing positions and velocities
+        positions : numpy.ndarray
+            List of atom positions of current frame
+        velocities : numpy.ndarray
+            List of atom velocities of current frame
+        frame_id : integer
+            Current frame id
+        """
+        # Add positions and velocities to data dictionary
+        if self._numpy_inp["positions"]:
+            pos = np.array(positions).reshape((len(self._res_list), len(self._atoms), 3)) / 10 # Convert to nm
+            pos_com = np.sum(pos * self._masses[np.newaxis,: , np.newaxis], axis=1) / self._sum_masses
+            data["positions"][frame_id] = pos_com
+
+        if self._numpy_inp["velocities"]:
+            vel = np.array(velocities).reshape((len(self._res_list), len(self._atoms), 3)) * 100 # Convert to m/s
+            vel_com = np.sum(vel * self._masses[np.newaxis,: , np.newaxis], axis=1) / self._sum_masses
+            data["velocities"][frame_id] = vel_com
+
     ############
     # Sampling #
     ############
-    def sample(self, shift=[0, 0, 0], np=0, is_pbc=True, is_broken=False, is_parallel=True):
+    def sample(self, shift=[0, 0, 0], num_cores=0, is_pbc=True, is_broken=False, is_parallel=True):
         """This function runs all enabled sampling routines. The output is
         stored in form of pickle files for later calculation using methods
         provided in the package.
@@ -1080,7 +1346,7 @@ class Sample:
             return
 
         # Get number of cores
-        np = np if np and np<=mp.cpu_count() else mp.cpu_count()
+        num_cores = num_cores if num_cores and num_cores<=mp.cpu_count() else mp.cpu_count()
 
         # Error message
         if is_parallel and self._is_angle:
@@ -1090,11 +1356,11 @@ class Sample:
         # Run sampling helper
         if is_parallel:
             # Divide number of frames on processors
-            frame_num = math.floor(self._num_frame/np)
+            frame_num = math.floor(self._num_frame/num_cores)
 
             # Define bounds
-            frame_start = [frame_num*i for i in range(np)]
-            frame_end = [frame_num*(i+1) if i<np-1 else self._num_frame for i in range(np)]
+            frame_start = [frame_num*i for i in range(num_cores)]
+            frame_end = [frame_num*(i+1) if i<num_cores-1 else self._num_frame for i in range(num_cores)]
 
             # Substract window filling for bin diffusion
             if self._is_diffusion_bin:
@@ -1106,11 +1372,18 @@ class Sample:
                     if frame_end[i] >= self._num_frame:
                         frame_end[i] = frame_end[-1]-max(self._diff_mc_inp["len_step"])
 
+            # Shift window to last new time origin and extend it by correlation time
+            if self._is_diffusion_vacf:
+                shift_start = [start%self._diff_vacf_inp["new_time_origin_steps"] for start in frame_start]
+                shift_end = [end%self._diff_vacf_inp["new_time_origin_steps"] for end in frame_end]
+                frame_start = [max(0, start-shift_start[i]-self._diff_vacf_inp["corr_steps"]+1) for i, start in enumerate(frame_start)]
+                frame_end = [min(self._num_frame, end-shift_end[i]+self._diff_vacf_inp["corr_steps"]) for i, end in enumerate(frame_end)]
+
             # Create working lists for processors
-            frame_np = [list(range(frame_start[i], frame_end[i])) for i in range(np)]
+            frame_np = [list(range(frame_start[i], frame_end[i])) for i in range(num_cores)]
 
             # Run parallel search
-            pool = mp.Pool(processes=np)
+            pool = mp.Pool(processes=num_cores)
             results = [pool.apply_async(self._sample_helper, args=(frame_list, shift, is_pbc, is_broken,)) for frame_list in frame_np]
             pool.close()
             pool.join()
@@ -1124,7 +1397,7 @@ class Sample:
 
         # Concatenate output and create pickle object files
         system = {"sys": "pore", "props": self._pore_props} if self._pore else {"sys": "box", "props": {"length" :self._box}}
-        inp = {"num_frame": self._num_frame, "mass": self._mol.get_mass(), "entry": self._entry}
+        inp = {"num_frame": self._num_frame, "mass": self._sum_masses, "entry": self._entry}
 
         if self._is_density:
             inp_dens = inp.copy()
@@ -1213,6 +1486,31 @@ class Sample:
             # Save dictionary to h5-file
             utils.save(results, self._diff_mc_inp["output"])
 
+        if self._is_diffusion_vacf:
+            inp_diff = inp.copy()
+            inp_diff.update(self._diff_vacf_inp)
+            inp_diff.pop("output")
+            data_diff = output[0]["diffusion_vacf"]
+            for out in output[1:]:
+                data_diff["density"] += out["diffusion_vacf"]["density"]
+                data_diff["vacf_data"] += out["diffusion_vacf"]["vacf_data"]
+
+            # Save results in dictionary
+            results = {system["sys"]: system["props"], "inp": inp_diff, "data": data_diff, "type": "diff_vacf"}
+
+            # Save dictionary
+            utils.save(results, self._diff_vacf_inp["output"])
+
+        if self._is_numpy:
+            data_numpy = output[0]["numpy"].copy()
+            for out in output[1:]:
+                if self._numpy_inp["positions"]:
+                    data_numpy["positions"] += out["numpy"]["positions"]
+                if self._numpy_inp["velocities"]:
+                    data_numpy["velocities"] += out["numpy"]["velocities"]
+
+            # Save results as numpy file
+            np.savez(self._numpy_inp["output"], **data_numpy)
 
     def _sample_helper(self, frame_list, shift, is_pbc, is_broken):
         """Helper function for sampling run.
@@ -1237,6 +1535,17 @@ class Sample:
         box = self._pore_props["box"]["dimensions"] if self._pore else self._box
         res = self._pore_props["box"]["res"] if self._pore else 0
 
+        # Calculate length index and com lists
+        if self._is_diffusion_bin:
+            len_fill = self._diff_bin_inp["len_window"]*self._diff_bin_inp["len_step"]
+        elif self._is_diffusion_mc:
+            len_fill = self._diff_mc_inp["len_step"][-1]+1
+        elif self._is_diffusion_vacf:
+            len_fill_vel = 2 * self._diff_vacf_inp["corr_steps"] - 1
+            len_fill_pos = self._diff_vacf_inp["corr_steps"]
+        else:
+            len_fill = 1
+
         if self._is_diffusion_bin:
             com_list = {}
             idx_list = {}
@@ -1247,6 +1556,12 @@ class Sample:
         elif self._is_diffusion_mc:
             com_list = []
             idx_list = []
+        elif self._is_diffusion_vacf:
+            pos_list = np.zeros((len_fill_pos, len(self._res_list), 3), float)
+            vel_list = np.zeros((len_fill_vel, len(self._res_list), 3), float)
+            pos_pointer = 0
+            vel_pointer = 0
+            filled_up = False
 
         # Create local data structures
         output = {}
@@ -1258,16 +1573,12 @@ class Sample:
             output["angle"] = self._angle_data()
         if self._is_diffusion_bin:
             output["diffusion_bin"] = self._diffusion_bin_data()
-        if self._is_diffusion_mc:
-            output["diffusion_mc"] = self._diffusion_mc_data()
-
-        # Calculate length index and com lists
-        if self._is_diffusion_bin:
-            len_fill = self._diff_bin_inp["len_window"]*self._diff_bin_inp["len_step"]
         elif self._is_diffusion_mc:
-            len_fill = self._diff_mc_inp["len_step"][-1]+1
-        else:
-            len_fill = 1
+            output["diffusion_mc"] = self._diffusion_mc_data()
+        elif self._is_diffusion_vacf:
+            output["diffusion_vacf"] = self._diffusion_vacf_data()
+        if self._is_numpy:
+            output["numpy"] = self._numpy_data()
 
         # Load trajectory
         traj = cf.Trajectory(self._traj)
@@ -1278,6 +1589,8 @@ class Sample:
             # Read frame
             frame = traj.read_step(frame_id)
             positions = frame.positions
+            if self._is_diffusion_vacf or self._is_numpy:
+                velocities = frame.velocities
 
             # Add new dictionaries and remove unneeded references
             if self._is_diffusion_bin:
@@ -1294,82 +1607,106 @@ class Sample:
                     com_list.pop(0)
                 idx_list.append({})
                 com_list.append({})
+            elif self._is_diffusion_vacf:
+                pos = np.array(positions).reshape((len(self._res_list), len(self._atoms), 3)) / 10 # Convert to nm
+                com = np.sum(pos * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
+                pos_list[pos_pointer] = com
+                pos_pointer += 1
+                if pos_pointer >= len_fill_pos:
+                    pos_pointer = 0
+                vel = np.array(velocities).reshape((len(self._res_list), len(self._atoms), 3)) * 100 # Convert A/ps to m/s
+                vel_com = np.sum(vel * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
+                vel_list[vel_pointer] = vel_com
+                vel_pointer += 1
+                if vel_pointer >= len_fill_vel:
+                    vel_pointer = 0
+                    if not filled_up:
+                        filled_up = True
 
-            # Run through residues
-            for res_id in self._res_list:
-                # Get position vectors
-                pos = [[positions[self._res_list[res_id][atom_id]][i]/10+shift[i] for i in range(3)] for atom_id in range(len(self._atoms))]
+            if self._is_angle or self._is_density or self._is_gyration or self._is_diffusion_bin or self._is_diffusion_mc:
+                # Run through residues
+                for res_id in self._res_list:
+                    # Get position and velocity vectors
+                    pos = [[positions[self._res_list[res_id][atom_id]][i]/10+shift[i] 
+                            for i in range(3)] for atom_id in range(len(self._atoms))]
 
-                # Calculate centre of mass
-                com_no_pbc = [sum([pos[atom_id][i]*self._masses[atom_id] for atom_id in range(len(self._atoms))])/self._sum_masses for i in range(3)]
+                    # Calculate centre of mass
+                    com_no_pbc = [sum([pos[atom_id][i]*self._masses[atom_id] for atom_id 
+                                    in range(len(self._atoms))])/self._sum_masses for i in range(3)]
 
-                # Check if molecule is broken
-                if is_broken:
-                    for i in range(3):
-                        if abs(com_no_pbc[i]-pos[0][i])>box[i]/3:
-                            print("Sample - Broken molecule found - ResID: "+"%5i"%res_id+", AtomID: "+"%5i"%atom_id)
+                    # Check if molecule is broken
+                    if is_broken:
+                        for i in range(3):
+                            if abs(com_no_pbc[i]-pos[0][i])>box[i]/3:
+                                print("Sample - Broken molecule found - ResID: "+"%5i"%res_id)
 
-                # Apply periodic boundary conditions
-                if is_pbc:
-                    com = [com_no_pbc[i]-math.floor(com_no_pbc[i]/box[i])*box[i] for i in range(3)]
-                else:
-                    com = com_no_pbc
+                    # Apply periodic boundary conditions
+                    if is_pbc:
+                        com = [com_no_pbc[i]-math.floor(com_no_pbc[i]/box[i])*box[i] for i in range(3)]
+                    else:
+                        com = com_no_pbc
 
-                # Calculate distance towards center axis
-                if self._pore:
-                    dist = {}
-                    for pore_id in self._pore.keys():
-                        if pore_id[:5]=="shape":
-                            if self._pore_props[pore_id]["type"] in ["CYLINDER","CONE"]:
-                                dist[pore_id] = geometry.length(geometry.vector([self._pore_props[pore_id]["focal"][0], self._pore_props[pore_id]["focal"][1]], [com[0],com[1]]))
-                                #print("dist",dist,com,self._pore_props[pore_id]["focal"])
-                            elif self._pore_props[pore_id]["type"]=="SLIT":
-                                dist[pore_id] = abs(self._pore_props[pore_id]["focal"][1]-com[1])
-                else:
-                    dist = 0
+                    # Calculate distance towards center axis
+                    if self._pore:
+                        dist = {}
+                        for pore_id in self._pore.keys():
+                            if pore_id[:5]=="shape":
+                                if self._pore_props[pore_id]["type"] in ["CYLINDER","CONE"]:
+                                    dist[pore_id] = geometry.length(geometry.vector([self._pore_props[pore_id]["focal"][0], self._pore_props[pore_id]["focal"][1]], [com[0],com[1]]))
+                                    #print("dist",dist,com,self._pore_props[pore_id]["focal"])
+                                elif self._pore_props[pore_id]["type"]=="SLIT":
+                                    dist[pore_id] = abs(self._pore_props[pore_id]["focal"][1]-com[1])
+                    else:
+                        dist = 0
 
-                # Set region - in-interior, ex-exterior
-                region = ""
-                pore_in = 1
-                if self._pore and com[2] > res+self._entry and com[2] < box[2]-res-self._entry:
-                    region = "in"
-                    for pore_id in self._pore.keys():
-                        if pore_id[:5]=="shape":
-                            z_min = res  + self._pore_props[pore_id]["focal"][2]-self._pore_props[pore_id]["length"]/2+self._entry
-                            z_max = res  + self._pore_props[pore_id]["focal"][2]+self._pore_props[pore_id]["length"]/2-self._entry
+                    # Set region - in-interior, ex-exterior
+                    region = ""
+                    pore_in = 1
+                    if self._pore and com[2] > res+self._entry and com[2] < box[2]-res-self._entry:
+                        region = "in"
+                        for pore_id in self._pore.keys():
+                            if pore_id[:5]=="shape":
+                                z_min = res  + self._pore_props[pore_id]["focal"][2]-self._pore_props[pore_id]["length"]/2+self._entry
+                                z_max = res  + self._pore_props[pore_id]["focal"][2]+self._pore_props[pore_id]["length"]/2-self._entry
 
-                            if ((z_min<com[2]<z_max) and (dist[pore_id]<(self._pore_props[pore_id]["diam"]*1.01)/2)):
-                                pore_in = pore_id
+                                if ((z_min<com[2]<z_max) and (dist[pore_id]<(self._pore_props[pore_id]["diam"]*1.01)/2)):
+                                    pore_in = pore_id
 
-                elif not self._pore or com[2] < res or com[2] > box[2]-res:
-                    region = "ex"
-                    pore_in = 0
+                    elif not self._pore or com[2] < res or com[2] > box[2]-res:
+                        region = "ex"
+                        pore_in = 0
 
 
-                # Remove window filling instances except from first processor
-                if self._is_diffusion_bin:
-                    for pore_id in self._pore.keys():
-                        if pore_id[:5]=="shape":
-                            is_sample = len(com_list[pore_id])==len_fill or frame_id<=len_fill
-                else:
-                    is_sample = True
+                    # Remove window filling instances except from first processor
+                    if self._is_diffusion_bin:
+                        for pore_id in self._pore.keys():
+                            if pore_id[:5]=="shape":
+                                is_sample = len(com_list[pore_id])==len_fill or frame_id<=len_fill
+                    else:
+                        is_sample = True
 
-                # Sampling routines
-                if is_sample:
-                    if (self._is_density) and (pore_in != 1):
-                        self._density(output["density"], region, dist, com, pore_in)
-                    if self._is_gyration and (pore_in != 1):
-                        self._gyration(output["gyration"], region, dist, com_no_pbc, pos, pore_in)
-                    if self._is_angle and (pore_in != 1):
-                        self._angle(output["angle"], region, dist, com, pos, pore_in)
-                if self._is_diffusion_bin and (pore_in != 1):
-                    self._diffusion_bin(output["diffusion_bin"], region,pore_in, dist, com_list, idx_list, res_id, com)
-                if self._is_diffusion_mc:
-                    self._diffusion_mc(output["diffusion_mc"], idx_list, com, res_id, frame_list, frame_id)
+                    # Sampling routines
+                    if is_sample:
+                        if (self._is_density) and (pore_in != 1):
+                            self._density(output["density"], region, dist, com, pore_in)
+                        if self._is_gyration and (pore_in != 1):
+                            self._gyration(output["gyration"], region, dist, com_no_pbc, pos, pore_in)
+                        if self._is_angle and (pore_in != 1):
+                            self._angle(output["angle"], region, dist, com, pos, pore_in)
+                    if self._is_diffusion_bin and (pore_in != 1):
+                        self._diffusion_bin(output["diffusion_bin"], region,pore_in, dist, com_list, idx_list, res_id, com)
+                    if self._is_diffusion_mc:
+                        self._diffusion_mc(output["diffusion_mc"], idx_list, com, res_id, frame_list, frame_id)
+            elif self._is_diffusion_vacf:
+                if filled_up:
+                    self._diffusion_vacf(output["diffusion_vacf"], frame_id, pos_list, pos_pointer, vel_list, vel_pointer)
+            elif self._is_numpy:
+                self._numpy(output["numpy"], positions, velocities, frame_id)
 
             # Progress
-            if (frame_id+1)%10==0 or frame_id==0 or frame_id==self._num_frame-1:
-                sys.stdout.write("Finished frame "+frame_form%(frame_id+1)+"/"+frame_form%self._num_frame+"...\r")
+            if frame_list[0] == 0 and (frame_id)%100==0 or frame_id==0:
+                sys.stdout.write("Finished frame "+frame_form%(frame_id)+"/"+frame_form%frame_list[-1]+" on one Core ...\r")
                 sys.stdout.flush()
-        print()
+
+        print("Finished on one Core for frames "+frame_form%(frame_list[0])+"-"+frame_form%frame_list[-1])
         return output
