@@ -1278,7 +1278,7 @@ def integrate_bin_diffusion_vacf(link_data):
     num_res = inp["num_res"]
 
     sample_datapoints = np.sum(data["density"])
-    print(f"Sampled {2*sample_datapoints} data points (including time reversal) over {sample_datapoints/num_res} frames.")
+    print(f"Sampled {2*sample_datapoints:_} data points (including time reversal) over {sample_datapoints/num_res} frames.")
 
     vacf_data = data["vacf_data"].copy() / data["density"][:, np.newaxis, :, np.newaxis]
 
@@ -1290,7 +1290,7 @@ def integrate_bin_diffusion_vacf(link_data):
 
     return integrated
 
-def plot_correlation_per_bin(link_data, plot_axis, plot_mean=True, bin_selection=None, **kwargs):
+def plot_correlation_per_bin(link_data, plot_axis, plot_mean=True, bin_selection=None, remove_low_density_bins=0.0, direction='m', **kwargs):
     """
     Plot the integrated velocity autocorrelation function (VACF) per bin.
     
@@ -1304,34 +1304,58 @@ def plot_correlation_per_bin(link_data, plot_axis, plot_mean=True, bin_selection
         If True, plot the mean integrated VACF across all bins (default is True).
     bin_selection : list, optional
         List of bin indices to plot. If empty, no bins are plotted (default is None)
+    remove_low_density_bins : float, optional
+        Threshold as minimum average number of particles per bin to plot
+        the integrated VACF. Removed bins are plotted in grey (default is 0.0, no removal).
+    direction : char, optional
+        Direction of the VACF to plot. Options are 'x', 'y', 'z', or 'm' (mean). Default is 'm' (mean over all directions).
     kwargs : dict, optional
         Additional keyword arguments for plotting, such as line style, color, etc.
     """
-    sample = utils.load(link_data)
-
-    integrated = integrate_bin_diffusion_vacf(link_data)
-
     if bin_selection is not None and not isinstance(bin_selection, list):
         print("bin_selection must be a list of bin indices or None.")
         return
+    if direction not in ['x', 'y', 'z', 'm']:
+        print("direction must be 'x', 'y', 'z', or 'm'.")
+        return
+
+    sample = utils.load(link_data)
+    integrated = integrate_bin_diffusion_vacf(link_data)
+    
+    density = pa.density.density_from_vacf(link_data)
+    mask = density < remove_low_density_bins
+    removed_bins = np.where(mask)[0]
 
     selected_bins = bin_selection if bin_selection is not None else range(integrated.shape[0])
 
+    if direction in ['x', 'y', 'z']:
+        index = "xyz".index(direction)
+        integrated = integrated[:, :, :, index:index+1] # Keep shape, but reduce to selected direction
+    x_axis = np.arange(integrated.shape[2]) * sample["inp"]["len_frame"] * sample["inp"]["sample_step"] * 1e12
+    y_axis = 1e9 * integrated.mean(axis=(1, 3))
+
     plot_kwargs = kwargs.copy()
-    plot_kwargs.pop('label', None) 
+    plot_kwargs.pop('label', None)
+    plot_kwargs.pop('color', None)
+    plot_kwargs.pop('alpha', None)
 
     for bin in selected_bins:
-        plot_axis.plot(np.arange(integrated.shape[2]) * sample["inp"]["len_frame"] * sample["inp"]["sample_step"] * 1e12,
-                       1e9 * integrated[bin, :, :, :].mean(axis=(0, 2)), label=kwargs.get('label', f'Bin {bin}'), **plot_kwargs)
+        if bin in removed_bins:
+            label = kwargs.get('label', f'Bin {bin} (removed)')
+            color = 'grey'
+            alpha = 0.4
+        else:
+            label = kwargs.get('label', f'Bin {bin}')
+            color = kwargs.get('color', None)
+            alpha = 1
+        plot_axis.plot(x_axis, y_axis[bin], label=label, color=color, alpha=alpha, **plot_kwargs)
     if plot_mean:
-        plot_kwargs.pop('color', None)
-        mean = np.nansum(np.nanmean(integrated, axis=(1, 3)) * pa.density.density_from_vacf(link_data)[:, np.newaxis], axis=0) / sample["inp"]["num_res"]
-        plot_axis.plot(np.arange(integrated.shape[2]) * sample["inp"]["len_frame"] * sample["inp"]["sample_step"] * 1e12,
-                       1e9 * mean, label=kwargs.get('label', 'Mean'), color=kwargs.get('color', 'black'), **plot_kwargs)
+        mean = np.nansum(np.nanmean(integrated, axis=(1, 3)) * density[:, np.newaxis], axis=0) / sample["inp"]["num_res"]
+        plot_axis.plot(x_axis, 1e9 * mean, label=kwargs.get('label', 'Mean'), color=kwargs.get('color', 'black'), **plot_kwargs)
     plot_axis.set_xlabel('t / ps')
     plot_axis.set_ylabel(r'Integrated vel. correlation / $10^{-9} \ \mathrm{m^2s^{-1}}$')
 
-def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.0, plot_axis=None, plot_selection='xyzm', **kwargs):
+def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.0, plot_axis=None, plot_selection='xyzm', combine_bins=1, **kwargs):
     """
     Plot the diffusion coefficient per bin from the integrated VACF data.
     
@@ -1352,6 +1376,8 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
     plot_selection : str, optional
         Selection of directions of diffusion to plot.
         Options are 'x', 'y', 'z', 'm' (mean), or combinations. Default is 'xyzm' (all directions and mean).
+    combine_bins : int, optional
+        Number of bins to combine for averaging the diffusion coefficient. Default is 1 (no combining).
     kwargs : dict, optional
         Additional keyword arguments for plotting, such as line style, color, etc.
 
@@ -1389,7 +1415,14 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
 
     mask = density < remove_low_density_bins
     diffusion[mask] = np.nan
-    print(f"Removed {np.sum(mask)} bins with low density.")
+    if np.sum(mask) > 0:
+        print(f"Removed {np.sum(mask)} bins with low density.")
+
+    # Combine bins if requested
+    diffusion_padded = np.pad(diffusion, ((0, (combine_bins - diffusion.shape[0] % combine_bins) % combine_bins), (0, 0)), mode='constant', constant_values=np.nan) # Pad with nan to make divisible by combine_bins
+    diffusion = np.nanmean(diffusion_padded.reshape(-1, combine_bins, 3), axis=1)
+    bin_num = diffusion.shape[0]
+    bins = np.linspace(sample["inp"]["bins"][0], sample["inp"]["bins"][-1], bin_num + 1)
 
     diffusion *= 1e9
 
@@ -1400,19 +1433,21 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
                 plot_kwargs.setdefault('marker', 'x')
                 label = str(plot_kwargs.pop('label', ""))
                 plot_kwargs['label'] = label + f" diffusion {direction}-direction" if label else None
-                plot_axis.plot([(sample["inp"]["bins"][i] + sample["inp"]["bins"][i+1]) / 2 for i in range(len(sample["inp"]["bins"]) - 1)],
+                plot_axis.plot([(bins[i] + bins[i+1]) / 2 for i in range(len(bins) - 1)], # Plot at bin centers
                                diffusion[:, 'xyz'.index(direction)], **plot_kwargs)
         if 'm' in plot_selection or 'mean' in plot_selection:
             plot_kwargs = kwargs.copy()
             plot_kwargs.setdefault('marker', 'o')
             plot_kwargs.setdefault('color', 'black')
             plot_kwargs['label'] = str(plot_kwargs.pop('label', "")) + " total diffusion" if label else None
-            plot_axis.plot([(sample["inp"]["bins"][i] + sample["inp"]["bins"][i+1]) / 2 for i in range(len(sample["inp"]["bins"]) - 1)],
+            plot_axis.plot([(bins[i] + bins[i+1]) / 2 for i in range(len(bins) - 1)],
                            diffusion.mean(axis=1), **plot_kwargs)
         plot_axis.set_xlabel("xyz"[sample["inp"]["direction"]] + " / nm")
         plot_axis.set_ylabel(r"Diffusion coefficient / $10^{-9}$ m${^2}$ s$^{-1}$")
 
     # Mean diffusion across all bins, weighted by density
-    mean_diffusion = np.nansum(diffusion * pa.density.density_from_vacf(link_data)[:, np.newaxis], axis=0) / sample["inp"]["num_res"]
+    density_padded = np.pad(density, (0, (combine_bins - density.shape[0] % combine_bins) % combine_bins), mode='constant', constant_values=0) 
+    density_combined = np.nansum(density_padded.reshape(-1, combine_bins), axis=1)
+    mean_diffusion = np.nansum(diffusion * density_combined[:, np.newaxis], axis=0) / sample["inp"]["num_res"]
 
     return diffusion, mean_diffusion
