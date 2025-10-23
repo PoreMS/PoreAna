@@ -1123,6 +1123,8 @@ class Sample:
         if self._traj.split(".")[-1]!="trr":
             print("VACF needs a trajectory file with velocities. Please use a .trr file.")
             return
+
+        # Calculate correlation steps and new time origin steps
         corr_steps = int(round(len_correration/len_frame/sample_step))
         new_time_origin_steps = int(round(new_time_origin/len_frame/sample_step))
         if corr_steps < 1 or new_time_origin_steps < 1:

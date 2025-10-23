@@ -1208,10 +1208,12 @@ def diffusion_from_npy_file_vacf(link, frame_length=20e-15, len_correration=1e-1
 
     # Plot the integrated VACF if requested
     if is_plot:
-        plt.plot(np.arange(integrated_vacf.shape[0]) * frame_length * 1e12, 1e9 * integrated_vacf[:, :, 0].mean(axis=1), label='x-direction', **kwargs)
-        plt.plot(np.arange(integrated_vacf.shape[0]) * frame_length * 1e12, 1e9 * integrated_vacf[:, :, 1].mean(axis=1), label='y-direction', **kwargs)
-        plt.plot(np.arange(integrated_vacf.shape[0]) * frame_length * 1e12, 1e9 * integrated_vacf[:, :, 2].mean(axis=1), label='z-direction', **kwargs)
-        plt.plot(np.arange(integrated_vacf.shape[0]) * frame_length * 1e12, 1e9 * integrated_vacf.mean(axis=(1, 2)), label='mean', color='black', **kwargs)
+        x_values = np.arange(integrated_vacf.shape[0]) * frame_length * 1e12
+        y_values = 1e9 * integrated_vacf[:, :].mean(axis=1)
+        plt.plot(x_values, y_values[:, 0], label='x-direction', **kwargs)
+        plt.plot(x_values, y_values[:, 1], label='y-direction', **kwargs)
+        plt.plot(x_values, y_values[:, 2], label='z-direction', **kwargs)
+        plt.plot(x_values, y_values.mean(axis=1), label='mean', color='black', **kwargs)
         plt.xlabel('Time (ps)')
         plt.ylabel('Integrated VACF ($10^{-9} \ \mathrm{m^2s^{-1}}$)')
 
