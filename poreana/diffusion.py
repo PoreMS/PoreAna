@@ -471,7 +471,7 @@ def mc_trans_mat(link, step, kwargs={}, is_norm=False, is_diagonal=False, is_len
 
 
     # Set title with selected lag time
-    plt.title("Lagtime: "+ str(step * frame_length) + " ps", fontsize=10)
+    plt.title("Lagtime: "+ str(step * frame_length) + " s", fontsize=10)
 
     # Plot the normalized transition matrix in a heatmap
     sns.heatmap(data=trans_mat, **kwargs)
@@ -742,7 +742,7 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
         # Plot the results
         plt.xlim(0, 1.5*max(lag_time_vec))
         plt.ylim(0, 1.5*max(fit.intercept + fit.slope*x_vec))
-        #sns.scatterplot(x=lag_time_vec, y=D_mean_vec, **kwargs_scatter)
+        sns.scatterplot(x=lag_time_vec, y=D_mean_vec, **kwargs_scatter)
         #plt.errorbar(x=lag_time_vec, y=D_mean_vec, yerr=[D_mean_vec[i]-diff_profiles_error_up[i] for i in range(len(D_mean_vec))], fmt="o", **kwargs_scatter)
         sns.lineplot(x=x_vec, y=(fit.intercept + fit.slope*x_vec), **kwargs_line)
         legend = ["$D_{\mathrm{fit}}$", "$D_{\mathrm{mean}}(\\Delta t_{\\alpha})$"]
@@ -808,7 +808,7 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
     # Load results
     results = data["output"]
     diff_bin = results["diff_profile"]
-    print("hallo",diff_bin.keys())
+
     # Load model inputs
     model = data["model"]
     diff_unit = model["diffusion unit"]

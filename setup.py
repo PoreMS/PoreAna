@@ -5,13 +5,13 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="poreana",
-    version="0.2.3",
+    version="0.3.0",
     author="Hamzeh Kraus",
     author_email="kraus@itt.uni-stuttgart.de",
     description="Pore system analysis tool.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/Ajax23/PoreAna",
+    url="https://github.com/porems/PoreAna",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

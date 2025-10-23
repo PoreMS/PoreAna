@@ -26,7 +26,7 @@ Based on the Density analysis
     mol = pms.Molecule(inp="data/benzene.gro")
 
     sample = pa.Sample("data/pore_system_cylinder.obj", "data/traj_cylinder.xtc", mol, [])
-    sample.init_density("output/dens.h5")
+    sample.init_density("output/dens.obj")
     sample.sample()
 
 
@@ -42,7 +42,7 @@ the bulk reservoirs
 
     import pandas as pd
 
-    ads = pa.adsorption.calculate("output/dens.h5")
+    ads = pa.adsorption.calculate("output/dens.obj")
 
     pd.DataFrame(ads)
 
@@ -102,8 +102,8 @@ density
     mol = pms.Molecule(inp="data/benzene.gro")
 
     sample = pa.Sample("data/pore_system_cylinder.obj", "data/traj_cylinder.xtc", mol, [])
-    sample.init_density("output/dens.h5")
-    sample.init_gyration("output/gyr.h5")
+    sample.init_density("output/dens.obj")
+    sample.init_gyration("output/gyr.obj")
     sample.sample()
 
 
@@ -122,14 +122,14 @@ of radius and distance inside and outside the pore respectively
     ylim = [0, 0.2]
 
     plt.subplot(121)
-    pa.gyration.bins_plot("output/gyr.h5", "output/dens.h5", intent="in")
+    pa.gyration.bins_plot("output/gyr.obj", "output/dens.obj", intent="in")
     plt.xlim([0, 2])
     plt.ylim(ylim)
     plt.xlabel("Distance from pore center (nm)")
     plt.ylabel(r"Radius of gyration (nm)")
 
     plt.subplot(122)
-    pa.gyration.bins_plot("output/gyr.h5", "output/dens.h5", intent="ex")
+    pa.gyration.bins_plot("output/gyr.obj", "output/dens.obj", intent="ex")
     plt.xlim([0, 5])
     plt.ylim(ylim)
     plt.xlabel("Distance from reservoir end (nm)")
@@ -158,8 +158,8 @@ the angle based on the bin density
     mol = pms.Molecule(inp="data/benzene.gro")
 
     sample = pa.Sample("data/pore_system_cylinder.obj", "data/traj_cylinder.xtc", mol, [])
-    sample.init_density("output/dens.h5")
-    sample.init_angle("output/angle.h5", [0, 3])
+    sample.init_density("output/dens.obj")
+    sample.init_angle("output/angle.obj", [0, 3])
     sample.sample(is_parallel=False)
 
 
@@ -176,7 +176,7 @@ determining the normal vectors
     def normal_ex(pos): return [0, 0, -1] if pos[2] < centroid[2] else [0, 0, 1]
     normals = {"in": normal_in, "ex": normal_ex}
 
-    sample.init_angle("output/angle.h5", [0, 3], normals=normals)
+    sample.init_angle("output/angle.obj", [0, 3], normals=normals)
 
 
 For more information on shapes, visit the `PoreMS documentation
@@ -193,14 +193,14 @@ of distance inside and outside the pore respectively
     ylim = [0, 0.2]
 
     plt.subplot(121)
-    pa.angle.bins_plot("output/angle.h5", "output/dens.h5", intent="in")
+    pa.angle.bins_plot("output/angle.obj", "output/dens.obj", intent="in")
     plt.xlim([0, 2])
     plt.ylim(ylim)
     plt.xlabel("Distance from pore center (nm)")
     plt.ylabel(r"Angle (deg)")
 
     plt.subplot(122)
-    pa.angle.bins_plot("output/angle.h5", "output/dens.h5", intent="ex")
+    pa.angle.bins_plot("output/angle.obj", "output/dens.obj", intent="ex")
     plt.xlim([0, 5])
     plt.ylim(ylim)
     plt.xlabel("Distance from reservoir end (nm)")

@@ -1,4 +1,8 @@
-# v0.2.3 (Upcoming)
+# v0.3.0
+* New version due to a change of GitHub organisation.
+* You can sample now until a specific frame
+
+# v0.2.3
 * New angle routine
 * Add option to calculate density in the pore with a constant bin area.
 * Add option to specify a upper integration limit when calculating the mean density

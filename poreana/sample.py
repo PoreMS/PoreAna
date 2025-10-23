@@ -688,7 +688,7 @@ class Sample:
         if not len_window == int(len_window):
             obs_u = (math.ceil(len_window)-1)*len_step*len_frame
             obs_d = (math.floor(len_window)-1)*len_step*len_frame
-            print("vi  not possible with current inputs. Alternatively use len_obs="+"%.1e" % obs_u+" or len_obs="+"%.1e" % obs_d+".")
+            print("Observation length not possible with current inputs. Alternatively use len_obs="+"%.1e" % obs_u+" or len_obs="+"%.1e" % obs_d+".")
             return
         else:
             len_window = int(len_window)
@@ -706,6 +706,7 @@ class Sample:
         data : dictionary
             Bin diffusion data structure
         """
+
         # Initialize
         bin_num = self._diff_bin_inp["bin_num"]
         len_window = self._diff_bin_inp["len_window"]
@@ -917,7 +918,7 @@ class Sample:
         ----------
         link_out : string
             Link to hdf5, obj or yml data file
-        len_step : integer
+        len_step : list
             Length of the step size between frames
         bin_num : integer, optional
             Number of bins to be used
