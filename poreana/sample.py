@@ -5,7 +5,6 @@
 ################################################################################
 
 
-from collections import deque
 from re import X
 import sys
 import math
@@ -77,6 +76,7 @@ class Sample:
                 self._masses = mol.get_masses()
             elif len(self._atoms) == 1:
                 self._masses = [1]
+        # Convert masses to np array
         self._masses = np.array(self._masses, float)
         self._sum_masses = sum(self._masses)
 
@@ -280,7 +280,7 @@ class Sample:
 
         return {"width": width, "bins": bins}
 
-    def _bin_mc(self, bin_num, direction):
+    def _bin_box(self, bin_num, direction):
         """This function creates a simple bin structure for the pore and
         resevoir.
 
@@ -954,7 +954,7 @@ class Sample:
         self._is_diffusion_mc = True
 
         # Calculate bins
-        bins = self._bin_mc(bin_num, direction)["bins"]
+        bins = self._bin_box(bin_num, direction)["bins"]
 
         # Sort len_step list
         len_step.sort()
@@ -1133,7 +1133,7 @@ class Sample:
         self._is_diffusion_vacf = True
 
         # Calculate bins
-        bins = self._bin_mc(bin_num, direction)["bins"]
+        bins = self._bin_box(bin_num, direction)["bins"]
 
         # Create input dictionary
         self._diff_vacf_inp = {"output": link_out,"bins": bins, "len_correration": len_correration,  
@@ -1148,7 +1148,9 @@ class Sample:
         Returns
         -------
         data : dictionary
-            VACF diffusion data structure
+            VACF diffusion data structure, containing vacf_data 
+            (bin_num, corr_steps, num_residues, 3) and 
+            density (bin_num, num_residues)
         """
         # Initialize
         bin_num = self._diff_vacf_inp["bin_num"]
@@ -1204,27 +1206,32 @@ class Sample:
         new_time_origin_steps = self._diff_vacf_inp["new_time_origin_steps"]
         sample_each_residue = self._diff_vacf_inp["sample_each_residue"]
 
-        pos = pos_list[pos_pointer, :, direction] # shape: (num_molecules); positions of v(0)
+        pos = pos_list[pos_pointer, :, direction] # positions of v(0), shape: (num_molecules); Pos pointer is at t=0
 
         if (frame_id-corr_steps)%new_time_origin_steps==0:
             com_bins = np.digitize(pos, bins) - 1  # bin indices for each molecule
-            # Pointer is at frame_id-(2*corr_steps-1) -> shift by +corr_steps-1 is middle of buffer which is t=0, mask is for t=0
+
+            # Vel pointer is at frame_id-(2*corr_steps-1) -> shift by +corr_steps-1 is middle of buffer which is t=0; mask is for t=0
             vel_pointer = (vel_pointer + corr_steps - 1) % vel_list.shape[0]  # Adjust pointer to t=0
+            
             # Create forward and backward indices for correlation steps
             forward_index = (np.arange(corr_steps) + vel_pointer) % vel_list.shape[0]  # Indices for backward velocities
             backward_index = (np.arange(corr_steps)[::-1] + vel_pointer + corr_steps) % vel_list.shape[0]  # Indices for forward velocities
+
             for bin_id in range(len(bins) - 1):
                 mask = (com_bins == bin_id)
                 if not np.any(mask):
                     continue
+
                 # Get filtered velocities for molecules in this bin (v_l(0) part in the equation)
                 vel0 = vel_list[vel_pointer, mask, :]  # shape: (num_mol_in_bin, 3)
                 # Build the velocity forward time series for these molecules (v(t) part in the equation)
-                forward_velos = vel_list[forward_index][:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3)
+                forward_velos = vel_list[forward_index][:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3); It is not the same as vel_list[forward_index, :, mask, :]
                 # Build the velocity backward time series for these molecules (v(t) part in the equation)
                 backward_velos = vel_list[backward_index][:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3)
                 # Concatenate forward and backward
-                vacf = (vel0[np.newaxis, :, :] * forward_velos + vel0[np.newaxis, :, :] * backward_velos) / 2  # shape: (corr_steps, num_mol_in_bin, 3)
+                vacf = (vel0[np.newaxis, :, :] * forward_velos + vel0[np.newaxis, :, :] * backward_velos) / 2 # shape: (corr_steps, num_mol_in_bin, 3)
+
                 if sample_each_residue:
                     res_indices = np.where(mask)[0]
                     data["vacf_data"][bin_id, :, :, :][:, res_indices, :] += vacf # It is not the same as [bin_id, :, res_indices, :]
@@ -1271,7 +1278,7 @@ class Sample:
         Returns
         -------
         data : dictionary
-            Numpy data structure
+            Numpy data structure, containing positions and/or velocities
         """
         # Initialize
         data = {}
@@ -1608,6 +1615,7 @@ class Sample:
                 pos_pointer += 1
                 if pos_pointer >= len_fill_pos:
                     pos_pointer = 0
+
                 vel = np.array(velocities).reshape((len(self._res_list), len(self._atoms), 3)) * 100 # Convert A/ps to m/s
                 vel_com = np.sum(vel * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
                 vel_list[vel_pointer] = vel_com

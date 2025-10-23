@@ -389,15 +389,18 @@ def density_from_bins(link_data, convert="", plot_axis=None, **kwargs):
     average_density_per_bin : np.ndarray
         The average density per bin in the specified conversion type, with shape (bin_num,).
     """
+    # Load data
     sample = utils.load(link_data)
     data = sample["data"]
     inp = sample["inp"]
 
     average_density_per_bin = np.array(data['ex'][:-1]) / inp['num_frame']
 
+    # Calculate volume per bin
     area = np.prod([sample["box"]["length"][i] for i in range(3) if i != inp["direction"]])
     volume = area * np.array([data["ex_width"][i+1] - data["ex_width"][i] for i in range(len(data["ex_width"]) - 1)])
     
+    # Convert density to desired units
     if convert == "":
         convert = "residues/bin"
     elif convert == "kg/m^3":
@@ -410,6 +413,7 @@ def density_from_bins(link_data, convert="", plot_axis=None, **kwargs):
         print(f"Unknown conversion type: {convert}. Using residue per bin without conversion.")
         convert = "residues/bin"
 
+    # Plot if axis is provided
     if plot_axis is not None:
         bin_centers = [(data["ex_width"][i] + data["ex_width"][i+1]) / 2 for i in range(len(data["ex_width"]) - 1)]
         plot_kwargs = dict(kwargs)
@@ -422,6 +426,7 @@ def density_from_bins(link_data, convert="", plot_axis=None, **kwargs):
             label=kwargs.get("label", "Density"),
             **plot_kwargs
         )
+        # Set axis labels
         plot_axis.set_xlabel("xyz"[inp["direction"]] + " / nm")
         plot_axis.set_ylabel("Density / $\mathrm{" + fr'{convert}' + "}$")
 
@@ -459,6 +464,7 @@ def density_from_vacf(link_data, convert="", plot_axis=None, **kwargs):
     average_density_per_bin : np.ndarray
         The average density per bin in the specified conversion type, with shape (bin_num,).
     """
+    # Load data
     sample = utils.load(link_data)
     data = sample["data"]
     num_res = sample["inp"]["num_res"]
@@ -466,6 +472,7 @@ def density_from_vacf(link_data, convert="", plot_axis=None, **kwargs):
     num_new_time_origins = np.sum(data["density"]) / num_res
     average_density_per_bin = data["density"].sum(axis=1) / num_new_time_origins
 
+    # Calculate volume per bin
     area = np.prod([sample["box"]["length"][i] for i in range(3) if i != sample["inp"]["direction"]])
     volume = area * np.array([sample["inp"]["bins"][i+1] - sample["inp"]["bins"][i] for i in range(len(sample["inp"]["bins"]) - 1)])
     if convert == "":
@@ -480,6 +487,7 @@ def density_from_vacf(link_data, convert="", plot_axis=None, **kwargs):
         print(f"Unknown conversion type: {convert}. Using residues per bin without conversion.")
         convert = "residues/bin"
 
+    # Plot if axis is provided
     if plot_axis is not None:
         bin_centers = [(sample["inp"]["bins"][i] + sample["inp"]["bins"][i+1]) / 2 for i in range(len(sample["inp"]["bins"]) - 1)]
         plot_kwargs = dict(kwargs)
@@ -492,6 +500,7 @@ def density_from_vacf(link_data, convert="", plot_axis=None, **kwargs):
             label=kwargs.get("label", "Density"),
             **plot_kwargs
         )
+        # Set axis labels
         plot_axis.set_xlabel("xyz"[sample["inp"]["direction"]] + " / nm")
         plot_axis.set_ylabel("Density / $\mathrm{" + fr'{convert}' + "}$")
 
@@ -515,6 +524,7 @@ def density_from_vacf_per_residue(link_data):
     avg_res_per_bin : np.ndarray
         The average number of residues per bin, with shape (bin_num, num_res).
     """
+    # Load data
     sample = utils.load(link_data)
     data = sample["data"]
     num_res = sample["inp"]["num_res"]
