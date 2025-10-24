@@ -1,0 +1,13 @@
+﻿:orphan:
+
+.. raw:: html
+
+    </div>
+    <div class=col-md-9 content>
+
+Sample.\_\_getattribute\_\_
+===========================
+
+.. currentmodule:: poreana.sample
+
+.. automethod:: Sample.__getattribute__

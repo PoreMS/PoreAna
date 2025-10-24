@@ -1,0 +1,13 @@
+﻿:orphan:
+
+.. raw:: html
+
+    </div>
+    <div class=col-md-9 content>
+
+Sample.\_\_init\_subclass\_\_
+=============================
+
+.. currentmodule:: poreana.sample
+
+.. automethod:: Sample.__init_subclass__

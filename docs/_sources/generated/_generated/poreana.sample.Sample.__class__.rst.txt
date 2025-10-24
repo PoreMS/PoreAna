@@ -1,0 +1,64 @@
+﻿.. raw:: html
+
+    </div>
+    <div class=col-md-9 content>
+
+Sample.\_\_class\_\_
+====================
+
+.. currentmodule:: poreana.sample
+
+.. autoclass:: Sample.__class__
+
+   
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Sample.__class__.__abstractmethods__
+      ~Sample.__class__.__base__
+      ~Sample.__class__.__bases__
+      ~Sample.__class__.__basicsize__
+      ~Sample.__class__.__call__
+      ~Sample.__class__.__class__
+      ~Sample.__class__.__delattr__
+      ~Sample.__class__.__dict__
+      ~Sample.__class__.__dictoffset__
+      ~Sample.__class__.__dir__
+      ~Sample.__class__.__doc__
+      ~Sample.__class__.__eq__
+      ~Sample.__class__.__flags__
+      ~Sample.__class__.__format__
+      ~Sample.__class__.__ge__
+      ~Sample.__class__.__getattribute__
+      ~Sample.__class__.__gt__
+      ~Sample.__class__.__hash__
+      ~Sample.__class__.__init__
+      ~Sample.__class__.__init_subclass__
+      ~Sample.__class__.__instancecheck__
+      ~Sample.__class__.__itemsize__
+      ~Sample.__class__.__le__
+      ~Sample.__class__.__lt__
+      ~Sample.__class__.__module__
+      ~Sample.__class__.__mro__
+      ~Sample.__class__.__name__
+      ~Sample.__class__.__ne__
+      ~Sample.__class__.__new__
+      ~Sample.__class__.__prepare__
+      ~Sample.__class__.__qualname__
+      ~Sample.__class__.__reduce__
+      ~Sample.__class__.__reduce_ex__
+      ~Sample.__class__.__repr__
+      ~Sample.__class__.__setattr__
+      ~Sample.__class__.__sizeof__
+      ~Sample.__class__.__str__
+      ~Sample.__class__.__subclasscheck__
+      ~Sample.__class__.__subclasses__
+      ~Sample.__class__.__subclasshook__
+      ~Sample.__class__.__text_signature__
+      ~Sample.__class__.__weakrefoffset__
+      ~Sample.__class__.mro
+   
+   
