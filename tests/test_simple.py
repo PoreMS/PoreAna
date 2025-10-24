@@ -90,7 +90,7 @@ class UserModelCase(unittest.TestCase):
         sample.sample(is_parallel=True, is_pbc=False)
         sample = pa.Sample("data/pore_system_cylinder_new.yml", "data/traj_cylinder.xtc", mol_B)
         sample.init_diffusion_mc("output/diff_mc_cyl_p.obj", len_step=[1, 2, 5, 10, 20, 30, 40, 50, 100, 200, 250, 300, 350])
-        sample.sample(is_parallel=True, is_pbc=True, np=6)
+        sample.sample(is_parallel=True, is_pbc=True, num_cores=6)
 
 
     #########
