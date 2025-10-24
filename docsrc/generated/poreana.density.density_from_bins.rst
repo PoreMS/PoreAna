@@ -5,9 +5,9 @@
     </div>
     <div class=col-md-9 content>
 
-bins
-====
+density\_from\_bins
+===================
 
 .. currentmodule:: poreana.density
 
-.. autofunction:: bins
+.. autofunction:: density_from_bins

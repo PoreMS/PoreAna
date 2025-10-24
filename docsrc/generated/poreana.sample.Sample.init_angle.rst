@@ -1,12 +1,12 @@
-:orphan:
+﻿:orphan:
 
 .. raw:: html
 
     </div>
     <div class=col-md-9 content>
 
-Sample\.init\_angle
-===================
+Sample.init\_angle
+==================
 
 .. currentmodule:: poreana.sample
 
