@@ -397,13 +397,23 @@ def density_from_bins(link_data, convert="", plot_axis=None, **kwargs):
     """
     # Load data
     sample = utils.load(link_data)
+    is_pore = "pore" in sample
     data = sample["data"]
+
+    pore_props = {}
+    if is_pore:
+        pore = sample["pore"]
+        box = pore["box"]["dimensions"]
+        res = pore["box"]["res"]
+    else:
+        box = sample["box"]["length"]
+        res = None
     inp = sample["inp"]
 
     average_density_per_bin = np.array(data['ex'][:-1]) / inp['num_frame']
 
     # Calculate volume per bin
-    area = np.prod([sample["box"]["length"][i] for i in range(3) if i != inp["direction"]])
+    area = np.prod([box[i] for i in range(3) if i != inp["direction"]])
     volume = area * np.array([data["ex_width"][i+1] - data["ex_width"][i] for i in range(len(data["ex_width"]) - 1)])
     
     # Convert density to desired units
@@ -473,13 +483,20 @@ def density_from_vacf(link_data, convert="", plot_axis=None, **kwargs):
     # Load data
     sample = utils.load(link_data)
     data = sample["data"]
+
+    if "pore" in sample:
+        pore = sample["pore"]
+        res = pore["box"]["res"]
+        box = pore["box"]["dimensions"]
+    else:
+        box = sample["box"]["length"]
     num_res = sample["inp"]["num_res"]
 
     num_new_time_origins = np.sum(data["density"]) / num_res
     average_density_per_bin = data["density"].sum(axis=1) / num_new_time_origins
 
     # Calculate volume per bin
-    area = np.prod([sample["box"]["length"][i] for i in range(3) if i != sample["inp"]["direction"]])
+    area = np.prod([box[i] for i in range(3) if i != sample["inp"]["direction"]])
     volume = area * np.array([sample["inp"]["bins"][i+1] - sample["inp"]["bins"][i] for i in range(len(sample["inp"]["bins"]) - 1)])
     if convert == "":
         convert = "residues/bin"

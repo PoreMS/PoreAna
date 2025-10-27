@@ -1305,7 +1305,7 @@ def integrate_bin_diffusion_vacf(link_data):
 
     return integrated
 
-def plot_correlation_per_bin(link_data, plot_axis, plot_mean=True, bin_selection=None, remove_low_density_bins=0.0, direction='m', **kwargs):
+def plot_correlation_per_bin(link_data, plot_axis=None, plot_mean=True, bin_selection=None, remove_low_density_bins=0.0, direction='m', **kwargs):
     """
     Plot the integrated velocity autocorrelation function (VACF) per bin.
     
