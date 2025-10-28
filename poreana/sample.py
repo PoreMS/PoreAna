@@ -1081,6 +1081,7 @@ class Sample:
         This function samples the local velocity autocorrelation function for
         the diffusion calculation. The local diffusion coefficient in a direction
         :math:`\\alpha` is calculated by
+
         .. math::
             D_{\\alpha,l} = \\frac{1}{N_l}\\sum_{i=1}^{N}\\int_0^{\\infty} \\langle v_{\\alpha,i,l}(0)v_{\\alpha,i}(t)\\rangle dt
 

@@ -370,11 +370,14 @@ def density_from_bins(link_data, convert="", plot_axis=None, **kwargs):
     Optionally, it can be plotted on the provided axis.
 
     For secondary axes use:
+
     .. code-block:: python
+
         ax2 = ax.twinx()
         ax2.spines['left'].set_color('tab:orange')
         ax2.tick_params(axis='y', colors='tab:orange')
         ax2.yaxis.label.set_color('tab:orange')
+
     and set the color in the kwargs.
 
     Parameters
@@ -455,18 +458,21 @@ def density_from_vacf(link_data, convert="", plot_axis=None, **kwargs):
     provided axis.
 
     For secondary axes use:
+
     .. code-block:: python
+
         ax2 = ax.twinx()
         ax2.spines['left'].set_color('tab:orange')
         ax2.tick_params(axis='y', colors='tab:orange')
         ax2.yaxis.label.set_color('tab:orange')
+
     and set the color in the kwargs.
 
     Parameters
     ----------
     link_data : str
-        The path to the data file containing the VACF data, created by the
-        :func:`poreana.sample.init_diffusion_vacf` function.
+        The path to the data file containing the VACF data, created by the 
+        :func:`poreana.sample.Sample.init_diffusion_vacf` function.
     convert : str, optional
         The conversion type for the density. Options are "kg/m^3", "molecules/nm^3", 
         "mol/m^3", or an empty string for residues per bin.
@@ -540,7 +546,7 @@ def density_from_vacf_per_residue(link_data):
     ----------
     link_data : str
         The path to the data file containing the VACF data, created by the
-        :func:`poreana.sample.init_diffusion_vacf` function.
+        :func:`poreana.sample.Sample.init_diffusion_vacf` function.
     
     Returns
     -------

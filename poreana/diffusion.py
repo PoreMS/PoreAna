@@ -1141,7 +1141,7 @@ def correlate_velocity_from_npz_file(link_in, link_out, frame_length=20e-15, len
     Parameters
     ----------
     link_in : string
-        Link to the numpy npz file containing the velocity data, created by the `poreana.sample.init_numpy_file` function.
+        Link to the numpy npz file containing the velocity data, created by the `poreana.sample.Sample.init_numpy_file` function.
     link_out : string
         Name of the numpy file where the VACF will be saved.
     frame_length : float, optional
@@ -1264,7 +1264,7 @@ def integrate_bin_diffusion_vacf(link_data):
     ----------
     link_data : str
         The path to the data file containing the VACF data, 
-        created by the `poreana.sample.init_diffusion_vacf` function.
+        created by the `poreana.sample.Sample.init_diffusion_vacf` function.
 
     Returns
     -------
