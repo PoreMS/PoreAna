@@ -1659,7 +1659,7 @@ class Sample:
                         z_min = res + self._pore_props[pore_id]["focal"][2]-self._pore_props[pore_id]["length"]/2+self._entry
                         z_max = res + self._pore_props[pore_id]["focal"][2]+self._pore_props[pore_id]["length"]/2-self._entry
 
-                        mask = (z_min < com[:,2] < z_max)
+                        mask = (z_min < com[:,2]) & (com[:,2] < z_max)
                         if self._pore_props[pore_id]["type"] in ["CYLINDER","CONE"]:
                             dist[mask] = np.linalg.norm(pore_center - com[mask,:2], axis=1)
                         elif self._pore_props[pore_id]["type"]=="SLIT":
