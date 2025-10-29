@@ -1651,7 +1651,7 @@ class Sample:
 
             pore_in = np.zeros(self.num_res, int)
             region = np.array(["ex"]*self.num_res)
-            dist = np.zeros([""]*self.num_res)
+            dist = np.array([""]*self.num_res)
             if self._pore:
                 for pore_id in self._pore.keys():
                     if pore_id[:5]=="shape":
