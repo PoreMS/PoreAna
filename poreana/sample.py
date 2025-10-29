@@ -1651,7 +1651,7 @@ class Sample:
 
             pore_in = np.zeros(self.num_res, int)
             region = np.array(["ex"]*self.num_res)
-            dist = np.zeros(self.num_res, float)
+            dist = np.zeros([""]*self.num_res)
             if self._pore:
                 for pore_id in self._pore.keys():
                     if pore_id[:5]=="shape":
@@ -1694,14 +1694,14 @@ class Sample:
 
                     # Sampling routines
                     if is_sample:
-                        if (self._is_density) and (pore_in != 1):
-                            self._density(output["density"], region_i, dist_i, com_i, pore_in)
-                        if self._is_gyration and (pore_in != 1):
-                            self._gyration(output["gyration"], region_i, dist_i, com_no_pbc_i, pos_i, pore_in)
-                        if self._is_angle and (pore_in != 1):
-                            self._angle(output["angle"], region_i, dist_i, com_i, pos_i, pore_in)
-                    if self._is_diffusion_bin and (pore_in != 1):
-                        self._diffusion_bin(output["diffusion_bin"], region_i, pore_in, dist_i, com_list, idx_list, res_id, com)
+                        if (self._is_density) and (pore_id != 1):
+                            self._density(output["density"], region_i, dist_i, com_i, pore_id)
+                        if self._is_gyration and (pore_id != 1):
+                            self._gyration(output["gyration"], region_i, dist_i, com_no_pbc_i, pos_i, pore_id)
+                        if self._is_angle and (pore_id != 1):
+                            self._angle(output["angle"], region_i, dist_i, com_i, pos_i, pore_id)
+                    if self._is_diffusion_bin and (pore_id != 1):
+                        self._diffusion_bin(output["diffusion_bin"], region_i, pore_id, dist_i, com_list, idx_list, res_id, com)
                     if self._is_diffusion_mc:
                         self._diffusion_mc(output["diffusion_mc"], idx_list, com, res_id, frame_list, frame_id)
             elif self._is_diffusion_vacf:
