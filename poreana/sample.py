@@ -95,14 +95,14 @@ class Sample:
         else:
             self._num_frame = frame_end
 
+        # Get numer of residues
+        frame = traj.read()
+        num_res = len(frame.topology.atoms)/mol.get_num()
+
         # Get box dimensions for non-pore systems
         if self._box == []:
             c = frame.cell
             self._box = np.array(c.lengths) / 10
-
-        # Get numer of residues
-        frame = traj.read()
-        num_res = len(frame.topology.atoms)/mol.get_num()
 
         # Check number of residues
         if abs(int(num_res)-num_res) >= 1e-5:
