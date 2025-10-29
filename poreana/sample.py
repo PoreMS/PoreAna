@@ -135,7 +135,7 @@ class Sample:
                     elif self._pore_props[pore_id]["type"] == "SLIT":
                         self._pore_props[pore_id]["diam"] = self._pore[pore_id]["diameter"]
             self._pore_props["box"] = {}
-            self._pore_props["box"]["dimensions"] = self._pore["system"]["dimensions"]
+            self._pore_props["box"]["dimensions"] = np.array(self._pore["system"]["dimensions"])
             self._pore_props["box"]["res"] = self._pore["system"]["reservoir"]
     
 
@@ -1606,14 +1606,14 @@ class Sample:
             com_no_pbc = np.sum(pos * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
             if is_broken:
                 distances = pos - com_no_pbc[:, np.newaxis, :]
-                max_dist = min(self.box)/3
+                max_dist = min(box)/3
                 broken = np.any(np.linalg.norm(distances, axis=2) > max_dist, axis=1)
                 if np.any(broken):
                     res_ids = np.where(broken)[0]
                     for res_id in res_ids:
                         print("Sample - Broken molecule found - ResID: "+"%5i"%res_id)
             if is_pbc:
-                com = com_no_pbc - np.floor(com_no_pbc / self._box) * self._box
+                com = com_no_pbc - np.floor(com_no_pbc / box) * box
             else:
                 com = com_no_pbc
 
@@ -1649,9 +1649,9 @@ class Sample:
                     if not filled_up:
                         filled_up = True
 
-            dist = np.zeros(self.num_res, int)
-            region = np.array([""]*self.num_res)
-            pore_in = np.array([""]*self.num_res)
+            dist = np.zeros(self.num_res, float)
+            region = [""]*self.num_res
+            pore_in = [1]*self.num_res
             if self._pore:
                 for pore_id in self._pore.keys():
                     if pore_id[:5]=="shape":
@@ -1670,15 +1670,17 @@ class Sample:
                             dist[in_wall_mask] = 0
                         
                         in_pore_mask = mask & (~in_wall_mask)
-                        region[in_pore_mask] = "in"
-                        pore_in[in_pore_mask] = pore_id
+                        for res_id in np.where(in_pore_mask)[0]:
+                            region[res_id] = "in"
+                            pore_in[res_id] = pore_id
                 mask_ex = (com[:,2] < res) | (com[:,2] > box[2]-res)
-                region[mask_ex] = "ex"
-                pore_in[mask_ex] = 0
+                for res_id in np.where(mask_ex)[0]:
+                    region[res_id] = "ex"
+                    pore_in[res_id] = 0
 
             elif not self._pore:
-                region[:] = "ex"
-                pore_in[:] = 0
+                region = ["ex"]*self.num_res
+                pore_in = [0]*self.num_res
 
             if self._is_angle or self._is_density or self._is_gyration or self._is_diffusion_bin or self._is_diffusion_mc:
                 # Run through residues
