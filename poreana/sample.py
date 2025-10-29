@@ -1655,21 +1655,23 @@ class Sample:
             if self._pore:
                 for pore_id in self._pore.keys():
                     if pore_id[:5]=="shape":
+                        pore_center = np.array(self._pore_props[pore_id]["focal"][0:2])
                         z_min = res + self._pore_props[pore_id]["focal"][2]-self._pore_props[pore_id]["length"]/2+self._entry
                         z_max = res + self._pore_props[pore_id]["focal"][2]+self._pore_props[pore_id]["length"]/2-self._entry
 
-                        for res_id in self._res_list:
-                            if com[res_id][2] > res+self._entry and com[res_id][2] < box[2]-res-self._entry:
-                                dist_i = 0
-                                if self._pore_props[pore_id]["type"] in ["CYLINDER","CONE"]:
-                                    dist_i = geometry.length(geometry.vector([self._pore_props[pore_id]["focal"][0], self._pore_props[pore_id]["focal"][1]], [com[res_id][0],com[res_id][1]]))
-                                elif self._pore_props[pore_id]["type"]=="SLIT":
-                                    dist_i = abs(self._pore_props[pore_id]["focal"][1]-com[res_id][1])
-
-                                if ((z_min<com[res_id][2]<z_max) and (dist_i<(self._pore_props[pore_id]["diam"]*1.01)/2)):
-                                    region[res_id] = "in"
-                                    pore_in[res_id] = pore_id
-                                    dist[res_id] = dist_i
+                        mask = (z_min < com[:,2] < z_max)
+                        if self._pore_props[pore_id]["type"] in ["CYLINDER","CONE"]:
+                            dist[mask] = np.linalg.norm(pore_center - com[mask,:2], axis=1)
+                        elif self._pore_props[pore_id]["type"]=="SLIT":
+                            dist[mask] = abs(self._pore_props[pore_id]["focal"][1]-com[mask,1])
+                        
+                        in_wall_mask = (dist >= (self._pore_props[pore_id]["diam"]*1.01)/2)
+                        if np.any(in_wall_mask):
+                            dist[in_wall_mask] = 0
+                        
+                        in_pore_mask = mask & (~in_wall_mask)
+                        region[in_pore_mask] = "in"
+                        pore_in[in_pore_mask] = pore_id
 
             if self._is_angle or self._is_density or self._is_gyration or self._is_diffusion_bin or self._is_diffusion_mc:
                 # Run through residues
