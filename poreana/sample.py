@@ -1649,9 +1649,9 @@ class Sample:
                     if not filled_up:
                         filled_up = True
 
-            pore_in = np.zeros(self.num_res, int)
-            region = np.array(["ex"]*self.num_res)
-            dist = np.array([""]*self.num_res)
+            dist = np.zeros(self.num_res, int)
+            region = np.array([""]*self.num_res)
+            pore_in = np.array([""]*self.num_res)
             if self._pore:
                 for pore_id in self._pore.keys():
                     if pore_id[:5]=="shape":
@@ -1665,13 +1665,20 @@ class Sample:
                         elif self._pore_props[pore_id]["type"]=="SLIT":
                             dist[mask] = abs(self._pore_props[pore_id]["focal"][1]-com[mask,1])
                         
-                        in_wall_mask = (dist >= (self._pore_props[pore_id]["diam"]*1.01)/2)
+                        in_wall_mask = (dist > (self._pore_props[pore_id]["diam"]*1.01)/2)
                         if np.any(in_wall_mask):
                             dist[in_wall_mask] = 0
                         
                         in_pore_mask = mask & (~in_wall_mask)
                         region[in_pore_mask] = "in"
                         pore_in[in_pore_mask] = pore_id
+                mask_ex = (com[:,2] < res) | (com[:,2] > box[2]-res)
+                region[mask_ex] = "ex"
+                pore_in[mask_ex] = 0
+
+            elif not self._pore:
+                region[:] = "ex"
+                pore_in[:] = 0
 
             if self._is_angle or self._is_density or self._is_gyration or self._is_diffusion_bin or self._is_diffusion_mc:
                 # Run through residues
@@ -1694,13 +1701,13 @@ class Sample:
 
                     # Sampling routines
                     if is_sample:
-                        if (self._is_density) and (pore_id != 1):
+                        if (self._is_density) and (pore_id != ""):
                             self._density(output["density"], region_i, dist_i, com_i, pore_id)
-                        if self._is_gyration and (pore_id != 1):
+                        if self._is_gyration and (pore_id != ""):
                             self._gyration(output["gyration"], region_i, dist_i, com_no_pbc_i, pos_i, pore_id)
-                        if self._is_angle and (pore_id != 1):
+                        if self._is_angle and (pore_id != ""):
                             self._angle(output["angle"], region_i, dist_i, com_i, pos_i, pore_id)
-                    if self._is_diffusion_bin and (pore_id != 1):
+                    if self._is_diffusion_bin and (pore_id != ""):
                         self._diffusion_bin(output["diffusion_bin"], region_i, pore_id, dist_i, com_list, idx_list, res_id, com)
                     if self._is_diffusion_mc:
                         self._diffusion_mc(output["diffusion_mc"], idx_list, com, res_id, frame_list, frame_id)
