@@ -1076,11 +1076,11 @@ class Sample:
     # VACF Diffusion #
     ##################
     def init_diffusion_vacf(self, link_out: str, len_correration=2e-11, new_time_origin=2e-13, sample_step=20, len_frame=1e-15, bin_num=32, direction=2, sample_each_residue=False):
-        """Enable diffusion sampling routine with the VACF Alogrithm.
+        """Enable diffusion sampling routine with the local VACF Alogrithm.
         
         This function samples the local velocity autocorrelation function for
-        the diffusion calculation. The local diffusion coefficient in a direction
-        :math:`\\alpha` is calculated by
+        the diffusion calculation in all three directions. The local diffusion 
+        coefficient in a direction :math:`\\alpha` is calculated by
 
         .. math::
             D_{\\alpha,l} = \\frac{1}{N_l}\\sum_{i=1}^{N}\\int_0^{\\infty} \\langle v_{\\alpha,i,l}(0)v_{\\alpha,i}(t)\\rangle dt
@@ -1089,8 +1089,14 @@ class Sample:
         :math:`v_{\\alpha,i}` as the velocity of molecule :math:`i` in direction 
         :math:`\\alpha` and :math:`v_{\\alpha,i,l}(t)` as :math:`v_{\\alpha,i}(t)S_{q,i}(t)`
         with :math:`S_{q,i}` as a swich function that is 1 if the molecule
-        :math:`i` is in the local region and 0 otherwise. The local region
-        is defined by a binning of the simulation box in the chosen direction.
+        :math:`i` is in the local region and 0 otherwise. 
+        
+        The local region is defined by a binning of the simulation box in the 
+        chosen direction, if the direction is **0** (x-axis), **1** (y-axis), or
+        **2** (z-axis). If the system is a pore system, the direction can be 
+        chosen as "radial" to bin the system in radial bins from the pore wall
+        to the center of the pore. Instead of calculating the diffusion in x, y and z
+        direction, the radial diffusion is calculated in cylindrical coordinates.
 
         The VACF is sampled for a correlation time and choosing a new time origin
         after a certain time. 
@@ -1109,12 +1115,23 @@ class Sample:
             Length of a frame in your simulation in seconds
         bin_num : integer, optional
             Number of bins to be used
-        direction : integer, optional
+        direction : integer or string, optional
             Direction of descretization of the simulation box (**0** (x-axis);
-            **1** (y-axis); **2** (z-axis))
+            **1** (y-axis); **2** (z-axis)) If the system is a pore system,
+            the direction can also be "radial" to bin the system in radial bins
         sample_each_residue : bool, optional
             If True, the VACF is sampled for each residue separately, default is False
         """
+        # Calculate correlation steps and new time origin steps
+        corr_steps = int(round(len_correration/len_frame/sample_step))
+        new_time_origin_steps = int(round(new_time_origin/len_frame/sample_step))
+        if corr_steps < 1 or new_time_origin_steps < 1:
+            print("VACF needs a correlation time longer than one frame. Please adjust len_correration and/or new_time_origin.")
+            return
+        if 2*corr_steps-1 <= self._num_frame:
+            print("VACF correlation time is too long for the number of frames in the trajectory. Please reduce len_correration or use a longer trajectory.")
+            return
+
         # Initialize
         if self._is_diffusion_bin:
             print("Binning and VACF-approaches cannot be run in parallel.")
@@ -1125,25 +1142,22 @@ class Sample:
         if self._is_numpy:
             print("VACF-approaches cannot be run in parallel with numpy approaches.")
             return
-        if direction not in [0,1,2]:
-            print("Wrong directional input. Possible inputs are 0 (x-axis), 1 (y-axis), and 2 (z-axis).")
+        if direction not in [0,1,2] or (direction=="radial" and not self._pore):
+            print("Wrong directional input. Possible inputs are 0 (x-axis), 1 (y-axis), 2 (z-axis), and 'radial' (only for pore systems).")
             return
         if self._traj.split(".")[-1]!="trr":
             print("VACF needs a trajectory file with velocities. Please use a .trr file.")
             return
 
-        # Calculate correlation steps and new time origin steps
-        corr_steps = int(round(len_correration/len_frame/sample_step))
-        new_time_origin_steps = int(round(new_time_origin/len_frame/sample_step))
-        if corr_steps < 1 or new_time_origin_steps < 1:
-            print("VACF needs a correlation time longer than one frame. Please adjust len_correration and/or new_time_origin.")
-            return
-        
         # Enable routine
         self._is_diffusion_vacf = True
 
         # Calculate bins
-        bins = self._bin_box(bin_num, direction)["bins"]
+        if direction=="radial":
+            direction = -1
+            bins = self._bin_radial(bin_num)["bins"]
+        else:
+            bins = self._bin_box(bin_num, direction)["bins"]
 
         # Create input dictionary
         self._diff_vacf_inp = {"output": link_out,"bins": bins, "len_correration": len_correration,  
@@ -1594,7 +1608,6 @@ class Sample:
         # Load trajectory
         traj = cf.Trajectory(self._traj)
         frame_form = "%"+str(len(str(self._num_frame)))+"i"
-        skip = 0
         # Run through frames
         for frame_id in frame_list:
             # Read frame
