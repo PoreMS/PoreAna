@@ -820,7 +820,7 @@ class Sample:
         # Only sample diffusion inside the pore
         if region == "in":
             # Calculate bin index
-            index = math.floor(dist[pore_in]/data[pore_in]["width"][1])
+            index = math.floor(dist/data[pore_in]["width"][1])
 
             # Add com and bin index to global lists
             com_list[pore_in][-1][res_id] = com
@@ -1695,9 +1695,9 @@ class Sample:
 
                     # Remove window filling instances except from first processor
                     if self._is_diffusion_bin:
-                        for pore_id in self._pore.keys():
-                            if pore_id[:5]=="shape":
-                                is_sample = len(com_list[pore_id])==len_fill or frame_id<=len_fill
+                        for pore_id_ in self._pore.keys():
+                            if pore_id_[:5]=="shape":
+                                is_sample = len(com_list[pore_id_])==len_fill or frame_id<=len_fill
                     else:
                         is_sample = True
 
@@ -1710,9 +1710,9 @@ class Sample:
                         if self._is_angle and (pore_id != ""):
                             self._angle(output["angle"], region_i, dist_i, com_i, pos_i, pore_id)
                     if self._is_diffusion_bin and (pore_id != ""):
-                        self._diffusion_bin(output["diffusion_bin"], region_i, pore_id, dist_i, com_list, idx_list, res_id, com)
+                        self._diffusion_bin(output["diffusion_bin"], region_i, pore_id, dist_i, com_list, idx_list, res_id, com_i)
                     if self._is_diffusion_mc:
-                        self._diffusion_mc(output["diffusion_mc"], idx_list, com, res_id, frame_list, frame_id)
+                        self._diffusion_mc(output["diffusion_mc"], idx_list, com_i, res_id, frame_list, frame_id)
             elif self._is_diffusion_vacf:
                 if filled_up:
                     self._diffusion_vacf(output["diffusion_vacf"], frame_id, pos_list, pos_pointer, vel_list, vel_pointer)
