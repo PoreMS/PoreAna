@@ -1663,35 +1663,42 @@ class Sample:
                     if not filled_up:
                         filled_up = True
 
+            # Create region and distance lists
             dist = np.zeros(self.num_res, float)
             region = [""]*self.num_res
             pore_in = [1]*self.num_res
+            # Determine region and distance
             if self._pore:
                 for pore_id in self._pore.keys():
                     if pore_id[:5]=="shape":
+                        # Determine pore properties
                         pore_center = np.array(self._pore_props[pore_id]["focal"][0:2])
                         z_min = res + self._pore_props[pore_id]["focal"][2]-self._pore_props[pore_id]["length"]/2+self._entry
                         z_max = res + self._pore_props[pore_id]["focal"][2]+self._pore_props[pore_id]["length"]/2-self._entry
 
-                        mask = (z_min < com[:,2]) & (com[:,2] < z_max)
+                        # Filter all residues not in reservoir and entry region
+                        pore_mask = (z_min < com[:,2]) & (com[:,2] < z_max)
                         if self._pore_props[pore_id]["type"] in ["CYLINDER","CONE"]:
-                            dist[mask] = np.linalg.norm(pore_center - com[mask,:2], axis=1)
+                            dist[pore_mask] = np.linalg.norm(pore_center - com[pore_mask,:2], axis=1)
                         elif self._pore_props[pore_id]["type"]=="SLIT":
-                            dist[mask] = abs(self._pore_props[pore_id]["focal"][1]-com[mask,1])
+                            dist[pore_mask] = abs(self._pore_props[pore_id]["focal"][1]-com[pore_mask,1])
                         
+                        # Filter all residues in pore wall
                         in_wall_mask = (dist > (self._pore_props[pore_id]["diam"]*1.01)/2)
                         if np.any(in_wall_mask):
                             dist[in_wall_mask] = 0
                         
-                        in_pore_mask = mask & (~in_wall_mask)
+                        # Not in wall and not in reservoir -> in pore
+                        in_pore_mask = pore_mask & (~in_wall_mask)
                         for res_id in np.where(in_pore_mask)[0]:
                             region[res_id] = "in"
                             pore_in[res_id] = pore_id
+                # FIlter all residues in reservoir region
                 mask_ex = (com[:,2] < res) | (com[:,2] > box[2]-res)
                 for res_id in np.where(mask_ex)[0]:
                     region[res_id] = "ex"
                     pore_in[res_id] = 0
-
+            # For box systems
             elif not self._pore:
                 region = ["ex"]*self.num_res
                 pore_in = [0]*self.num_res
