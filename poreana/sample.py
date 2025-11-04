@@ -72,18 +72,19 @@ class Sample:
         self._atoms = [atom.get_name() for atom in mol.get_atom_list()] if not self._atoms else self._atoms
         self._atoms = [atom_id for atom_id in range(mol.get_num()) if mol.get_atom_list()[atom_id].get_name() in self._atoms]
 
+        self._num_atoms = len(self._atoms)
         # Check masses
         if not self._masses:
-            if len(self._atoms)==mol.get_num():
+            if self._num_atoms==mol.get_num():
                 self._masses = mol.get_masses()
-            elif len(self._atoms) == 1:
+            elif self._num_atoms == 1:
                 self._masses = [1]
         # Convert masses to np array
         self._masses = np.array(self._masses, float)
         self._sum_masses = sum(self._masses)
 
         # Check atom mass consistency
-        if self._atoms and not len(self._masses) == len(self._atoms):
+        if self._atoms and not len(self._masses) == self._num_atoms:
             print("Length of variables *atoms* and *masses* do not match!")
             return
 
@@ -94,24 +95,24 @@ class Sample:
         else:
             self._num_frame = frame_end
 
-
         # Get numer of residues
         frame = traj.read()
         num_res = len(frame.topology.atoms)/mol.get_num()
 
+        # Get box dimensions for non-pore systems
         if self._box == []:
-            # Get box length from trajectory
             c = frame.cell
-            self._box = list(np.array(c.lengths) / 10)
+            self._box = np.array(c.lengths) / 10
 
         # Check number of residues
         if abs(int(num_res)-num_res) >= 1e-5:
             print("Number of atoms is inconsistent with number of residues.")
             return
+        self.num_res = int(num_res)
 
         # Create residue list with all relevant atom ids
         self._res_list = {}
-        for res_id in range(int(num_res)):
+        for res_id in range(int(self.num_res)):
             self._res_list[res_id] = [res_id*mol.get_num()+atom for atom in range(mol.get_num()) if atom in self._atoms]
 
         # Get pore properties
@@ -134,7 +135,7 @@ class Sample:
                     elif self._pore_props[pore_id]["type"] == "SLIT":
                         self._pore_props[pore_id]["diam"] = self._pore[pore_id]["diameter"]
             self._pore_props["box"] = {}
-            self._pore_props["box"]["dimensions"] = self._pore["system"]["dimensions"]
+            self._pore_props["box"]["dimensions"] = np.array(self._pore["system"]["dimensions"])
             self._pore_props["box"]["res"] = self._pore["system"]["reservoir"]
     
 
@@ -400,11 +401,11 @@ class Sample:
         # Molecule is inside pore
         if (region=="in" and pore_id!=0):
             if self._dens_inp["bin_const_A"]:
-                index = np.digitize(dist[pore_id], data[pore_id]["in_width"][1:])
+                index = np.digitize(dist, data[pore_id]["in_width"][1:])
             elif self._dens_inp["avg_slit"]==False:
                 index = np.digitize(com[1],data[pore_id]["in_width"][1:])
             elif self._dens_inp["avg_slit"]==True:
-                index = int(dist[pore_id]/data[pore_id]["in_width"][1])
+                index = int(dist/data[pore_id]["in_width"][1])
 
             if index <= bin_num:
                 data[pore_id]["in"][index] += 1
@@ -418,7 +419,7 @@ class Sample:
             # Only consider reservoir space in vicinity of crystobalit
             # Remove an extended pore volume from the reservoir
             if self._pore and self._dens_inp["remove_pore_from_res"] and pore_id=="shape_00":
-                is_add = index <= bin_num and dist[pore_id] > self._pore_props[pore_id]["diam"]/2 and com[2]<=self._pore_props["box"][2]
+                is_add = index <= bin_num and dist > self._pore_props[pore_id]["diam"]/2 and com[2]<=self._pore_props["box"][2]
             else:
                 is_add = index <= bin_num
 
@@ -506,11 +507,11 @@ class Sample:
         bin_num = self._gyr_inp["bin_num"]
 
         # Calculate gyration radius
-        r_g = (sum([geometry.length(geometry.vector(pos[atom_id], com))**2*self._masses[atom_id] for atom_id in range(len(self._atoms))])/self._sum_masses)**0.5
+        r_g = (sum([geometry.length(geometry.vector(pos[atom_id], com))**2*self._masses[atom_id] for atom_id in range(self._num_atoms)])/self._sum_masses)**0.5
 
         # Add molecule to bin
         if region=="in" and pore_id!=0:
-            index = int(dist[pore_id]/data[pore_id]["in_width"][1])
+            index = int(dist/data[pore_id]["in_width"][1])
             if index <= bin_num:
                 data[pore_id]["in"][index] += r_g
 
@@ -522,7 +523,7 @@ class Sample:
             # Only consider reservoir space in vicinity of crystobalit
             # Remove an extended pore volume from the reservoir
             if self._pore and pore_id!=0:
-                is_add = index <= bin_num and dist[pore_id] > self._pore_props[pore_id]["diam"]/2 and com[2]<=self._pore_props["box"]["dimensions"][2]
+                is_add = index <= bin_num and dist > self._pore_props[pore_id]["diam"]/2 and com[2]<=self._pore_props["box"]["dimensions"][2]
             else:
                 is_add = index <= bin_num
 
@@ -639,7 +640,7 @@ class Sample:
 
         # Add molecule to bin
         if region=="in" and pore_id !=0:
-            index = int(dist[pore_id]/data[pore_id]["in_width"][1])
+            index = int(dist/data[pore_id]["in_width"][1])
             if index <= bin_num:
                 data[pore_id]["in"][index] += angle
 
@@ -819,7 +820,7 @@ class Sample:
         # Only sample diffusion inside the pore
         if region == "in":
             # Calculate bin index
-            index = math.floor(dist[pore_in]/data[pore_in]["width"][1])
+            index = math.floor(dist/data[pore_in]["width"][1])
 
             # Add com and bin index to global lists
             com_list[pore_in][-1][res_id] = com
@@ -1164,7 +1165,7 @@ class Sample:
                                "new_time_origin": new_time_origin, "sample_step": sample_step, 
                                "len_frame": len_frame, "bin_num": bin_num, "direction": direction, 
                                "corr_steps": corr_steps, "new_time_origin_steps": new_time_origin_steps,
-                               "num_res": len(self._res_list), "sample_each_residue": sample_each_residue}
+                               "num_res": self.num_res, "sample_each_residue": sample_each_residue}
 
     def _diffusion_vacf_data(self) -> dict:
         """Create VACF diffusion data structure.
@@ -1186,13 +1187,13 @@ class Sample:
 
         # Initialize vacf data
         if sample_each_residue:
-            data["vacf_data"] = np.zeros((bin_num, corr_steps, len(self._res_list), 3), float)
+            data["vacf_data"] = np.zeros((bin_num, corr_steps, self.num_res, 3), float)
         else:
             data["vacf_data"] = np.zeros((bin_num, corr_steps, 1, 3), float)
 
         # Initialize density data
         if sample_each_residue:
-            data["density"] = np.zeros((bin_num, len(self._res_list)), int)
+            data["density"] = np.zeros((bin_num, self.num_res), int)
         else:
             data["density"] = np.zeros((bin_num, 1), int)
 
@@ -1309,9 +1310,9 @@ class Sample:
 
         # Add positions and velocities
         if self._numpy_inp["positions"]:
-            data["positions"] = np.zeros((self._num_frame, len(self._res_list), 3), float)
+            data["positions"] = np.zeros((self._num_frame, self.num_res, 3), float)
         if self._numpy_inp["velocities"]:
-            data["velocities"] = np.zeros((self._num_frame, len(self._res_list), 3), float)
+            data["velocities"] = np.zeros((self._num_frame, self.num_res, 3), float)
 
         return data
     
@@ -1332,12 +1333,12 @@ class Sample:
         """
         # Add positions and velocities to data dictionary
         if self._numpy_inp["positions"]:
-            pos = np.array(positions).reshape((len(self._res_list), len(self._atoms), 3)) / 10 # Convert to nm
+            pos = np.array(positions).reshape((self.num_res, self._num_atoms, 3)) / 10 # Convert to nm
             pos_com = np.sum(pos * self._masses[np.newaxis,: , np.newaxis], axis=1) / self._sum_masses
             data["positions"][frame_id] = pos_com
 
         if self._numpy_inp["velocities"]:
-            vel = np.array(velocities).reshape((len(self._res_list), len(self._atoms), 3)) * 100 # Convert to m/s
+            vel = np.array(velocities).reshape((self.num_res, self._num_atoms, 3)) * 100 # Convert to m/s
             vel_com = np.sum(vel * self._masses[np.newaxis,: , np.newaxis], axis=1) / self._sum_masses
             data["velocities"][frame_id] = vel_com
 
@@ -1409,7 +1410,7 @@ class Sample:
 
             # Run parallel search
             pool = mp.Pool(processes=num_cores)
-            results = [pool.apply_async(self._sample_helper, args=(frame_list, shift, is_pbc, is_broken,)) for frame_list in frame_np]
+            results = [pool.apply_async(self._sample_helper, args=(frame_list, np.array(shift), is_pbc, is_broken,)) for frame_list in frame_np]
             pool.close()
             pool.join()
             output = [x.get() for x in results]
@@ -1418,7 +1419,7 @@ class Sample:
             del results
         else:
             # Run sampling
-            output = [self._sample_helper(list(range(self._num_frame)), shift, is_pbc, is_broken)]
+            output = [self._sample_helper(list(range(self._num_frame)), np.array(shift), is_pbc, is_broken)]
 
         # Concatenate output and create pickle object files
         system = {"sys": "pore", "props": self._pore_props} if self._pore else {"sys": "box", "props": {"length" :self._box}}
@@ -1544,7 +1545,7 @@ class Sample:
         ----------
         frame_list :
             List of frame ids to process
-        shift : list
+        shift : np.ndarray
             Vector for translating atoms in nm
         is_pbc : bool
             True to apply periodic boundary conditions
@@ -1563,15 +1564,7 @@ class Sample:
         # Calculate length index and com lists
         if self._is_diffusion_bin:
             len_fill = self._diff_bin_inp["len_window"]*self._diff_bin_inp["len_step"]
-        elif self._is_diffusion_mc:
-            len_fill = self._diff_mc_inp["len_step"][-1]+1
-        elif self._is_diffusion_vacf:
-            len_fill_vel = 2 * self._diff_vacf_inp["corr_steps"] - 1
-            len_fill_pos = self._diff_vacf_inp["corr_steps"]
-        else:
-            len_fill = 1
 
-        if self._is_diffusion_bin:
             com_list = {}
             idx_list = {}
             for pore_id in self._pore.keys():
@@ -1579,14 +1572,21 @@ class Sample:
                     com_list[pore_id] = []
                     idx_list[pore_id] = []
         elif self._is_diffusion_mc:
+            len_fill = self._diff_mc_inp["len_step"][-1]+1
+
             com_list = []
             idx_list = []
         elif self._is_diffusion_vacf:
-            pos_list = np.zeros((len_fill_pos, len(self._res_list), 3), float)
-            vel_list = np.zeros((len_fill_vel, len(self._res_list), 3), float)
+            len_fill_vel = 2 * self._diff_vacf_inp["corr_steps"] - 1
+            len_fill_pos = self._diff_vacf_inp["corr_steps"]
+
+            pos_list = np.zeros((len_fill_pos, self.num_res, 3), float)
             pos_pointer = 0
+            vel_list = np.zeros((len_fill_vel, self.num_res, 3), float)
             vel_pointer = 0
             filled_up = False
+        else:
+            len_fill = 1
 
         # Create local data structures
         output = {}
@@ -1616,6 +1616,25 @@ class Sample:
             if self._is_diffusion_vacf or self._is_numpy:
                 velocities = frame.velocities
 
+            pos = np.array(positions).reshape((self.num_res, self._num_atoms, 3)) / 10 + shift # Convert to nm
+            com_no_pbc = np.sum(pos * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
+            if is_broken:
+                distances = pos - com_no_pbc[:, np.newaxis, :]
+                max_dist = min(box)/3
+                broken = np.any(np.linalg.norm(distances, axis=2) > max_dist, axis=1)
+                if np.any(broken):
+                    res_ids = np.where(broken)[0]
+                    for res_id in res_ids:
+                        print("Sample - Broken molecule found - ResID: "+"%5i"%res_id)
+            if is_pbc:
+                com = com_no_pbc - np.floor(com_no_pbc / box) * box
+            else:
+                com = com_no_pbc
+
+            if self._is_diffusion_vacf or self._is_numpy:
+                vel = np.array(velocities).reshape((self.num_res, self._num_atoms, 3)) * 100 # Convert A/ps to m/s
+                vel_com = np.sum(vel * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
+
             # Add new dictionaries and remove unneeded references
             if self._is_diffusion_bin:
                 for pore_id in self._pore.keys():
@@ -1632,15 +1651,11 @@ class Sample:
                 idx_list.append({})
                 com_list.append({})
             elif self._is_diffusion_vacf:
-                pos = np.array(positions).reshape((len(self._res_list), len(self._atoms), 3)) / 10 # Convert to nm
-                com = np.sum(pos * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
                 pos_list[pos_pointer] = com
                 pos_pointer += 1
                 if pos_pointer >= len_fill_pos:
                     pos_pointer = 0
 
-                vel = np.array(velocities).reshape((len(self._res_list), len(self._atoms), 3)) * 100 # Convert A/ps to m/s
-                vel_com = np.sum(vel * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
                 vel_list[vel_pointer] = vel_com
                 vel_pointer += 1
                 if vel_pointer >= len_fill_vel:
@@ -1648,80 +1663,70 @@ class Sample:
                     if not filled_up:
                         filled_up = True
 
+            dist = np.zeros(self.num_res, float)
+            region = [""]*self.num_res
+            pore_in = [1]*self.num_res
+            if self._pore:
+                for pore_id in self._pore.keys():
+                    if pore_id[:5]=="shape":
+                        pore_center = np.array(self._pore_props[pore_id]["focal"][0:2])
+                        z_min = res + self._pore_props[pore_id]["focal"][2]-self._pore_props[pore_id]["length"]/2+self._entry
+                        z_max = res + self._pore_props[pore_id]["focal"][2]+self._pore_props[pore_id]["length"]/2-self._entry
+
+                        mask = (z_min < com[:,2]) & (com[:,2] < z_max)
+                        if self._pore_props[pore_id]["type"] in ["CYLINDER","CONE"]:
+                            dist[mask] = np.linalg.norm(pore_center - com[mask,:2], axis=1)
+                        elif self._pore_props[pore_id]["type"]=="SLIT":
+                            dist[mask] = abs(self._pore_props[pore_id]["focal"][1]-com[mask,1])
+                        
+                        in_wall_mask = (dist > (self._pore_props[pore_id]["diam"]*1.01)/2)
+                        if np.any(in_wall_mask):
+                            dist[in_wall_mask] = 0
+                        
+                        in_pore_mask = mask & (~in_wall_mask)
+                        for res_id in np.where(in_pore_mask)[0]:
+                            region[res_id] = "in"
+                            pore_in[res_id] = pore_id
+                mask_ex = (com[:,2] < res) | (com[:,2] > box[2]-res)
+                for res_id in np.where(mask_ex)[0]:
+                    region[res_id] = "ex"
+                    pore_in[res_id] = 0
+
+            elif not self._pore:
+                region = ["ex"]*self.num_res
+                pore_in = [0]*self.num_res
+
             if self._is_angle or self._is_density or self._is_gyration or self._is_diffusion_bin or self._is_diffusion_mc:
                 # Run through residues
                 for res_id in self._res_list:
-                    # Get position and velocity vectors
-                    pos = [[positions[self._res_list[res_id][atom_id]][i]/10+shift[i] 
-                            for i in range(3)] for atom_id in range(len(self._atoms))]
+                    pos_i = pos[res_id]
+                    com_i = com[res_id]
+                    com_no_pbc_i = com_no_pbc[res_id]
 
-                    # Calculate centre of mass
-                    com_no_pbc = [sum([pos[atom_id][i]*self._masses[atom_id] for atom_id 
-                                    in range(len(self._atoms))])/self._sum_masses for i in range(3)]
-
-                    # Check if molecule is broken
-                    if is_broken:
-                        for i in range(3):
-                            if abs(com_no_pbc[i]-pos[0][i])>box[i]/3:
-                                print("Sample - Broken molecule found - ResID: "+"%5i"%res_id)
-
-                    # Apply periodic boundary conditions
-                    if is_pbc:
-                        com = [com_no_pbc[i]-math.floor(com_no_pbc[i]/box[i])*box[i] for i in range(3)]
-                    else:
-                        com = com_no_pbc
-
-                    # Calculate distance towards center axis
-                    if self._pore:
-                        dist = {}
-                        for pore_id in self._pore.keys():
-                            if pore_id[:5]=="shape":
-                                if self._pore_props[pore_id]["type"] in ["CYLINDER","CONE"]:
-                                    dist[pore_id] = geometry.length(geometry.vector([self._pore_props[pore_id]["focal"][0], self._pore_props[pore_id]["focal"][1]], [com[0],com[1]]))
-                                    #print("dist",dist,com,self._pore_props[pore_id]["focal"])
-                                elif self._pore_props[pore_id]["type"]=="SLIT":
-                                    dist[pore_id] = abs(self._pore_props[pore_id]["focal"][1]-com[1])
-                    else:
-                        dist = 0
-
-                    # Set region - in-interior, ex-exterior
-                    region = ""
-                    pore_in = 1
-                    if self._pore and com[2] > res+self._entry and com[2] < box[2]-res-self._entry:
-                        region = "in"
-                        for pore_id in self._pore.keys():
-                            if pore_id[:5]=="shape":
-                                z_min = res  + self._pore_props[pore_id]["focal"][2]-self._pore_props[pore_id]["length"]/2+self._entry
-                                z_max = res  + self._pore_props[pore_id]["focal"][2]+self._pore_props[pore_id]["length"]/2-self._entry
-
-                                if ((z_min<com[2]<z_max) and (dist[pore_id]<(self._pore_props[pore_id]["diam"]*1.01)/2)):
-                                    pore_in = pore_id
-
-                    elif not self._pore or com[2] < res or com[2] > box[2]-res:
-                        region = "ex"
-                        pore_in = 0
-
+                    pore_id = pore_in[res_id]
+                    region_i = region[res_id]
+                    dist_i = dist[res_id]
 
                     # Remove window filling instances except from first processor
                     if self._is_diffusion_bin:
-                        for pore_id in self._pore.keys():
-                            if pore_id[:5]=="shape":
-                                is_sample = len(com_list[pore_id])==len_fill or frame_id<=len_fill
+                        for pore_id_ in self._pore.keys():
+                            if pore_id_[:5]=="shape":
+                                is_sample = len(com_list[pore_id_])==len_fill or frame_id<=len_fill
                     else:
                         is_sample = True
 
                     # Sampling routines
                     if is_sample:
-                        if (self._is_density) and (pore_in != 1):
-                            self._density(output["density"], region, dist, com, pore_in)
-                        if self._is_gyration and (pore_in != 1):
-                            self._gyration(output["gyration"], region, dist, com_no_pbc, pos, pore_in)
-                        if self._is_angle and (pore_in != 1):
-                            self._angle(output["angle"], region, dist, com, pos, pore_in)
-                    if self._is_diffusion_bin and (pore_in != 1):
-                        self._diffusion_bin(output["diffusion_bin"], region,pore_in, dist, com_list, idx_list, res_id, com)
+                        if (self._is_density) and (pore_id != ""):
+                            self._density(output["density"], region_i, dist_i, com_i, pore_id)
+                        if self._is_gyration and (pore_id != ""):
+                            self._gyration(output["gyration"], region_i, dist_i, com_no_pbc_i, pos_i, pore_id)
+                        if self._is_angle and (pore_id != ""):
+                            self._angle(output["angle"], region_i, dist_i, com_i, pos_i, pore_id)
+                    if self._is_diffusion_bin and (pore_id != ""):
+                        self._diffusion_bin(output["diffusion_bin"], region_i, pore_id, dist_i, com_list, idx_list, res_id, com_i)
                     if self._is_diffusion_mc:
-                        self._diffusion_mc(output["diffusion_mc"], idx_list, com, res_id, frame_list, frame_id)
+                        self._diffusion_mc(output["diffusion_mc"], idx_list, com_i, res_id, frame_list, frame_id)
             elif self._is_diffusion_vacf:
                 if filled_up:
                     self._diffusion_vacf(output["diffusion_vacf"], frame_id, pos_list, pos_pointer, vel_list, vel_pointer)
