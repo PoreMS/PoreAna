@@ -5,8 +5,8 @@
 ################################################################################
 
 
-from re import X
 import sys
+import os
 import math
 import scipy
 import numpy as np
@@ -1342,7 +1342,7 @@ class Sample:
         ----------
         shift : list, optional
             Vector for translating atoms in nm
-        np : integer, optional
+        num_cores : integer, optional
             Number of cores to use
         is_pbc : bool, optional
             True to apply periodic boundary conditions
@@ -1356,8 +1356,18 @@ class Sample:
             print("Sample - Wrong shift dimension.")
             return
 
-        # Get number of cores
-        num_cores = num_cores if num_cores and num_cores<=mp.cpu_count() else mp.cpu_count()
+        # Get number of available cores
+        avail_cores = mp.cpu_count()
+        # for cluster compatibility
+        cluster_tasks = (
+            os.getenv("SLURM_NTASKS")
+            or os.getenv("PBS_NP")
+            or os.getenv("LSB_DJOB_NUMPROC")
+            or os.getenv("NSLOTS")
+        )
+        cluster_tasks = int(cluster_tasks) if cluster_tasks else None
+        max_cores = min(avail_cores, cluster_tasks) if cluster_tasks else avail_cores-1
+        num_cores = num_cores if num_cores and num_cores<=max_cores else max_cores
 
         # Error message
         if is_parallel and self._is_angle:
