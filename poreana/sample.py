@@ -312,6 +312,18 @@ class Sample:
         # Define bins
         bins = [z_length/bin_num*x for x in range(bin_num+1)]
         return {"bins": bins}
+    
+    def _bin_pore(self, bin_num):
+        bins = {}
+        for pore_id in self._pore.keys():
+            if pore_id[:5]=="shape":
+                if self._pore_props[pore_id]["type"] == "CYLINDER":
+                    bins[pore_id] = np.linspace(0, self._pore_props[pore_id]["diam"]/2, bin_num+1)
+                elif self._pore_props[pore_id]["type"] == "CONE":
+                    return "Cone binning not implemented yet."
+                elif self._pore_props[pore_id]["type"] == "SLIT":
+                    bins[pore_id] = np.linspace(0, self._pore_props["box"]["dimensions"][1], bin_num+1)
+        return {"bins": bins}
 
 
     ###########
@@ -1185,21 +1197,30 @@ class Sample:
         # Create dictionary
         data = {}
 
-        # Initialize vacf data
-        if sample_each_residue:
-            data["vacf_data"] = np.zeros((bin_num, corr_steps, self.num_res, 3), float)
+        # For pore systems
+        if self._pore:
+            for pore_id in self._pore.keys():
+                if pore_id[:5]=="shape":
+                    data[pore_id] = {}
+                    if sample_each_residue:
+                        data[pore_id]["vacf_data"] = np.zeros((bin_num, corr_steps, self.num_res, 3), float)
+                        data[pore_id]["density"] = np.zeros((bin_num, self.num_res), int)
+                    else:
+                        data[pore_id]["vacf_data"] = np.zeros((bin_num, corr_steps, 1, 3), float)
+                        data[pore_id]["density"] = np.zeros((bin_num, 1), int)
+        # For box systems
         else:
-            data["vacf_data"] = np.zeros((bin_num, corr_steps, 1, 3), float)
-
-        # Initialize density data
-        if sample_each_residue:
-            data["density"] = np.zeros((bin_num, self.num_res), int)
-        else:
-            data["density"] = np.zeros((bin_num, 1), int)
+            # Initialize vacf and density data
+            if sample_each_residue:
+                data["vacf_data"] = np.zeros((bin_num, corr_steps, self.num_res, 3), float)
+                data["density"] = np.zeros((bin_num, self.num_res), int)
+            else:
+                data["vacf_data"] = np.zeros((bin_num, corr_steps, 1, 3), float)
+                data["density"] = np.zeros((bin_num, 1), int)
 
         return data
 
-    def _diffusion_vacf(self, data: dict, frame_id: int, pos_list: np.ndarray, pos_pointer: int, vel_list: np.ndarray, vel_pointer: int):
+    def _diffusion_vacf(self, data: dict, frame_id: int, pos_list: np.ndarray, pos_pointer: int, vel_list: np.ndarray, vel_pointer: int, pore_in, region):
         """
         This function samples the local velocity autocorrelation function (VACF) for
         the diffusion calculation.
@@ -1224,6 +1245,10 @@ class Sample:
             shape: (2*corr_steps-1, num_molecules, 3)
         vel_pointer : integer
             Pointer to the current frame in the velocity list
+        pore_in : numpy.ndarray
+            Array indicating if molecule is inside pore
+        region : numpy.ndarray
+            Array indicating region of each molecule ("in" or "ex")
         """
         bins = self._diff_vacf_inp["bins"]
         direction = self._diff_vacf_inp["direction"]
@@ -1736,7 +1761,7 @@ class Sample:
                         self._diffusion_mc(output["diffusion_mc"], idx_list, com_i, res_id, frame_list, frame_id)
             elif self._is_diffusion_vacf:
                 if filled_up:
-                    self._diffusion_vacf(output["diffusion_vacf"], frame_id, pos_list, pos_pointer, vel_list, vel_pointer)
+                    self._diffusion_vacf(output["diffusion_vacf"], frame_id, pos_list, pos_pointer, vel_list, vel_pointer, pore_in, region)
             elif self._is_numpy:
                 self._numpy(output["numpy"], positions, velocities, frame_id)
 
