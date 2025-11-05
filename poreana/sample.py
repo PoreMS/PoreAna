@@ -1319,7 +1319,7 @@ class Sample:
                     data_pore = data
                     bin_pore = bins
                     pore_mask = np.ones(pos.shape, dtype=bool)
-                    in_wall_mask = np.ones(pos.shape, dtype=bool)
+                    in_wall_mask = np.zeros(pos.shape, dtype=bool)
 
                 for bin_id in range(len(bin_pore) - 1):
                     com_bins = np.digitize(pos, bin_pore) - 1  # bin indices for each molecule
@@ -1328,6 +1328,7 @@ class Sample:
 
                     mask = bin_mask & pore_mask & ~in_wall_mask
                     if not np.any(mask):
+                        print("No molecules found in bin", bin_id, "at frame", frame_id)
                         continue
                     # Get filtered velocities for molecules in this bin (v_l(0) part in the equation)
                     vel0 = vel_list[vel_pointer, mask, :]  # shape: (num_mol_in_bin, 3)
