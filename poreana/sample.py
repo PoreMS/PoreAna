@@ -1326,7 +1326,7 @@ class Sample:
 
                     bin_mask = (com_bins == bin_id)
 
-                    mask = bin_mask & pore_mask & in_wall_mask
+                    mask = bin_mask & pore_mask & ~in_wall_mask
                     if not np.any(mask):
                         continue
                     # Get filtered velocities for molecules in this bin (v_l(0) part in the equation)

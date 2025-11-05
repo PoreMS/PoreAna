@@ -1255,7 +1255,7 @@ def diffusion_from_npy_file_vacf(link, frame_length=20e-15, len_correration=1e-1
 
     return np.array([diffusion_x, diffusion_y, diffusion_z]), integrated_vacf
 
-def integrate_bin_diffusion_vacf(link_data):
+def integrate_bin_diffusion_vacf(link_data, pore_id=None):
     """
     Calculate the velocity autocorrelation function (VACF) from the given data.
     The VACF is calculated using the cumulative trapezoid rule for integration.
@@ -1265,6 +1265,8 @@ def integrate_bin_diffusion_vacf(link_data):
     link_data : str
         The path to the data file containing the VACF data, 
         created by the `poreana.sample.Sample.init_diffusion_vacf` function.
+    pore_id : str
+        The pore ID to analyze.
 
     Returns
     -------
@@ -1273,7 +1275,10 @@ def integrate_bin_diffusion_vacf(link_data):
     """
     sample = utils.load(link_data)
 
-    data = sample["data"]
+    if "pore" in sample:
+        data = sample["data"][pore_id]
+    else:
+        data = sample["data"]
 
     inp = sample["inp"]
     num_frame = inp["num_frame"]
@@ -1305,7 +1310,7 @@ def integrate_bin_diffusion_vacf(link_data):
 
     return integrated
 
-def plot_correlation_per_bin(link_data, plot_axis=None, plot_mean=True, bin_selection=None, remove_low_density_bins=0.0, direction='m', **kwargs):
+def plot_correlation_per_bin(link_data, plot_axis=None, plot_mean=True, bin_selection=None, remove_low_density_bins=0.0, direction='m', pore_id=None, **kwargs):
     """
     Plot the integrated velocity autocorrelation function (VACF) per bin.
     
@@ -1323,7 +1328,11 @@ def plot_correlation_per_bin(link_data, plot_axis=None, plot_mean=True, bin_sele
         Threshold as minimum average number of particles per bin to plot
         the integrated VACF. Removed bins are plotted in grey (default is 0.0, no removal).
     direction : char, optional
-        Direction of the VACF to plot. Options are 'x', 'y', 'z', or 'm' (mean). Default is 'm' (mean over all directions).
+        Direction of the VACF to plot. Options are 'm' (mean) and 'x', 'y', 'z' 
+        for box systems and 'r' (radius), 't' (theta), 'a' (axial). 
+        Default is 'm' (mean over all directions).
+    pore_id : str, optional
+        The pore ID to analyze.
     kwargs : dict, optional
         Additional keyword arguments for plotting, such as line style, color, etc.
     """
@@ -1331,24 +1340,24 @@ def plot_correlation_per_bin(link_data, plot_axis=None, plot_mean=True, bin_sele
     if bin_selection is not None and not isinstance(bin_selection, list):
         print("bin_selection must be a list of bin indices or None.")
         return
-    if direction not in ['x', 'y', 'z', 'm']:
-        print("direction must be 'x', 'y', 'z', or 'm'.")
+    if direction not in ['x', 'y', 'z', 'm', 'r', 't', 'a']:
+        print("direction must be 'm', 'x', 'y', 'z', 'r', 't', or 'a'.")
         return
 
     # Load data
     sample = utils.load(link_data)
-    integrated = integrate_bin_diffusion_vacf(link_data)
+    integrated = integrate_bin_diffusion_vacf(link_data, pore_id=pore_id)
     
     # Determine bins to remove based on density
-    density = pa.density.density_from_vacf(link_data)
+    density = pa.density.density_from_vacf(link_data, pore_id=pore_id)
     mask = density < remove_low_density_bins
     removed_bins = np.where(mask)[0]
 
     selected_bins = bin_selection if bin_selection is not None else range(integrated.shape[0])
 
     # Prepare data for plotting
-    if direction in ['x', 'y', 'z']:
-        index = "xyz".index(direction)
+    if direction in ['x', 'y', 'z', 'r', 't', 'a']:
+        index = {'x': 0, 'y': 1, 'z': 2, 'r': 0, 't': 1, 'a': 2}[direction]
         integrated = integrated[:, :, :, index:index+1] # Keep shape, but reduce to selected direction
     x_axis = np.arange(integrated.shape[2]) * sample["inp"]["len_frame"] * sample["inp"]["sample_step"] * 1e12
     y_axis = 1e9 * integrated.mean(axis=(1, 3))
@@ -1387,7 +1396,7 @@ def plot_correlation_per_bin(link_data, plot_axis=None, plot_mean=True, bin_sele
     plot_axis.set_xlabel('t / ps')
     plot_axis.set_ylabel(r'Integrated vel. correlation / $10^{-9} \ \mathrm{m^2s^{-1}}$')
 
-def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.0, plot_axis=None, plot_selection='xyzm', combine_bins=1, **kwargs):
+def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.0, plot_axis=None, plot_selection='xyzrtam', combine_bins=1, pore_id=None, **kwargs):
     """
     Plot the diffusion coefficient per bin from the integrated VACF data.
     
@@ -1407,9 +1416,13 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
         The axis on which to plot the diffusion coefficient. If None, no plotting is done.
     plot_selection : str, optional
         Selection of directions of diffusion to plot.
-        Options are 'x', 'y', 'z', 'm' (mean), or combinations. Default is 'xyzm' (all directions and mean).
+        Options are (mean) and 'x', 'y', 'z' for box systems and 'r', 't', 'a' 
+        for pore systems or combination. Default is 'xyzrtam' (all directions
+        regardless of system).
     combine_bins : int, optional
         Number of bins to combine for averaging the diffusion coefficient. Default is 1 (no combining).
+    pore_id : str, optional
+        The pore ID to analyze.
     kwargs : dict, optional
         Additional keyword arguments for plotting, such as line style, color, etc.
 
@@ -1422,8 +1435,14 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
     """
     # Load data from 
     sample = utils.load(link_data)
-    integrated = integrate_bin_diffusion_vacf(link_data)
-    density = pa.density.density_from_vacf(link_data)
+    integrated = integrate_bin_diffusion_vacf(link_data, pore_id=pore_id)
+    density = pa.density.density_from_vacf(link_data, pore_id=pore_id)
+    if "pore" in sample:
+        bins = sample["inp"]["bins"][pore_id]
+        directions = ['r', 't', 'a']
+    else:
+        bins = sample["inp"]["bins"]
+        directions = ['x', 'y', 'z']
 
     # Calculate diffusion coefficient by averaging over specified time range
     # Case 1: mean_over_time is a float
@@ -1458,7 +1477,7 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
     diffusion_padded = np.pad(diffusion, ((0, (combine_bins - diffusion.shape[0] % combine_bins) % combine_bins), (0, 0)), mode='constant', constant_values=np.nan) # Pad with nan to make divisible by combine_bins
     diffusion = np.nanmean(diffusion_padded.reshape(-1, combine_bins, 3), axis=1)
     bin_num = diffusion.shape[0]
-    bins = np.linspace(sample["inp"]["bins"][0], sample["inp"]["bins"][-1], bin_num + 1)
+    bins = np.linspace(bins[0], bins[-1], bin_num + 1)
 
     # Convert diffusion to 10^-9 m^2/s for plotting and returning
     diffusion *= 1e9
@@ -1466,24 +1485,27 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
     # Plot diffusion if requested
     if plot_axis is not None:
         x_axis = [(bins[i] + bins[i+1]) / 2 for i in range(len(bins) - 1)] # Plot at bin centers
-        for direction in ['x', 'y', 'z']:
+        for direction in directions:
             if direction in plot_selection:
                 plot_kwargs = kwargs.copy()
                 plot_kwargs.setdefault('marker', 'x')
-                label = str(plot_kwargs.pop('label', ""))
-                plot_kwargs['label'] = label + f" {direction}-direction" if label else None
+                plot_kwargs['label'] = fr"$D_{direction}$"
                 plot_axis.plot(x_axis,
-                               diffusion[:, 'xyz'.index(direction)], 
+                               diffusion[:, {'x': 0, 'y': 1, 'z': 2, 'r': 0, 't': 1, 'a': 2}[direction]], 
                                **plot_kwargs)
         if 'm' in plot_selection or 'mean' in plot_selection:
             plot_kwargs = kwargs.copy()
             plot_kwargs.setdefault('marker', 'o')
             plot_kwargs.setdefault('color', 'black')
-            plot_kwargs['label'] = str(plot_kwargs.pop('label', "")) + " total" if label else None
+            plot_kwargs['label'] = r"$D_{\mathrm{mean}}$"
             plot_axis.plot(x_axis,
                            diffusion.mean(axis=1), 
                            **plot_kwargs)
-        plot_axis.set_xlabel("xyz"[sample["inp"]["direction"]] + " / nm")
+        if sample["inp"]["direction"] == "radial_cylindrical":
+            direction_label = 'r / nm'
+        elif sample["inp"]["direction"] in [0, 1, 2]:
+            direction_label = "xyz"[sample["inp"]["direction"]] + " / nm"
+        plot_axis.set_xlabel(f"{direction_label}")
         plot_axis.set_ylabel(r"Diffusion coefficient / $10^{-9}$ m${^2}$ s$^{-1}$")
 
     # Mean diffusion across all bins, weighted by density

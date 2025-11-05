@@ -451,7 +451,7 @@ def density_from_bins(link_data, convert="", plot_axis=None, **kwargs):
 
     return average_density_per_bin
 
-def density_from_vacf(link_data, convert="", plot_axis=None, **kwargs):
+def density_from_vacf(link_data, convert="", pore_id=None, plot_axis=None, **kwargs):
     """
     Calculate the density from given VACF data. The density is returned as the 
     average number of residues per bin. Optionally, it can be plotted on the 
@@ -476,6 +476,8 @@ def density_from_vacf(link_data, convert="", plot_axis=None, **kwargs):
     convert : str, optional
         The conversion type for the density. Options are "kg/m^3", "molecules/nm^3", 
         "mol/m^3", or an empty string for residues per bin.
+    pore_id : str, optional
+        The pore ID to calculate the density for. If None, the box density is calculated.
     plot_axis : matplotlib.axes.Axes, optional
         The axis on which to plot the density. If None, no plot is created.
     **kwargs : dict, optional
@@ -488,7 +490,14 @@ def density_from_vacf(link_data, convert="", plot_axis=None, **kwargs):
     """
     # Load data
     sample = utils.load(link_data)
-    data = sample["data"]
+    if pore_id and "pore" in sample:
+        data = sample["data"][pore_id]
+        bins = sample["inp"]["bins"][pore_id]
+        direction = 3
+    else:
+        data = sample["data"]
+        bins = sample["inp"]["bins"]
+        direction = sample["inp"]["direction"]
 
     if "pore" in sample:
         pore = sample["pore"]
@@ -502,8 +511,14 @@ def density_from_vacf(link_data, convert="", plot_axis=None, **kwargs):
     average_density_per_bin = data["density"].sum(axis=1) / num_new_time_origins
 
     # Calculate volume per bin
-    area = np.prod([box[i] for i in range(3) if i != sample["inp"]["direction"]])
-    volume = area * np.array([sample["inp"]["bins"][i+1] - sample["inp"]["bins"][i] for i in range(len(sample["inp"]["bins"]) - 1)])
+    if pore_id and "pore" in sample:
+        pore_props = sample["pore"][pore_id]
+        if pore_props["type"] == "CYLINDER":
+            area = np.array([math.pi * (bins[i+1]**2 - bins[i]**2) for i in range(len(bins)-1)])
+            volume = area * pore_props["length"]
+    else:
+        area = np.prod([box[i] for i in range(3) if i != sample["inp"]["direction"]])
+        volume = area * np.array([bins[i+1] - bins[i] for i in range(len(bins) - 1)])
     if convert == "":
         convert = "residues/bin"
     elif convert == "kg/m^3":
@@ -518,7 +533,7 @@ def density_from_vacf(link_data, convert="", plot_axis=None, **kwargs):
 
     # Plot if axis is provided
     if plot_axis is not None:
-        bin_centers = [(sample["inp"]["bins"][i] + sample["inp"]["bins"][i+1]) / 2 for i in range(len(sample["inp"]["bins"]) - 1)]
+        bin_centers = [(bins[i] + bins[i+1]) / 2 for i in range(len(bins) - 1)]
         plot_kwargs = dict(kwargs)
         plot_kwargs.pop("color", None)
         plot_kwargs.pop("label", None)
@@ -530,12 +545,12 @@ def density_from_vacf(link_data, convert="", plot_axis=None, **kwargs):
             **plot_kwargs
         )
         # Set axis labels
-        plot_axis.set_xlabel("xyz"[sample["inp"]["direction"]] + " / nm")
+        plot_axis.set_xlabel("xyzr"[direction] + " / nm")
         plot_axis.set_ylabel("Density / $\mathrm{" + fr'{convert}' + "}$")
 
     return average_density_per_bin
 
-def density_from_vacf_per_residue(link_data):
+def density_from_vacf_per_residue(link_data, pore_id=None):
     """
     Calculate the density from given VACF data for each residue.
     The density is returned as the average number of residues per bin.
@@ -547,6 +562,8 @@ def density_from_vacf_per_residue(link_data):
     link_data : str
         The path to the data file containing the VACF data, created by the
         :func:`poreana.sample.Sample.init_diffusion_vacf` function.
+    pore_id : str, optional
+        The pore ID to calculate the density for. If None, the box density is calculated.
     
     Returns
     -------
@@ -555,7 +572,10 @@ def density_from_vacf_per_residue(link_data):
     """
     # Load data
     sample = utils.load(link_data)
-    data = sample["data"]
+    if "pore" in sample:
+        data = sample["data"][pore_id]
+    else:
+        data = sample["data"]
     num_res = sample["inp"]["num_res"]
 
     num_new_time_origins = np.sum(data["density"]) / num_res
