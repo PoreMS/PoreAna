@@ -1303,8 +1303,8 @@ class Sample:
             backward_index = (np.arange(corr_steps)[::-1] + vel_pointer + corr_steps) % vel_list.shape[0]  # Indices for forward velocities
 
             for pore_id in self._pore.keys() if self._pore else [None]:
-                res = self._pore_props["box"]["res"]
                 if pore_id:
+                    res = self._pore_props["box"]["res"]
                     if pore_id[:5]!="shape":
                         continue
                     data_pore = data[pore_id]
