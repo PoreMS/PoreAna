@@ -314,6 +314,19 @@ class Sample:
         return {"bins": bins}
     
     def _bin_pore(self, bin_num):
+        """This function creates a simple bin structure for the interior of the
+        pore based on the pore diameter.
+
+        Parameters
+        ----------
+        bin_num : integer
+            Number of bins to be used
+
+        Returns
+        -------
+        data : dictionary
+            Dictionary containing a list of the bins for each pore
+        """
         bins = {}
         for pore_id in self._pore.keys():
             if pore_id[:5]=="shape":
@@ -322,7 +335,8 @@ class Sample:
                 elif self._pore_props[pore_id]["type"] == "CONE":
                     return "Cone binning not implemented yet."
                 elif self._pore_props[pore_id]["type"] == "SLIT":
-                    bins[pore_id] = np.linspace(0, self._pore_props["box"]["dimensions"][1], bin_num+1)
+                    return "Slit binning not implemented yet."
+                    # bins[pore_id] = np.linspace(0, self._pore_props["box"]["dimensions"][1], bin_num+1)
         return {"bins": bins}
 
 
@@ -1106,10 +1120,13 @@ class Sample:
         
         The local region is defined by a binning of the simulation box in the 
         chosen direction, if the direction is **0** (x-axis), **1** (y-axis), or
-        **2** (z-axis). If the system is a pore system, the direction can be 
-        chosen as "radial" to bin the system in radial bins from the pore wall
-        to the center of the pore. Instead of calculating the diffusion in x, y and z
-        direction, the radial diffusion is calculated in cylindrical coordinates.
+        **2** (z-axis). If the system is a pore system, consisting of pores all
+        the same shape, sharing the same axis, the direction can be chosen as 
+        "radial" to bin the system in bins according to the distance to the 
+        center of the pore. The diffusion is then calculated in coordinates
+        corresponding to the pore shape. For cylindrical pores, the diffusion is
+        calculated in cylindrical coordinates (radial, tangential, axial), for
+        slit pores in Cartesian coordinates (x, y, z).
 
         The VACF is sampled for a correlation time and choosing a new time origin
         after a certain time. 
@@ -1141,7 +1158,7 @@ class Sample:
         if corr_steps < 1 or new_time_origin_steps < 1:
             print("VACF needs a correlation time longer than one frame. Please adjust len_correration and/or new_time_origin.")
             return
-        if 2*corr_steps-1 <= self._num_frame:
+        if 2*corr_steps-1 >= self._num_frame:
             print("VACF correlation time is too long for the number of frames in the trajectory. Please reduce len_correration or use a longer trajectory.")
             return
 
@@ -1155,20 +1172,40 @@ class Sample:
         if self._is_numpy:
             print("VACF-approaches cannot be run in parallel with numpy approaches.")
             return
-        if direction not in [0,1,2] or (direction=="radial" and not self._pore):
+        if direction not in [0,1,2] and (direction=="radial" and not self._pore):
             print("Wrong directional input. Possible inputs are 0 (x-axis), 1 (y-axis), 2 (z-axis), and 'radial' (only for pore systems).")
             return
         if self._traj.split(".")[-1]!="trr":
             print("VACF needs a trajectory file with velocities. Please use a .trr file.")
             return
+        if direction=="radial":
+            # Check if all pores share the same cylindrical axis
+            axes = []
+            shape = []
+            for pore_id in self._pore.keys():
+                if pore_id[:5]=="shape":
+                    if self._pore_props[pore_id]["type"]=="CYLINDER":
+                        axes.append(tuple(self._pore_props[pore_id]["focal"][0:2]))
+                        shape.append(self._pore_props[pore_id]["type"])
+                    else:
+                        print("Full radial diffusion only available for pore systems consisting of cylindrical pores.")
+                        return
+            if not all(axis == axes[0] for axis in axes):
+                print("Radial diffusion only available for pore systems consisting of pores, all sharing the same cylindrical axis.")
+                return
+            if all(s == shape[0] for s in shape):
+                if shape[0]=="CYLINDER":
+                    direction = "radial_cylindrical"
+            else:
+                print("Radial diffusion only available for pore systems consisting of pores of the same shape.")
+                return
 
         # Enable routine
         self._is_diffusion_vacf = True
 
         # Calculate bins
-        if direction=="radial":
-            direction = -1
-            bins = self._bin_radial(bin_num)["bins"]
+        if direction=="radial_cylindrical":
+            bins = self._bin_pore(bin_num)["bins"]
         else:
             bins = self._bin_box(bin_num, direction)["bins"]
 
@@ -1220,7 +1257,7 @@ class Sample:
 
         return data
 
-    def _diffusion_vacf(self, data: dict, frame_id: int, pos_list: np.ndarray, pos_pointer: int, vel_list: np.ndarray, vel_pointer: int, pore_in, region):
+    def _diffusion_vacf(self, data: dict, frame_id: int, pos_list: np.ndarray, pos_pointer: int, vel_list: np.ndarray, vel_pointer: int):
         """
         This function samples the local velocity autocorrelation function (VACF) for
         the diffusion calculation.
@@ -1245,10 +1282,6 @@ class Sample:
             shape: (2*corr_steps-1, num_molecules, 3)
         vel_pointer : integer
             Pointer to the current frame in the velocity list
-        pore_in : numpy.ndarray
-            Array indicating if molecule is inside pore
-        region : numpy.ndarray
-            Array indicating region of each molecule ("in" or "ex")
         """
         bins = self._diff_vacf_inp["bins"]
         direction = self._diff_vacf_inp["direction"]
@@ -1256,10 +1289,11 @@ class Sample:
         new_time_origin_steps = self._diff_vacf_inp["new_time_origin_steps"]
         sample_each_residue = self._diff_vacf_inp["sample_each_residue"]
 
-        pos = pos_list[pos_pointer, :, direction] # positions of v(0), shape: (num_molecules); Pos pointer is at t=0
+        if direction=="radial_cylindrical":
+            direction = 0  # radial direction in cylindrical coordinates
 
         if (frame_id-corr_steps)%new_time_origin_steps==0:
-            com_bins = np.digitize(pos, bins) - 1  # bin indices for each molecule
+            pos = pos_list[pos_pointer, :, direction] # positions of v(0), shape: (num_molecules); Pos pointer is at t=0
 
             # Vel pointer is at frame_id-(2*corr_steps-1) -> shift by +corr_steps-1 is middle of buffer which is t=0; mask is for t=0
             vel_pointer = (vel_pointer + corr_steps - 1) % vel_list.shape[0]  # Adjust pointer to t=0
@@ -1268,27 +1302,49 @@ class Sample:
             forward_index = (np.arange(corr_steps) + vel_pointer) % vel_list.shape[0]  # Indices for backward velocities
             backward_index = (np.arange(corr_steps)[::-1] + vel_pointer + corr_steps) % vel_list.shape[0]  # Indices for forward velocities
 
-            for bin_id in range(len(bins) - 1):
-                mask = (com_bins == bin_id)
-                if not np.any(mask):
-                    continue
+            for pore_id in self._pore.keys() if self._pore else [None]:
+                res = self._pore_props["box"]["res"]
+                if pore_id:
+                    if pore_id[:5]!="shape":
+                        continue
+                    data_pore = data[pore_id]
+                    bin_pore = bins[pore_id]
+                    z_min = res + self._pore_props[pore_id]["focal"][2]-self._pore_props[pore_id]["length"]/2+self._entry
+                    z_max = res + self._pore_props[pore_id]["focal"][2]+self._pore_props[pore_id]["length"]/2-self._entry
 
-                # Get filtered velocities for molecules in this bin (v_l(0) part in the equation)
-                vel0 = vel_list[vel_pointer, mask, :]  # shape: (num_mol_in_bin, 3)
-                # Build the velocity forward time series for these molecules (v(t) part in the equation)
-                forward_velos = vel_list[forward_index][:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3); It is not the same as vel_list[forward_index, :, mask, :]
-                # Build the velocity backward time series for these molecules (v(t) part in the equation)
-                backward_velos = vel_list[backward_index][:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3)
-                # Concatenate forward and backward
-                vacf = (vel0[np.newaxis, :, :] * forward_velos + vel0[np.newaxis, :, :] * backward_velos) / 2 # shape: (corr_steps, num_mol_in_bin, 3)
-
-                if sample_each_residue:
-                    res_indices = np.where(mask)[0]
-                    data["vacf_data"][bin_id, :, :, :][:, res_indices, :] += vacf # It is not the same as [bin_id, :, res_indices, :]
-                    data["density"][bin_id, res_indices] += 1
+                    # Filter all molecules that are inside the pore in z-direction
+                    pore_mask = (z_min < pos_list[pos_pointer, :, 2]) & (pos_list[pos_pointer, :, 2] < z_max)
+                    in_wall_mask = (pos > (self._pore_props[pore_id]["diam"]*1.01)/2)
                 else:
-                    data["vacf_data"][bin_id, :, 0, :] += np.sum(vacf, axis=1)
-                    data["density"][bin_id, 0] += np.sum(mask)
+                    data_pore = data
+                    bin_pore = bins
+                    pore_mask = np.ones(pos.shape, dtype=bool)
+                    in_wall_mask = np.ones(pos.shape, dtype=bool)
+
+                for bin_id in range(len(bin_pore) - 1):
+                    com_bins = np.digitize(pos, bin_pore) - 1  # bin indices for each molecule
+
+                    bin_mask = (com_bins == bin_id)
+
+                    mask = bin_mask & pore_mask & in_wall_mask
+                    if not np.any(mask):
+                        continue
+                    # Get filtered velocities for molecules in this bin (v_l(0) part in the equation)
+                    vel0 = vel_list[vel_pointer, mask, :]  # shape: (num_mol_in_bin, 3)
+                    # Build the velocity forward time series for these molecules (v(t) part in the equation)
+                    forward_velos = vel_list[forward_index][:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3); It is not the same as vel_list[forward_index, :, mask]
+                    # Build the velocity backward time series for these molecules (v(t) part in the equation)
+                    backward_velos = vel_list[backward_index][:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3)
+                    # Concatenate forward and backward
+                    vacf = (vel0[np.newaxis, :, :] * forward_velos + vel0[np.newaxis, :, :] * backward_velos) / 2 # shape: (corr_steps, num_mol_in_bin, 3)
+
+                    if sample_each_residue:
+                        res_indices = np.where(mask)[0]
+                        data_pore["vacf_data"][bin_id, :, :, :][:, res_indices, :] += vacf # It is not the same as [bin_id, :, res_indices, :]
+                        data_pore["density"][bin_id, res_indices] += 1
+                    else:
+                        data_pore["vacf_data"][bin_id, :, 0, :] += np.sum(vacf, axis=1)
+                        data_pore["density"][bin_id, 0] += np.sum(mask)
 
     ##################
     # Numpy Sampling #
@@ -1543,8 +1599,15 @@ class Sample:
             inp_diff.pop("output")
             data_diff = output[0]["diffusion_vacf"]
             for out in output[1:]:
-                data_diff["density"] += out["diffusion_vacf"]["density"]
-                data_diff["vacf_data"] += out["diffusion_vacf"]["vacf_data"]
+                for pore_id in output[0]["diffusion_vacf"].keys() if self._pore else [None]:
+                    if pore_id:
+                        if pore_id[:5]!="shape":
+                            continue
+                        data_diff[pore_id]["density"] += out["diffusion_vacf"][pore_id]["density"]
+                        data_diff[pore_id]["vacf_data"] += out["diffusion_vacf"][pore_id]["vacf_data"]
+                    else:
+                        data_diff["density"] += out["diffusion_vacf"]["density"]
+                        data_diff["vacf_data"] += out["diffusion_vacf"]["vacf_data"]
 
             # Save results in dictionary
             results = {system["sys"]: system["props"], "inp": inp_diff, "data": data_diff, "type": "diff_vacf"}
@@ -1660,34 +1723,6 @@ class Sample:
                 vel = np.array(velocities).reshape((self.num_res, self._num_atoms, 3)) * 100 # Convert A/ps to m/s
                 vel_com = np.sum(vel * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
 
-            # Add new dictionaries and remove unneeded references
-            if self._is_diffusion_bin:
-                for pore_id in self._pore.keys():
-                    if pore_id[:5]=="shape":
-                        if len(com_list[pore_id]) >= len_fill:
-                            idx_list[pore_id].pop(0)
-                            com_list[pore_id].pop(0)
-                        idx_list[pore_id].append({})
-                        com_list[pore_id].append({})
-            elif self._is_diffusion_mc:
-                if len(com_list) >= len_fill:
-                    idx_list.pop(0)
-                    com_list.pop(0)
-                idx_list.append({})
-                com_list.append({})
-            elif self._is_diffusion_vacf:
-                pos_list[pos_pointer] = com
-                pos_pointer += 1
-                if pos_pointer >= len_fill_pos:
-                    pos_pointer = 0
-
-                vel_list[vel_pointer] = vel_com
-                vel_pointer += 1
-                if vel_pointer >= len_fill_vel:
-                    vel_pointer = 0
-                    if not filled_up:
-                        filled_up = True
-
             # Create region and distance lists
             dist = np.zeros(self.num_res, float)
             region = [""]*self.num_res
@@ -1728,6 +1763,59 @@ class Sample:
                 region = ["ex"]*self.num_res
                 pore_in = [0]*self.num_res
 
+            # Add new dictionaries and remove unneeded references
+            if self._is_diffusion_bin:
+                for pore_id in self._pore.keys():
+                    if pore_id[:5]=="shape":
+                        if len(com_list[pore_id]) >= len_fill:
+                            idx_list[pore_id].pop(0)
+                            com_list[pore_id].pop(0)
+                        idx_list[pore_id].append({})
+                        com_list[pore_id].append({})
+            elif self._is_diffusion_mc:
+                if len(com_list) >= len_fill:
+                    idx_list.pop(0)
+                    com_list.pop(0)
+                idx_list.append({})
+                com_list.append({})
+            elif self._is_diffusion_vacf:
+                if self._diff_vacf_inp["direction"] == "radial_cylindrical":
+                    # Convert to cylindrical coordinates for radial direction
+                    pore_center = np.array(self._pore_props["shape_00"]["focal"][0:2])
+                    dx = com[:,0] - pore_center[0]
+                    dy = com[:,1] - pore_center[1]
+                    r = np.sqrt(dx**2 + dy**2)
+                    theta = np.arctan2(dy, dx)
+                    z = com[:,2]
+                    com_cylindrical = np.zeros_like(com)
+                    com_cylindrical[:,0] = r
+                    com_cylindrical[:,1] = theta
+                    com_cylindrical[:,2] = z
+                    com = com_cylindrical
+                    # Convert velocities to cylindrical coordinates
+                    r_save = np.where(r==0, 1e-8, r)  # Avoid division by zero
+                    vr = (vel_com[:,0]*dx + vel_com[:,1]*dy) / r_save
+                    vtheta = (vel_com[:,1]*dx - vel_com[:,0]*dy) / r_save
+                    vtheta[r==1e-8] = 0  # If r was zero, set vtheta to zero
+                    vz = vel_com[:,2]
+                    vel_com_cylindrical = np.zeros_like(vel_com)
+                    vel_com_cylindrical[:,0] = vr
+                    vel_com_cylindrical[:,1] = vtheta
+                    vel_com_cylindrical[:,2] = vz
+                    vel_com = vel_com_cylindrical
+
+                pos_list[pos_pointer] = com
+                pos_pointer += 1
+                if pos_pointer >= len_fill_pos:
+                    pos_pointer = 0
+
+                vel_list[vel_pointer] = vel_com
+                vel_pointer += 1
+                if vel_pointer >= len_fill_vel:
+                    vel_pointer = 0
+                    if not filled_up:
+                        filled_up = True
+
             if self._is_angle or self._is_density or self._is_gyration or self._is_diffusion_bin or self._is_diffusion_mc:
                 # Run through residues
                 for res_id in self._res_list:
@@ -1761,7 +1849,7 @@ class Sample:
                         self._diffusion_mc(output["diffusion_mc"], idx_list, com_i, res_id, frame_list, frame_id)
             elif self._is_diffusion_vacf:
                 if filled_up:
-                    self._diffusion_vacf(output["diffusion_vacf"], frame_id, pos_list, pos_pointer, vel_list, vel_pointer, pore_in, region)
+                    self._diffusion_vacf(output["diffusion_vacf"], frame_id, pos_list, pos_pointer, vel_list, vel_pointer)
             elif self._is_numpy:
                 self._numpy(output["numpy"], positions, velocities, frame_id)
 
