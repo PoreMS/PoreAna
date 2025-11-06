@@ -1296,7 +1296,7 @@ def integrate_bin_diffusion_vacf(link_data, pore_id=None):
 
     # Calculate total number of sampled datapoints (good for estimating statistics)
     sample_datapoints = np.sum(data["density"])
-    print(f"Sampled {2*sample_datapoints:_} data points (including time reversal) over {sample_datapoints/num_res} frames.")
+    print(f"Sampled {2*sample_datapoints:_} data points (including time reversal) for VACF calculation.")
 
     # Calculate the VACF per bin; the normalization by 'density' accounts for every timeorigin and the average number of residues in the bin
     vacf_data = data["vacf_data"].copy() / data["density"][:, np.newaxis, :, np.newaxis] # 

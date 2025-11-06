@@ -1302,33 +1302,40 @@ class Sample:
             forward_index = (np.arange(corr_steps) + vel_pointer) % vel_list.shape[0]  # Indices for backward velocities
             backward_index = (np.arange(corr_steps)[::-1] + vel_pointer + corr_steps) % vel_list.shape[0]  # Indices for forward velocities
 
+            # Loop over all pores or just the box
             for pore_id in self._pore.keys() if self._pore else [None]:
+                # For pore systems
                 if pore_id:
-                    res = self._pore_props["box"]["res"]
                     if pore_id[:5]!="shape":
                         continue
                     data_pore = data[pore_id]
                     bin_pore = bins[pore_id]
+                    res = self._pore_props["box"]["res"]
                     z_min = res + self._pore_props[pore_id]["focal"][2]-self._pore_props[pore_id]["length"]/2+self._entry
                     z_max = res + self._pore_props[pore_id]["focal"][2]+self._pore_props[pore_id]["length"]/2-self._entry
-
                     # Filter all molecules that are inside the pore in z-direction
                     pore_mask = (z_min < pos_list[pos_pointer, :, 2]) & (pos_list[pos_pointer, :, 2] < z_max)
                     in_wall_mask = (pos > (self._pore_props[pore_id]["diam"]*1.01)/2)
+                # For box systems (all molecules are in the "pore" and not in the wall)
                 else:
                     data_pore = data
                     bin_pore = bins
                     pore_mask = np.ones(pos.shape, dtype=bool)
                     in_wall_mask = np.zeros(pos.shape, dtype=bool)
 
-                for bin_id in range(len(bin_pore) - 1):
-                    com_bins = np.digitize(pos, bin_pore) - 1  # bin indices for each molecule
+                com_bins = np.digitize(pos, bin_pore) - 1  # bin indices for each molecule
+                # If there are molecules that should be in a bin, print a warning
+                if np.any(com_bins[pore_mask] >= len(bin_pore) - 1) or np.any(com_bins[pore_mask] < 0):
+                    print("WARNING: Some molecules are outside the defined bins at frame", frame_id, "Number of molecules outside bins:", np.sum((com_bins[pore_mask] >= len(bin_pore) - 1) | (com_bins[pore_mask] < 0)))
+                    print("WARNING: Position min/max:", np.min(pos[pore_mask]), np.max(pos[pore_mask]))
 
+                for bin_id in range(len(bin_pore) - 1):
                     bin_mask = (com_bins == bin_id)
 
+                    # All molecules to consider are in a bin, inside the pore, and not in the wall
                     mask = bin_mask & pore_mask & ~in_wall_mask
                     if not np.any(mask):
-                        print("No molecules found in bin", bin_id, "at frame", frame_id)
+                        print("WARNING: No molecules found in bin", bin_id, "at frame", frame_id)
                         continue
                     # Get filtered velocities for molecules in this bin (v_l(0) part in the equation)
                     vel0 = vel_list[vel_pointer, mask, :]  # shape: (num_mol_in_bin, 3)
@@ -1805,11 +1812,13 @@ class Sample:
                     vel_com_cylindrical[:,2] = vz
                     vel_com = vel_com_cylindrical
 
+                # Update center of mass list
                 pos_list[pos_pointer] = com
                 pos_pointer += 1
                 if pos_pointer >= len_fill_pos:
                     pos_pointer = 0
 
+                # Update velocity list
                 vel_list[vel_pointer] = vel_com
                 vel_pointer += 1
                 if vel_pointer >= len_fill_vel:
