@@ -388,8 +388,9 @@ def density_from_bins(link_data, convert="", plot_axis=None, **kwargs):
     convert : str, optional
         The conversion type for the density. Options are "kg/m^3", "molecules/nm^3", 
         "mol/m^3", or an empty string for residues per bin.
-    plot_axis : matplotlib.axes.Axes, optional
-        The axis on which to plot the density. If None, no plot is created.
+    plot_axis : matplotlib.axes.Axes or True, optional
+        The axis on which to plot the density. If True, a new figure and axis are created.
+        If None, no plot is created.
     **kwargs : dict, optional
         Additional keyword arguments for the plot, such as 'color', 'marker', etc.
 
@@ -398,6 +399,10 @@ def density_from_bins(link_data, convert="", plot_axis=None, **kwargs):
     average_density_per_bin : np.ndarray
         The average density per bin in the specified conversion type, with shape (bin_num,).
     """
+    # Create plot axis if requested
+    if plot_axis is True:
+        fig, plot_axis = plt.subplots()
+
     # Load data
     sample = utils.load(link_data)
     is_pore = "pore" in sample
@@ -478,8 +483,9 @@ def density_from_vacf(link_data, convert="", pore_id=None, plot_axis=None, **kwa
         "mol/m^3", or an empty string for residues per bin.
     pore_id : str, optional
         The pore ID to calculate the density for. If None, the box density is calculated.
-    plot_axis : matplotlib.axes.Axes, optional
-        The axis on which to plot the density. If None, no plot is created.
+    plot_axis : matplotlib.axes.Axes or True, optional
+        The axis on which to plot the density. If True, a new figure and axis are created.
+        If None, no plot is created.
     **kwargs : dict, optional
         Additional keyword arguments for the plot, such as 'color', 'marker', etc.
     
@@ -488,6 +494,10 @@ def density_from_vacf(link_data, convert="", pore_id=None, plot_axis=None, **kwa
     average_density_per_bin : np.ndarray
         The average density per bin in the specified conversion type, with shape (bin_num,).
     """
+    # Create plot axis if requested
+    if plot_axis is True:
+        fig, plot_axis = plt.subplots()
+
     # Load data
     sample = utils.load(link_data)
     if pore_id and "pore" in sample:

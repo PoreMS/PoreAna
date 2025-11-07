@@ -1318,8 +1318,8 @@ def plot_correlation_per_bin(link_data, plot_axis=None, plot_mean=True, bin_sele
     ----------
     link_data : str
         The path to the data file containing the VACF data.
-    plot_axis : matplotlib.axes.Axes
-        The axis on which to plot the integrated VACF.
+    plot_axis : matplotlib.axes.Axes, optional
+        The axis on which to plot the integrated VACF. If None, a new figure and axis are created.
     plot_mean : bool, optional
         If True, plot the mean integrated VACF across all bins (default is True).
     bin_selection : list, optional
@@ -1343,6 +1343,10 @@ def plot_correlation_per_bin(link_data, plot_axis=None, plot_mean=True, bin_sele
     if direction not in ['x', 'y', 'z', 'm', 'r', 't', 'a']:
         print("direction must be 'm', 'x', 'y', 'z', 'r', 't', or 'a'.")
         return
+    
+    # Create plot axis if not provided
+    if plot_axis is None:
+        fig, plot_axis = plt.subplots()
 
     # Load data
     sample = utils.load(link_data)
@@ -1412,8 +1416,9 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
         Threshold as minimum average number of particles per bin to calculate 
         the diffusion coefficient. Can be used to remove bins with low density 
         (default is 0.0, no removal).
-    plot_axis : matplotlib.axes.Axes, optional
-        The axis on which to plot the diffusion coefficient. If None, no plotting is done.
+    plot_axis : matplotlib.axes.Axes or True, optional
+        The axis on which to plot the diffusion coefficient. If True, a new figure and axis are created.
+        If None, no plot is created (default is None).
     plot_selection : str, optional
         Selection of directions of diffusion to plot.
         Options are (mean) and 'x', 'y', 'z' for box systems and 'r', 't', 'a' 
@@ -1433,6 +1438,10 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
     mean_diffusion : np.ndarray
         Mean diffusion coefficient in 10^-9 m^2/s across all bins, in x, y, and z directions.
     """
+    # Create plot axis if requested
+    if plot_axis is True:
+        fig, plot_axis = plt.subplots()
+
     # Load data from 
     sample = utils.load(link_data)
     integrated = integrate_bin_diffusion_vacf(link_data, pore_id=pore_id)
