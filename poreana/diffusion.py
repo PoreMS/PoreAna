@@ -805,7 +805,7 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
     """
     # Load data
     data = utils.load(link)
-
+    directions = ['x', 'y', 'z']
     # Load results
     results = data["output"]
     diff_bin = results["diff_profile"]
@@ -948,19 +948,20 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
                     del kwargs["label"]
                 plt.fill_between(bins, [(diff_profile_fit[i]-diff_error_bin[i]) for i in range(len(diff_profile_fit))], [(diff_profile_fit[i]+diff_error_bin[i]) for i in range(len(diff_profile_fit))],alpha=0.3, **kwargs)
                 
-    # # Set legend for lag times
-    # if is_plot:
-    #     if not infty_profile and len(len_step) >= 2:
-    #         legend.append("$\\Delta t_{\\alpha} \\rightarrow \\infty$ ps")
-    #     if (not is_error) and infty_profile:
-    #         legend.append("$\\Delta t_{\\alpha} \\rightarrow \\infty$ ps")
-    #     # Set plot properties
-    #     # Plot axis title for a entire system
-    #     plt.ylabel(r"Diff. coeff. ($10^{-9} \ \mathrm{m^2s^{-1}}$)")
-    #     plt.xlabel(r"Box length (nm)")
-    #     plt.xlim([min(bins),max(bins)])
-    #     if legend:
-    #         plt.legend(legend)
+    # Set legend for lag times
+    if is_plot:
+        if not infty_profile and len(len_step) >= 2:
+            legend.append("$\\Delta t_{\\alpha} \\rightarrow \\infty$ ps")
+        if (not is_error) and infty_profile:
+            legend.append("$\\Delta t_{\\alpha} \\rightarrow \\infty$ ps")
+        # Set plot properties
+        # Plot axis title for a entire system
+        plt.ylabel(r"Diff. coeff. ($10^{-9} / \mathrm{m^2s^{-1}}$)")
+        direction_label = "xyz"[data["model"]["direction"]] + " / nm"
+        plt.xlabel(f"Box length {direction_label}")
+        plt.xlim([min(bins),max(bins)])
+        if legend:
+            plt.legend(legend)
 
 
     return diff_profile_fit, diff_profiles, bins
@@ -1511,10 +1512,10 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
                            diffusion.mean(axis=1), 
                            **plot_kwargs)
         if sample["inp"]["direction"] == "radial_cylindrical":
-            direction_label = 'r / nm'
+            direction_label = 'Distance from pore center / nm'
         elif sample["inp"]["direction"] in [0, 1, 2]:
             direction_label = "xyz"[sample["inp"]["direction"]] + " / nm"
-        plot_axis.set_xlabel(f"{direction_label}")
+        plot_axis.set_xlabel(f"Box length {direction_label}")
         plot_axis.set_ylabel(r"Diffusion coefficient / $10^{-9}$ m${^2}$ s$^{-1}$")
 
     # Mean diffusion across all bins, weighted by density
