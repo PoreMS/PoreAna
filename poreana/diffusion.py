@@ -1514,8 +1514,8 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
         if sample["inp"]["direction"] == "radial_cylindrical":
             direction_label = 'Distance from pore center / nm'
         elif sample["inp"]["direction"] in [0, 1, 2]:
-            direction_label = "xyz"[sample["inp"]["direction"]] + " / nm"
-        plot_axis.set_xlabel(f"Box length {direction_label}")
+            direction_label = "Box length " + "xyz"[sample["inp"]["direction"]] + " / nm"
+        plot_axis.set_xlabel(f"{direction_label}")
         plot_axis.set_ylabel(r"Diffusion coefficient / $10^{-9}$ m${^2}$ s$^{-1}$")
 
     # Mean diffusion across all bins, weighted by density
