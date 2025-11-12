@@ -1130,6 +1130,8 @@ class Sample:
 
         The VACF is sampled for a correlation time and choosing a new time origin
         after a certain time. 
+
+        The method was described by Hunter et al. in the Journal of Chemical Physics. Theory Comput. , 18(12), pp.3357–3363.
         
         Parameters
         ----------

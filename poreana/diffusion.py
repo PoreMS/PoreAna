@@ -883,7 +883,7 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
     # Cut profile
     # Calculated start and end bin index of the pore area
     index_start = np.digitize(area[0], bins)
-    index_end = np.digitize(area[1], bins)
+    index_end = np.digitize(area[1], bins) 
 
     # Save for all lag times the cutted profile
     for i in len_step:
@@ -1401,7 +1401,7 @@ def plot_correlation_per_bin(link_data, plot_axis=None, plot_mean=True, bin_sele
     plot_axis.set_xlabel('t / ps')
     plot_axis.set_ylabel(r'Integrated vel. correlation / $10^{-9} \ \mathrm{m^2s^{-1}}$')
 
-def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.0, plot_axis=None, plot_selection='xyzrtam', combine_bins=1, pore_id=None, **kwargs):
+def diffusion_per_bin(link_data, section=[], mean_over_time=None, remove_low_density_bins=0.0, plot_axis=None, plot_selection='xyzrtam', combine_bins=1, pore_id=None, **kwargs):
     """
     Plot the diffusion coefficient per bin from the integrated VACF data.
     
@@ -1409,6 +1409,14 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
     ----------
     link_data : str
         The path to the data file containing the VACF data.
+    section : list, string, optional
+        List to specify an area for the mean_diffusion calculation
+        If :math:`\\mathrm{section} = \\mathrm{"pore"}` the pore section is
+        fitted.
+        If :math:`\\mathrm{section} = \\mathrm{"reservoir"}` the left reservoir
+        area is fitted.
+        If :math:`\\mathrm{section} = \\mathrm{[a,b]}` the box area between a
+        and b is fitted.
     mean_over_time : float or tuple, optional
         If float, Time in s at the end to average the diffusion coefficient over. 
         If tuple, (start_time, end_time) in s to average the diffusion coefficient over.
@@ -1437,7 +1445,8 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
     diffusion : np.ndarray
         Diffusion coefficient in 10^-9 m^2/s for each bin, in x, y, and z directions, in shape (num_bins, 3).
     mean_diffusion : np.ndarray
-        Mean diffusion coefficient in 10^-9 m^2/s across all bins, in x, y, and z directions.
+        Mean diffusion coefficient in 10^-9 m^2/s across all bins or the specify section, in (x, y, and z) or (r, t and a) directions.
+
     """
     # Create plot axis if requested
     if plot_axis is True:
@@ -1453,6 +1462,57 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
     else:
         bins = sample["inp"]["bins"]
         directions = ['x', 'y', 'z']
+
+    # If a pore system is considered
+    if "pore" in sample:
+        pore = sample["pore"]
+        res = pore["box"]["res"]
+        box = pore["box"]["dimensions"]
+
+    # Pore 
+    if isinstance(section, str) and section== "pore":
+        # If only the pore area should be considered
+        # Load pore system
+        if "pore" in sample:
+            # Set section
+            area = [res, box[2]-res-2*(bins[1]-bins[0])]
+
+
+        # If only the pore area should be considered
+        else:
+            print("obj.-file includes results of a simple box")
+            return;
+
+    # Reservoir
+    elif isinstance(section, str) and section== "reservoir":
+        # If only the pore area should be considered
+        # Load pore system
+        if "pore" in sample:
+            # Set section
+            area = [0,res]
+
+        # If only the pore area should be considered
+        else:
+            print("obj.-file includes results of a simple box")
+            return;
+
+    elif isinstance(section, str) and section not in ["reservoir", "pore"]:
+        print("Wrong input for section! Check documentation for available options")
+        return;
+
+    elif isinstance(section, list) and len(section)>=3:
+        print("Wrong input for section! Check documentation for available options")
+        return;
+
+    #Area section
+    elif isinstance(section, list):
+        area = section
+    
+    # If section is not defined -> entire system
+    if not section:
+        # Set section
+        area = [bins[0], bins[-1]]
+
 
     # Calculate diffusion coefficient by averaging over specified time range
     # Case 1: mean_over_time is a float
@@ -1489,6 +1549,11 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
     bin_num = diffusion.shape[0]
     bins = np.linspace(bins[0], bins[-1], bin_num + 1)
 
+    # Cut profile
+    # Calculated start and end bin index of the pore area
+    index_start = np.digitize(area[0], bins) - 1
+    index_end = np.digitize(area[1], bins)
+
     # Convert diffusion to 10^-9 m^2/s for plotting and returning
     diffusion *= 1e9
 
@@ -1521,6 +1586,6 @@ def diffusion_per_bin(link_data, mean_over_time=None, remove_low_density_bins=0.
     # Mean diffusion across all bins, weighted by density
     density_padded = np.pad(density, (0, (combine_bins - density.shape[0] % combine_bins) % combine_bins), mode='constant', constant_values=0) 
     density_combined = np.nansum(density_padded.reshape(-1, combine_bins), axis=1)
-    mean_diffusion = np.nansum(diffusion * density_combined[:, np.newaxis], axis=0) / sample["inp"]["num_res"]
+    mean_diffusion = np.nansum(diffusion[index_start:index_end] * density_combined[index_start:index_end, np.newaxis], axis=0) /np.sum(density_combined[index_start:index_end, np.newaxis])
 
     return diffusion, mean_diffusion
