@@ -275,7 +275,7 @@ class CosineModel(Model):
         x = np.arange(self._bin_num)
 
         # Calculate basis for Fourier cosine series
-        basis = [np.cos(2 * k * np.pi * (x + 1.) / self._bin_num) / (k + 1) for k in range(self._n_diff)]
+        basis = [np.cos(2 * k * np.pi * (x) / self._bin_num) / (k + 1) for k in range(self._n_diff)]
 
         # Transpose basis (is now a bin_num x ncos Matrix)
         self._diff_basis = np.array(basis).transpose()
