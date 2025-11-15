@@ -170,7 +170,7 @@ class CosineModel(Model):
         self._n_diff = n_diff
         self._n_diff_radial = n_diff_radial
         self._print_output = is_print
-        print(type(d0))
+
         if type(d0) == float:
             self._d0 = d0 * (10**9)/(10**12)                # guess init profile [A^2/ps]
         elif type(d0) == list:
@@ -206,7 +206,7 @@ class CosineModel(Model):
         # Create basis (for the free energy)
         self._create_basis_center()
 
-        # Create basis (for the free energy)
+        # Create basis (for the diffusion)
         self._create_basis_border()
 
         # Update diffusion profile

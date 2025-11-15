@@ -1564,7 +1564,7 @@ def diffusion_per_bin(link_data, section=[], mean_over_time=None, remove_low_den
             if direction in plot_selection:
                 plot_kwargs = kwargs.copy()
                 plot_kwargs.setdefault('marker', 'x')
-                plot_kwargs['label'] = fr"$D_{direction}$"
+                plot_kwargs['label'] = fr"$D_{direction}$" if 'label' not in plot_kwargs else plot_kwargs['label']
                 plot_axis.plot(x_axis,
                                diffusion[:, {'x': 0, 'y': 1, 'z': 2, 'r': 0, 't': 1, 'a': 2}[direction]], 
                                **plot_kwargs)
@@ -1572,7 +1572,7 @@ def diffusion_per_bin(link_data, section=[], mean_over_time=None, remove_low_den
             plot_kwargs = kwargs.copy()
             plot_kwargs.setdefault('marker', 'o')
             plot_kwargs.setdefault('color', 'black')
-            plot_kwargs['label'] = r"$D_{\mathrm{mean}}$"
+            plot_kwargs['label'] = r"$D_{\mathrm{mean}}$" if 'label' not in plot_kwargs else plot_kwargs['label']
             plot_axis.plot(x_axis,
                            diffusion.mean(axis=1), 
                            **plot_kwargs)
