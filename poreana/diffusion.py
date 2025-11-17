@@ -881,7 +881,7 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
 
     # Cut profile
     # Calculated start and end bin index of the pore area
-    index_start = np.digitize(area[0], bins)
+    index_start = np.digitize(area[0], bins) - 1
     index_end = np.digitize(area[1], bins)
 
     # Save for all lag times the cutted profile
