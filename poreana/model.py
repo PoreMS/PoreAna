@@ -275,7 +275,7 @@ class CosineModel(Model):
         x = np.arange(self._bin_num)
 
         # Calculate basis for Fourier cosine series
-        basis = [np.cos(2 * k * np.pi * (x + 1.) / self._bin_num) / (k + 1) for k in range(self._n_diff)]
+        basis = [np.cos(2 * k * np.pi * x / self._bin_num) / (k + 1) for k in range(self._n_diff)]
 
         # Transpose basis (is now a bin_num x ncos Matrix)
         self._diff_basis = np.array(basis).transpose()
@@ -452,7 +452,7 @@ class StepModel(Model):
         with :math:`i = [1,...,n_{\\mathrm{diff}}-1]`.
         """
         # Calculated the basis in the border of a bin
-        x = np.arange(self._bin_num)+1.
+        x = np.arange(self._bin_num)
         basis = [np.where((x >= i) & (x <= self._bin_num-i), 1., 0.) for i in self._diff_x0]
 
         # Transpose basis (is now a bin_num x ncos Matrix)
