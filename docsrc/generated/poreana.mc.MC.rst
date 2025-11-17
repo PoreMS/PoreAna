@@ -17,6 +17,13 @@ MC
 
    .. autosummary::
    
+      ~MC._init_rate_matrix_pbc
+      ~MC._init_stats
+      ~MC._log_likelihood_z
+      ~MC._mcmove_df
+      ~MC._mcmove_diffusion
+      ~MC._run_helper
+      ~MC._update_movewidth_mc
       ~MC.run
    
    

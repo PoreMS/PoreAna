@@ -4,6 +4,11 @@
 .. automodule:: poreana.utils
 
    
+   
+   
+
+   
+   
    .. rubric:: Functions
 
    .. autosummary::
@@ -22,3 +27,15 @@
       tic
       toc
    
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

@@ -4,6 +4,11 @@
 .. automodule:: poreana.density
 
    
+   
+   
+
+   
+   
    .. rubric:: Functions
 
    .. autosummary::
@@ -15,3 +20,15 @@
       density_from_vacf_per_residue
       mean
    
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
