@@ -754,7 +754,7 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
     return diffusion, diffusion_mean, diff_table, float(fit.intercept_stderr)
 
 
-def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True, is_error=True, kwargs={}):
+def mc_profile(link, len_step=[], section=[], infty_profile=True, is_plot=True, is_error=True, is_legend=True, kwargs={}):
     """This function plots the diffusion profile for an infinity
     lag time (:math:`\\Delta t_{\\alpha} \\rightarrow \\infty`) over the box
     fitted with the specified :math:`\\mathrm{len}\_\\mathrm{step}` list.
@@ -789,6 +789,8 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
         Show diffusion profile
     is_error : bool, optional
         Show error area 
+    is_legend : bool, optional
+        Show legend
     kwargs: dict, optional
         Dictionary with plotting parameters
 
@@ -960,7 +962,7 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
         direction_label = "xyz"[data["model"]["direction"]] + " / nm"
         plt.xlabel(f"Box length {direction_label}")
         plt.xlim([min(bins),max(bins)])
-        if legend:
+        if is_legend:
             plt.legend(legend)
 
 
