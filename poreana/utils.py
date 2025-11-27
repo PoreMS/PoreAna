@@ -611,7 +611,7 @@ def num_dens_to_mass_dens(dens):
 
     .. math::
 
-        \\rho_{m}=\\frac{M \\cdot 10}{6.022\\cdot \\rho}.
+        \\rho_{m}=\\frac{M \\cdot 10}{6.022} \\cdot \\rho.
 
     Parameters
     ----------

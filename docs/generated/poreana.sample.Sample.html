@@ -165,7 +165,7 @@ analysisd</p>
 <tr class="row-odd"><td><p><a class="reference internal" href="poreana.sample.Sample._sample_helper.html#poreana.sample.Sample._sample_helper" title="poreana.sample.Sample._sample_helper"><code class="xref py py-obj docutils literal notranslate"><span class="pre">_sample_helper</span></code></a>(frame_list, shift, is_pbc, ...)</p></td>
 <td><p>Helper function for sampling run.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="poreana.sample.Sample.sample.html#poreana.sample.Sample.sample" title="poreana.sample.Sample.sample"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sample</span></code></a>([shift, num_cores, is_pbc, ...])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="poreana.sample.Sample.sample.html#poreana.sample.Sample.sample" title="poreana.sample.Sample.sample"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sample</span></code></a>([shift, np, is_pbc, is_broken, ...])</p></td>
 <td><p>This function runs all enabled sampling routines.</p></td>
 </tr>
 </tbody>
@@ -258,6 +258,9 @@ analysisd</p>
 <tr class="row-even"><td><p><a class="reference internal" href="poreana.sample.Sample._bin_window.html#poreana.sample.Sample._bin_window" title="poreana.sample.Sample._bin_window"><code class="xref py py-obj docutils literal notranslate"><span class="pre">_bin_window</span></code></a>(bin_num, len_window)</p></td>
 <td><p>This function creates window list for each bin for the interior of the pore based on the pore diameter.</p></td>
 </tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="poreana.sample.Sample._bin_mc.html#poreana.sample.Sample._bin_mc" title="poreana.sample.Sample._bin_mc"><code class="xref py py-obj docutils literal notranslate"><span class="pre">_bin_mc</span></code></a>(bin_num, direction)</p></td>
+<td><p>This function creates a simple bin structure for the pore and resevoir.</p></td>
+</tr>
 </tbody>
 </table>
 </dd></dl>
@@ -277,7 +280,7 @@ analysisd</p>
     </p>
     <p>
         &copy; Copyright 2021, Hamzeh Kraus.<br/>
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 7.4.6.<br/>
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 7.4.5.<br/>
     </p>
   </div>
 </footer>

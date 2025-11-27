@@ -1,142 +1,171 @@
-:orphan:
+Diffusion Analysis with the VACF
+================================
 
-.. raw:: html
+Example code to analyse a local diffusion profile over the simulation
+box. The method can run for a specific pore system (using a pore.yml
+file from PoreMS) or an other simulation box.
 
-  <div class="container-fluid">
-    <div class="row">
-      <div class="col-md-10">
-        <div style="text-align: justify; text-justify: inter-word;">
+Import packages
+---------------
 
-Diffusion Analysis in a Pore (MC Method)
-========================================
+.. code:: ipython3
 
-The MC diffusion analysis needs the sampled object file using the mc
-diffusion routine
-
-.. code-block:: python
-
-    import porems as pms
     import poreana as pa
+    import porems as pms
     import matplotlib.pyplot as plt
 
 
+Create the molecules
+====================
+
+| Load the molecule to be analyzed (here: water, using the TIP4P/2005
+  force field).
+| Because this force field defines a specific dipole moment, we must
+  explicitly set the atomic masses.
+| For most other molecules, this step is not required.
+
+.. code:: ipython3
+
     # Load molecule
-    mol = pms.Molecule("benzene", "BEN", inp="data/benzene.gro")
+    mol = pms.Molecule(inp="tip4p2005.gro")
+    
+    # Set mass
+    mol.set_masses([15.999,1.00784,1.00784,0])
 
-    # Set step length
-    len_steps = [1,2,5,10,20,30,40]
+VACF Inputs
+===========
 
-    # Set frame length
-    len_frame = 2e-12
+Specifiy VACF inputs for the sampling
 
-    # Sample transition matrix
-    sample = pa.Sample("data/pore_system_cylinder.obj", "data/traj_cylinder.xtc", mol)
-    sample.init_diffusion_mc("output/diff_mc_cyl_s.obj", len_steps, len_frame=len_frame)
+.. code:: ipython3
+
+    # Inputs for sampling
+    len_corr = 15e-12           # Correlation time of the molecule in seconds
+    new_time_o = 1e-13          # New time origin in seconds
+    sample_st = 20              # sample rate of frames
+    len_fr = 1e-15              # time between two frames in seconds
+
+Sample the VACF for the trajectory
+==================================
+
+The local VACF diffusion analysis need the sampled object file using the
+vacf diffusion routine. In this example the density is sampled along the
+z-axis (direction = 2) of the simulation box.
+
+.. code:: ipython3
+
+    sample = pa.Sample("pore.yml", "traj_SOL.trr", mol, masses = [15.999,1.00784,1.00784,0])
+    sample.init_diffusion_vacf("diff_vacf.obj", len_correration=len_corr, new_time_origin=new_time_o, sample_step=sample_st, len_frame=len_fr, bin_num=32, direction=2)
     sample.sample(is_parallel=False)
 
-``Finished frame 2001/2001...``
+.. parsed-literal::
+    
+    Finished on one Core for frames      0-200000
 
 
-With the sampling obj-file the transition matrix can be plotted
+The VACF is used to sample the diffusion inside a pore in radial, axial and tangial direction (direction = "radial"). 
 
-.. code-block:: python
+.. code:: ipython3
 
-    # Set kwargs for the heatmap
-    kwargs = {"vmin":0,"vmax":0.5, "xticklabels":30, "yticklabels":30, "cbar":True, "square":False}
+    sample = pa.Sample("pore.yml", "traj_SOL.trr", mol, masses = [15.999,1.00784,1.00784,0])
+    sample.init_diffusion_vacf("diff_vacf_radial.obj", len_correration=len_corr, new_time_origin=new_time_o, sample_step=sample_st, len_frame=len_fr, bin_num=32, direction="radial")
+    sample.sample(is_parallel=False)
 
-    # Plot transition matrix for a step length of 10
-    pa.diffusion.mc_trans_mat("output/diff_mc_cyl_s.obj", 10, kwargs)
+.. parsed-literal::
+    
+    Finished on one Core for frames      0-200000
 
+Display the integrated VACF for every bin
+=========================================
 
-.. figure::  /pics/diffusion_mc_01.png
+With the sampling obj-file the integrated velocity correlation for every
+bin in the simulation box can be displayed.
+
+.. code:: ipython3
+
+    fig, ax = plt.subplots(figsize=(30,9))
+    ax1 = plt.subplot(1,2,1)
+    plt.title("Box sampling")
+    pa.diffusion.plot_correlation_per_bin("diff_vacf.obj", plot_axis = ax1, direction= "z")
+    ax2 = plt.subplot(1,2,2)
+    plt.title("Pore sampling")
+    pa.diffusion.plot_correlation_per_bin("diff_vacf_radial.obj", plot_axis = ax2, pore_id = "shape_00", direction = "a")
+    plt.xlim([0,2])
+    plt.tight_layout()
+    plt.savefig("integration_vacf.svg")
+
+.. parsed-literal::
+
+    Sampled 673_047_282 data points (including time reversal) for VACF calculation.
+    Sampled 145_760_688 data points (including time reversal) for VACF calculation.
+
+.. figure::  /pics/diffusion_vacf_int.svg
       :align: center
-      :width: 50%
+      :width: 100%
       :name: fig1
 
 
-After sampling, a model has to set and the MC Alogirthm started
+Display the diffusion profile over the box length
+-------------------------------------------------
 
-.. code-block:: python
+The following function can use to show the diffusion profile over the
+simulation box
 
-    # Set Cosine Model for diffusion and energy profile
-    model = pa.CosineModel("output/diff_mc_cyl_s.obj", 6, 10)
+.. code:: ipython3
 
-    # Do the MC Algorithm
-    pa.MC().run(model,"output/diff_mc.obj", nmc_eq=5000, nmc=5000, is_print=False, is_parallel=False)
-
-
-``MC Calculation Start``
-
-``...``
-
-``MC Calculation Done.``
-
-
-The results of the MC Alogrithm the diffusion can be calculated
-
-.. code-block:: python
-
-    # Print the results for the normal diffusion
-    diff,diff_mean,diff_table = pa.diffusion.mc_fit("output/diff_mc.obj")
+    fig, ax = plt.subplots(figsize=(30,9))
+    ax1 = plt.subplot(1,2,1)
+    plt.title("Box sampling")
+    diffusion_profile, diffusion_mean = pa.diffusion.diffusion_per_bin("diff_vacf.obj", plot_selection="xyz", plot_axis= ax1, combine_bins=4, mean_over_time=10e-12)
+    plt.legend()
+    ax2 = plt.subplot(1,2,2)
+    plt.title("Pore sampling")
+    diffusion_profile, diffusion_mean = pa.diffusion.diffusion_per_bin("diff_vacf_radial.obj", plot_selection="rat", pore_id = "shape_00", plot_axis= ax2, combine_bins=6, mean_over_time=10e-12)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("diff_profile_vacf.svg")
 
 
-``Diffusion axial: 1.6913e-09 m^2/s``
+.. parsed-literal::
 
-``Mean Diffusion axial: 1.6777e-09 m^2/s``
+    Sampled 673_047_282 data points (including time reversal) for VACF calculation.
+    Mean over last 500 steps.
+    Sampled 145_760_688 data points (including time reversal) for VACF calculation.
+    Mean over last 500 steps.
 
-``Standard deviation: 6.9341e-11 m^2/s``
-
-
-.. figure::  /pics/diffusion_mc_02.svg
+.. figure::  /pics/diff_profile_vacf.svg
       :align: center
-      :width: 50%
+      :width: 150%
       :name: fig2
 
 
-or the diffusion and free energy profile over the entire system can be
-displayed
+Calculating diffusion coefficients
+==================================
 
-.. code-block:: python
+.. code:: ipython3
 
-    # Plot diffusion profile over the simulation box
-    pa.diffusion.mc_profile("output/diff_mc.obj", infty_profile=True)
-
-    # Plot free energy profile over the simulation box
-    pa.freeenergy.mc_profile("output/diff_mc.obj", [10])
-
-
-.. figure::  /pics/diffusion_mc_03.svg
-      :align: center
-      :width: 100%
-      :name: fig3
-
-Additionally, the pore area can be considered more closely
-
-.. code-block:: python
-
-    # Plot the lag time extrapolation for the pore ares
-    pa.diffusion.mc_fit("output/diff_mc.obj", section="pore")
-
-    # Plot diffusion profile in a pore
-    pa.diffusion.mc_profile("output/diff_mc.obj", section="pore", infty_profile=True)
+    # Using the diffusion profile in z-directions
+    diffusion_profile, diffusion_mean_res = pa.diffusion.diffusion_per_bin("diff_vacf.obj", section = [0,5], combine_bins=8, mean_over_time=10e-12)
+    diffusion_profile, diffusion_mean_pore = pa.diffusion.diffusion_per_bin("diff_vacf.obj", section = [5,15], combine_bins=4, mean_over_time=10e-12)
+    print("Box Sampling")
+    print("\nReservoir diffusion : ", diffusion_mean_res[2], "m²/s")
+    print("Pore diffusion : ", diffusion_mean_pore[2], "m²/s")
+    print("Reservoir/Pore ratio : ", diffusion_mean_res[2]/diffusion_mean_pore[2])
+    
+    # Using the diffusion profile in the pore
+    diffusion_profile, diffusion_rad_pore = pa.diffusion.diffusion_per_bin("diff_vacf_radial.obj",pore_id = "shape_00", combine_bins=4, mean_over_time=10e-12)
+    print("Pore Sampling")
+    print("Pore diffusion (axial) : ", diffusion_rad_pore[2], "m²/s")
+    print("Pore diffusion (radial) : ", diffusion_rad_pore[0], "m²/s")
 
 
+.. parsed-literal::
+    Box Sampling
+    Reservoir diffusion :  1.9675621308108457 m²/s
+    Pore diffusion :  1.457195798962518 m²/s
+    Reservoir/Pore ratio :  1.3502386791203311
 
-``Diffusion axial (Pore): 1.2534e-09 m^2/s``
+    Pore Sampling
+    Pore diffusion (axial) :  1.5062768636353063 m²/s
+    Pore diffusion (radial) :  1.2449438793219074 m²/s
 
-``Mean Diffusion axial (Pore): 1.3417e-09 m^2/s``
-
-``Standard deviation: 3.1949e-10 m^2/s``
-
-.. figure::  /pics/diffusion_mc_04.svg
-      :align: center
-      :width: 100%
-      :name: fig4
-
-
-.. raw:: html
-
-        </div>
-      </div>
-    </div>
-  </div>

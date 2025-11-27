@@ -129,29 +129,31 @@
 <h1>density_from_vacf<a class="headerlink" href="#density-from-vacf" title="Link to this heading">¶</a></h1>
 <dl class="py function">
 <dt class="sig sig-object py" id="poreana.density.density_from_vacf">
-<span class="sig-prename descclassname"><span class="pre">poreana.density.</span></span><span class="sig-name descname"><span class="pre">density_from_vacf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">link_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">convert</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_axis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#poreana.density.density_from_vacf" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">poreana.density.</span></span><span class="sig-name descname"><span class="pre">density_from_vacf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">link_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">convert</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pore_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_axis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#poreana.density.density_from_vacf" title="Link to this definition">¶</a></dt>
 <dd><p>Calculate the density from given VACF data. The density is returned as the 
 average number of residues per bin. Optionally, it can be plotted on the 
 provided axis.</p>
-<p>For secondary axes use:
-.. code-block:: python</p>
-<blockquote>
-<div><p>ax2 = ax.twinx()
-ax2.spines[‘left’].set_color(‘tab:orange’)
-ax2.tick_params(axis=’y’, colors=’tab:orange’)
-ax2.yaxis.label.set_color(‘tab:orange’)</p>
-</div></blockquote>
+<p>For secondary axes use:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">ax2</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
+<span class="n">ax2</span><span class="o">.</span><span class="n">spines</span><span class="p">[</span><span class="s1">&#39;left&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="s1">&#39;tab:orange&#39;</span><span class="p">)</span>
+<span class="n">ax2</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s1">&#39;y&#39;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s1">&#39;tab:orange&#39;</span><span class="p">)</span>
+<span class="n">ax2</span><span class="o">.</span><span class="n">yaxis</span><span class="o">.</span><span class="n">label</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="s1">&#39;tab:orange&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
 <p>and set the color in the kwargs.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><dl class="simple">
-<dt><strong>link_data</strong><span class="classifier">str</span></dt><dd><p>The path to the data file containing the VACF data, created by the
-<code class="xref py py-func docutils literal notranslate"><span class="pre">poreana.sample.init_diffusion_vacf()</span></code> function.</p>
+<dt><strong>link_data</strong><span class="classifier">str</span></dt><dd><p>The path to the data file containing the VACF data, created by the 
+<code class="xref py py-func docutils literal notranslate"><span class="pre">poreana.sample.Sample.init_diffusion_vacf()</span></code> function.</p>
 </dd>
 <dt><strong>convert</strong><span class="classifier">str, optional</span></dt><dd><p>The conversion type for the density. Options are “kg/m^3”, “molecules/nm^3”, 
 “mol/m^3”, or an empty string for residues per bin.</p>
 </dd>
-<dt><strong>plot_axis</strong><span class="classifier">matplotlib.axes.Axes, optional</span></dt><dd><p>The axis on which to plot the density. If None, no plot is created.</p>
+<dt><strong>pore_id</strong><span class="classifier">str, optional</span></dt><dd><p>The pore ID to calculate the density for. If None, the box density is calculated.</p>
+</dd>
+<dt><strong>plot_axis</strong><span class="classifier">matplotlib.axes.Axes or True, optional</span></dt><dd><p>The axis on which to plot the density. If True, a new figure and axis are created.
+If None, no plot is created.</p>
 </dd>
 <dt><strong>**kwargs</strong><span class="classifier">dict, optional</span></dt><dd><p>Additional keyword arguments for the plot, such as ‘color’, ‘marker’, etc.</p>
 </dd>
@@ -181,7 +183,7 @@ ax2.yaxis.label.set_color(‘tab:orange’)</p>
     </p>
     <p>
         &copy; Copyright 2021, Hamzeh Kraus.<br/>
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 7.4.6.<br/>
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 7.4.5.<br/>
     </p>
   </div>
 </footer>

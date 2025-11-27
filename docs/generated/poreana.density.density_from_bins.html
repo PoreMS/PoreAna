@@ -134,14 +134,13 @@
 The density is returned as the given conversion type, which can be “kg/m^3”, 
 “atoms/nm^3” or “mol/m^3”, or as residues per bin if no conversion is specified. 
 Optionally, it can be plotted on the provided axis.</p>
-<p>For secondary axes use:
-.. code-block:: python</p>
-<blockquote>
-<div><p>ax2 = ax.twinx()
-ax2.spines[‘left’].set_color(‘tab:orange’)
-ax2.tick_params(axis=’y’, colors=’tab:orange’)
-ax2.yaxis.label.set_color(‘tab:orange’)</p>
-</div></blockquote>
+<p>For secondary axes use:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">ax2</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
+<span class="n">ax2</span><span class="o">.</span><span class="n">spines</span><span class="p">[</span><span class="s1">&#39;left&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="s1">&#39;tab:orange&#39;</span><span class="p">)</span>
+<span class="n">ax2</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s1">&#39;y&#39;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s1">&#39;tab:orange&#39;</span><span class="p">)</span>
+<span class="n">ax2</span><span class="o">.</span><span class="n">yaxis</span><span class="o">.</span><span class="n">label</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="s1">&#39;tab:orange&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
 <p>and set the color in the kwargs.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -152,7 +151,8 @@ ax2.yaxis.label.set_color(‘tab:orange’)</p>
 <dt><strong>convert</strong><span class="classifier">str, optional</span></dt><dd><p>The conversion type for the density. Options are “kg/m^3”, “molecules/nm^3”, 
 “mol/m^3”, or an empty string for residues per bin.</p>
 </dd>
-<dt><strong>plot_axis</strong><span class="classifier">matplotlib.axes.Axes, optional</span></dt><dd><p>The axis on which to plot the density. If None, no plot is created.</p>
+<dt><strong>plot_axis</strong><span class="classifier">matplotlib.axes.Axes or True, optional</span></dt><dd><p>The axis on which to plot the density. If True, a new figure and axis are created.
+If None, no plot is created.</p>
 </dd>
 <dt><strong>**kwargs</strong><span class="classifier">dict, optional</span></dt><dd><p>Additional keyword arguments for the plot, such as ‘color’, ‘marker’, etc.</p>
 </dd>
@@ -182,7 +182,7 @@ ax2.yaxis.label.set_color(‘tab:orange’)</p>
     </p>
     <p>
         &copy; Copyright 2021, Hamzeh Kraus.<br/>
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 7.4.6.<br/>
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 7.4.5.<br/>
     </p>
   </div>
 </footer>

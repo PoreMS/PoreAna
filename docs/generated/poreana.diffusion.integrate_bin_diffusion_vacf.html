@@ -129,14 +129,16 @@
 <h1>integrate_bin_diffusion_vacf<a class="headerlink" href="#integrate-bin-diffusion-vacf" title="Link to this heading">¶</a></h1>
 <dl class="py function">
 <dt class="sig sig-object py" id="poreana.diffusion.integrate_bin_diffusion_vacf">
-<span class="sig-prename descclassname"><span class="pre">poreana.diffusion.</span></span><span class="sig-name descname"><span class="pre">integrate_bin_diffusion_vacf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">link_data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#poreana.diffusion.integrate_bin_diffusion_vacf" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">poreana.diffusion.</span></span><span class="sig-name descname"><span class="pre">integrate_bin_diffusion_vacf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">link_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pore_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#poreana.diffusion.integrate_bin_diffusion_vacf" title="Link to this definition">¶</a></dt>
 <dd><p>Calculate the velocity autocorrelation function (VACF) from the given data.
 The VACF is calculated using the cumulative trapezoid rule for integration.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><dl class="simple">
 <dt><strong>link_data</strong><span class="classifier">str</span></dt><dd><p>The path to the data file containing the VACF data, 
-created by the <cite>poreana.sample.init_diffusion_vacf</cite> function.</p>
+created by the <cite>poreana.sample.Sample.init_diffusion_vacf</cite> function.</p>
+</dd>
+<dt><strong>pore_id</strong><span class="classifier">str</span></dt><dd><p>The pore ID to analyze.</p>
 </dd>
 </dl>
 </dd>
@@ -164,7 +166,7 @@ created by the <cite>poreana.sample.init_diffusion_vacf</cite> function.</p>
     </p>
     <p>
         &copy; Copyright 2021, Hamzeh Kraus.<br/>
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 7.4.6.<br/>
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 7.4.5.<br/>
     </p>
   </div>
 </footer>

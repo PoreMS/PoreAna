@@ -129,14 +129,14 @@
 <h1>plot_correlation_per_bin<a class="headerlink" href="#plot-correlation-per-bin" title="Link to this heading">¶</a></h1>
 <dl class="py function">
 <dt class="sig sig-object py" id="poreana.diffusion.plot_correlation_per_bin">
-<span class="sig-prename descclassname"><span class="pre">poreana.diffusion.</span></span><span class="sig-name descname"><span class="pre">plot_correlation_per_bin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">link_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_axis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_mean</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bin_selection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove_low_density_bins</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">direction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'m'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#poreana.diffusion.plot_correlation_per_bin" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">poreana.diffusion.</span></span><span class="sig-name descname"><span class="pre">plot_correlation_per_bin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">link_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_axis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_mean</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bin_selection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove_low_density_bins</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">direction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'m'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pore_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#poreana.diffusion.plot_correlation_per_bin" title="Link to this definition">¶</a></dt>
 <dd><p>Plot the integrated velocity autocorrelation function (VACF) per bin.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><dl class="simple">
 <dt><strong>link_data</strong><span class="classifier">str</span></dt><dd><p>The path to the data file containing the VACF data.</p>
 </dd>
-<dt><strong>plot_axis</strong><span class="classifier">matplotlib.axes.Axes</span></dt><dd><p>The axis on which to plot the integrated VACF.</p>
+<dt><strong>plot_axis</strong><span class="classifier">matplotlib.axes.Axes, optional</span></dt><dd><p>The axis on which to plot the integrated VACF. If None, a new figure and axis are created.</p>
 </dd>
 <dt><strong>plot_mean</strong><span class="classifier">bool, optional</span></dt><dd><p>If True, plot the mean integrated VACF across all bins (default is True).</p>
 </dd>
@@ -145,7 +145,11 @@
 <dt><strong>remove_low_density_bins</strong><span class="classifier">float, optional</span></dt><dd><p>Threshold as minimum average number of particles per bin to plot
 the integrated VACF. Removed bins are plotted in grey (default is 0.0, no removal).</p>
 </dd>
-<dt><strong>direction</strong><span class="classifier">char, optional</span></dt><dd><p>Direction of the VACF to plot. Options are ‘x’, ‘y’, ‘z’, or ‘m’ (mean). Default is ‘m’ (mean over all directions).</p>
+<dt><strong>direction</strong><span class="classifier">char, optional</span></dt><dd><p>Direction of the VACF to plot. Options are ‘m’ (mean) and ‘x’, ‘y’, ‘z’ 
+for box systems and ‘r’ (radius), ‘t’ (theta), ‘a’ (axial). 
+Default is ‘m’ (mean over all directions).</p>
+</dd>
+<dt><strong>pore_id</strong><span class="classifier">str, optional</span></dt><dd><p>The pore ID to analyze.</p>
 </dd>
 <dt><strong>kwargs</strong><span class="classifier">dict, optional</span></dt><dd><p>Additional keyword arguments for plotting, such as line style, color, etc.</p>
 </dd>
@@ -169,7 +173,7 @@ the integrated VACF. Removed bins are plotted in grey (default is 0.0, no remova
     </p>
     <p>
         &copy; Copyright 2021, Hamzeh Kraus.<br/>
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 7.4.6.<br/>
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 7.4.5.<br/>
     </p>
   </div>
 </footer>
