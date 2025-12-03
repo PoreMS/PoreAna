@@ -493,7 +493,7 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
     :math:`D_\\mathrm{mean}({\\Delta t_{\\alpha}})` over the
     inverse lag times and the linear fit. Additionally, the final diffusion
     coefficient :math:`D` for a lag time
-    :math:`\\Delta t_{\\alpha} \\rightarrow \infty` is printed. Also, a table
+    :math:`\\Delta t_{\\alpha} \\rightarrow \\infty` is printed. Also, a table
     of the selected step length and the belonging
     :math:`D_{\\mathrm{mean}}({\\Delta t_{\\alpha}})` can be displayed.
 
@@ -757,11 +757,11 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
 def mc_profile(link, len_step=[], section=[], infty_profile=True, is_plot=True, is_error=True, is_legend=True, kwargs={}):
     """This function plots the diffusion profile for an infinity
     lag time (:math:`\\Delta t_{\\alpha} \\rightarrow \\infty`) over the box
-    fitted with the specified :math:`\\mathrm{len}\_\\mathrm{step}` list.
+    fitted with the specified :math:`\\mathrm{len}\\_\\mathrm{step}` list.
     Additionally, it is possible to display the diffusion profiles for the
     calculated lag times. Therefore, the
-    :math:`\\mathrm{infty}\_\\mathrm{profile}` has to be false.
-    The list :math:`\\mathrm{len}\_\\mathrm{step}`
+    :math:`\\mathrm{infty}\\_\\mathrm{profile}` has to be false.
+    The list :math:`\\mathrm{len}\\_\\mathrm{step}`
     contains the calculated step length which should be
     displayed.
 
@@ -1218,7 +1218,7 @@ def diffusion_from_npy_file_vacf(link, frame_length=20e-15, len_correration=1e-1
         plt.plot(x_values, y_values[:, 2], label='z-direction', **kwargs)
         plt.plot(x_values, y_values.mean(axis=1), label='mean', color='black', **kwargs)
         plt.xlabel('Time (ps)')
-        plt.ylabel('Integrated VACF ($10^{-9} \ \mathrm{m^2s^{-1}}$)')
+        plt.ylabel('Integrated VACF ($10^{-9} \\mathrm{m^2s^{-1}}$)')
 
     # Determine the time range for averaging the diffusion coefficient
     # Case 1: mean_over_time is a float

@@ -937,12 +937,12 @@ class Sample:
 
         .. math::
 
-            \\Delta t_{\\alpha} = t \cdot s
+            \\Delta t_{\\alpha} = t \\cdot s
 
         After the sampling a model class has to set and then the MC calculation
         can run. Subsequently the final mean diffusion coefficient can be
         determined with a extrapolation to
-        :math:`\\Delta t_{\\alpha} \\rightarrow \infty`.
+        :math:`\\Delta t_{\\alpha} \\rightarrow \\infty`.
         For the etxrapolation we need the mean diffusion over the bins for
         different chosen lag times. That's why we have to calculate the results
         and the transition matrix for several lag times. More information about
@@ -1045,12 +1045,12 @@ class Sample:
 
         .. math::
 
-            \\Delta t_{\\alpha} = t \cdot s
+            \\Delta t_{\\alpha} = t \\cdot s
 
         After the sampling a model class has to set and then the MC calculation
         can run. Subsequently the final mean diffusion coefficient can be
         determined with a extrapolation to
-        :math:`\\Delta t_{\\alpha} \\rightarrow \infty`.
+        :math:`\\Delta t_{\\alpha} \\rightarrow \\infty`.
         For the etxrapolation we need the mean diffusion over the bins for
         different chosen lag times. That's why we have to calculate the results
         and the transition matrix for several lag times. More information about
