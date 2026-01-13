@@ -146,10 +146,10 @@ def bins(link_data, area=[[10, 90], [10, 90]], target_dens=0, is_print=True):
             if pore_props[pore_id]["pore_type"] in ["CYLINDER","CONE"]:
                 volume[pore_id]["in"] = [math.pi*(pore_props[pore_id]["length"]-2*entry)*(width[pore_id]["in"][i+1]**2-width[pore_id]["in"][i]**2) for i in range(0, bin_num+1)]
             elif pore_props[pore_id]["pore_type"]=="SLIT" and inp["avg_slit"]:
-                volume[pore_id]["in"] = [box[0]*(box[2]-2*res-2*entry)*(width[pore_id]["in"][i+1]-width[pore_id]["in"][i])*2 for i in range(0, bin_num+1)]
+                volume[pore_id]["in"] = [box[0]*(pore_props[pore_id]["length"]-2*entry)*(width[pore_id]["in"][i+1]-width[pore_id]["in"][i])*2 for i in range(0, bin_num+1)]
             elif pore_props[pore_id]["pore_type"]=="SLIT" and not inp["avg_slit"]:
                 print(res,entry)
-                volume[pore_id]["in"] = [box[0]*(box[2]-2*res-2*entry)*(width[pore_id]["in"][i+1]-width[pore_id]["in"][i]) for i in range(0, bin_num+1)]
+                volume[pore_id]["in"] = [box[0]*(pore_props[pore_id]["length"]-2*entry)*(width[pore_id]["in"][i+1]-width[pore_id]["in"][i]) for i in range(0, bin_num+1)]
 
             ## Exterior  ###Update fehlt hier noch 
             if remove_pore_from_res and pore_props[pore_id]["pore_type"] in ["CYLINDER","CONE"]:
