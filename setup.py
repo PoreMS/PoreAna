@@ -5,20 +5,24 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="poreana",
-    version="0.3.0",
+    version="1.0.0",
     author="Hamzeh Kraus",
     author_email="kraus@itt.uni-stuttgart.de",
     description="Pore system analysis tool.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/porems/PoreAna",
+    url="https://github.com/PoreMS/PoreAna",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.5',
-    install_requires=['pandas', 'seaborn', 'scipy', 'chemfiles==0.10.0', 'porems>=0.2.5', 'jinja2', 'h5py>=3.0.0', 'pyyaml'],
+    python_requires='>=3.10',
+    install_requires=['pandas', 'seaborn', 'scipy', 'chemfiles', 'porems>=1.0.0', 'jinja2', 'h5py>=3.0.0', 'pyyaml'],
     include_package_data=True,
 )

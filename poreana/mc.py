@@ -4,7 +4,6 @@ import scipy as sc
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
-import numpy as numpy
 
 import poreana.utils as utils
 
@@ -20,18 +19,11 @@ class MC:
     def __init__(self):
         return
 
-        # Save for radial diffusion
-        #self._delta_diff_radial = delta_diff_radial          # MC Move width radial Diffusion
-        #self._delta_diff_radial_start = delta_diff_radial
-        #self._nmc_eq_radial = nmc_eq_radial                  # Number of MC steps
-        #self._nmc_radial = nmc_radial                        # Number of MC steps
-        #self._lmax = lmax                                    # Number of bessel functions
-
     ##############
     # MC - Cylce #
     ##############
-    def run(self, model, link_out, nmc_eq=50000, nmc=100000, delta_df=0.05, delta_diff=0.05,  num_mc_update=10, temp=1, np=0, print_freq=100, is_print=False, do_radial=False, is_parallel=True):
-        """This function do the MC Cycle to calculate the diffusion and free
+    def run(self, model, link_out, nmc_eq=50000, nmc=100000, delta_df=0.05, delta_diff=0.05,  num_mc_update=10, temp=1, n_proc=0, print_freq=100, is_print=False, do_radial=False, is_parallel=True):
+        r"""This function do the MC Cycle to calculate the diffusion and free
         energy profile over the bins and save the results in an output hdf5
         file. This happens with the adjustment of the coefficient from the model
         which is set with the appropriate model class. The code determines the
@@ -85,7 +77,7 @@ class MC:
             is required)
         temp : float, optional
             Temperature in Monte Carlo acceptance criterium
-        np : integer, optional
+        n_proc : integer, optional
             Number of cores to use
         print_freq : integer, optional
             Print MC step every print_freq
@@ -150,15 +142,14 @@ class MC:
 
 
         # Get number of cores
-        np = np if np and np<=mp.cpu_count() else mp.cpu_count()
+        n_proc = n_proc if n_proc and n_proc <= mp.cpu_count() else mp.cpu_count()
 
         # List for step times per cpu
-        len_step_cpu = numpy.array_split(model._len_step,np);
-
+        len_step_cpu = np.array_split(model._len_step, n_proc)
 
         # If is parallel is true, each lag time MC run is calculated on one CPU
         if is_parallel:
-            pool = mp.Pool(processes=np)
+            pool = mp.Pool(processes=n_proc)
             results = [pool.apply_async(self._run_helper, args=(model,list(step), do_radial)) for step in len_step_cpu]
             pool.close()
             pool.join()
@@ -466,7 +457,7 @@ class MC:
 
 
         # Set output data
-        output = {"diff_profile": list_diff_profile, "df_profile": list_df_profile, "diff_coeff": list_diff_coeff,  "df_coeff": list_df_coeff, "nacc_df": nacc_df_mean, "nacc_diff": nacc_diff_mean, "fluc_df": list_df_fluc, "fluc_diff": list_diff_fluc,"fluc_diff_bin": diff_fluc_per_bin,"fluc_df_bin": df_fluc_per_bin,"list_diff_coeff": list_diff_profile, "list_df_coeff":  list_df_profile}
+        output = {"diff_profile": list_diff_profile, "df_profile": list_df_profile, "diff_coeff": list_diff_coeff, "df_coeff": list_df_coeff, "nacc_df": nacc_df_mean, "nacc_diff": nacc_diff_mean, "fluc_df": list_df_fluc, "fluc_diff": list_diff_fluc, "fluc_diff_bin": diff_fluc_per_bin, "fluc_df_bin": df_fluc_per_bin, "list_diff_coeff": list_diff_coeff, "list_df_coeff": list_df_coeff}
 
         return output
 
@@ -500,7 +491,7 @@ class MC:
         self._nacc_diff_radial_coeff = np.zeros(model._n_diff_radial, int) # Radial diffusion
 
     def _mcmove_diffusion(self, model):
-        """This function does the MC move for the diffusion profile and adjust
+        r"""This function does the MC move for the diffusion profile and adjust
         one coefficient of the model. A MC move in the parameter space is defined
         by
 
@@ -561,7 +552,7 @@ class MC:
     # MC Moves #
     ############
     def _mcmove_df(self, model):
-        """This function does the MC move for the free energy profile and adjust
+        r"""This function does the MC move for the free energy profile and adjust
         the coefficents of the model. A MC move in the parameter space is
         defined by
 
@@ -617,7 +608,7 @@ class MC:
                 self._nacc_df_update += 1
 
     # def _mcmove_diffusion_radial(self,model):
-    #     """This function do the MC move for the radial diffusion profile and
+    #     r"""This function do the MC move for the radial diffusion profile and
     #     adjust the coefficents of the model. A MC move in the parameter space
     #     is defined by
     #
@@ -673,7 +664,7 @@ class MC:
     #             self._nacc_diff_radial_update += 1
 
     def _update_movewidth_mc(self, imc, radial=False):
-        """This function sets a new MC move width after a define number of MC
+        r"""This function sets a new MC move width after a define number of MC
         steps :math:`n_\\text{MC,update}`. The new step width is estimate with
 
         .. math::
@@ -708,7 +699,7 @@ class MC:
     # Rate matrix #
     ###############
     def _init_rate_matrix_pbc(self, bin_num, diff_bin, df_bin):
-        """This function estimates the rate Matrix R for the current free energy
+        r"""This function estimates the rate Matrix R for the current free energy
         and log diffusion profiles over the bins for periodic boundary
         conditions. The dimension of the matrix is :math:`n \\times n`
         with :math:`n` as number of the bins.
@@ -794,7 +785,7 @@ class MC:
     # Likelihood #
     ##############
     def _log_likelihood_z(self, model,  temp=None):
-        """This function estimate the likelihood of the current free energy or
+        r"""This function estimate the likelihood of the current free energy or
         diffusion profile over the bins in a simulation box. It is used to
         calculated the diffusion in z-direction over z-coordinate. This
         likelihood is necessary to decide whether the MC step will be accepted.
@@ -854,7 +845,7 @@ class MC:
         return log_like
 
     # def log_likelihood_radial(self, model, wrad):
-    #     """This function estimate the likelihood of the current radial diffusion
+    #     r"""This function estimate the likelihood of the current radial diffusion
     #     profile over the bins in a simulation box. This likelihood is necessary
     #     to decide whether the MC step will be accepted.
     #
@@ -963,7 +954,7 @@ class MC:
     #     return log_like
     #
     # def setup_bessel_box(self,model):
-    #     """This function set the zeros of the 0th order Bessel first type and
+    #     r"""This function set the zeros of the 0th order Bessel first type and
     #     the bessel function for the radial likelihood.
     #
     #     .. math::

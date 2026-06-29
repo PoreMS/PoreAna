@@ -3,7 +3,6 @@ from poreana.sample import Sample
 from poreana.model import Model
 from poreana.model import CosineModel
 from poreana.model import StepModel
-from poreana.model import StepModel
 
 from poreana.mc import MC
 

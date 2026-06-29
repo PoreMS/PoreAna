@@ -278,8 +278,8 @@ def mc_results(link, print_con=False, sections={"box": [], "pore": [], "res": []
     len_step = list(model["len_step"]) if not len_step else len_step
 
     # Extract system data
-    box_z = round(data["pore"]["box"][2], 2) if "pore" in data else round(data["box"]["length"][2], 2)
-    res = round(data["pore"]["res"], 2) if "pore" in data else 0
+    box_z = round(data["pore"]["box"]["dimensions"][2], 2) if "pore" in data else round(data["box"]["length"][2], 2)
+    res = round(data["pore"]["box"]["res"], 2) if "pore" in data else 0
 
     # Run through sections
     diff_dict = {}

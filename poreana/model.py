@@ -32,7 +32,6 @@ class Model:
         self._type = sample["type"]
 
         self._sys_props = {}
-        self._sys_props = {}
         if "pore" in sample:
             for pore_id in sample["pore"].keys():
                 if pore_id[:5]=="shape":
@@ -71,9 +70,8 @@ class Model:
         elif type(self._d0) == list:
             for i in range(len(self._d0)):
                 self._diff_bin[i] = np.log(self._d0[i]) - self._diff_unit
-            print(self._diff_bin[i])                    
     def _calc_profile(self, coeff, basis):
-        """This function calculates the diffusion and free energy profile over
+        r"""This function calculates the diffusion and free energy profile over
         the bins. It is used to initialize the system at the beginning of the
         calculation/MC run. Additionally, it is needed to update the profiles
         in the Monte Carlo part after the adjustment of a profile coefficient.
@@ -120,7 +118,7 @@ class Model:
 
 
 class CosineModel(Model):
-    """This class sets the Cosine Model to calculate the free energy profile
+    r"""This class sets the Cosine Model to calculate the free energy profile
     and the diffusion profile. The profiles have the typical cosine oscillation.
     These profiles over the bins are expressed by the following Fourier
     series. The diffusion profile is calculated between bin i and i+1  over
@@ -170,12 +168,10 @@ class CosineModel(Model):
         self._n_diff = n_diff
         self._n_diff_radial = n_diff_radial
         self._print_output = is_print
-        print(type(d0))
         if type(d0) == float:
-            self._d0 = d0 * (10**9)/(10**12)                # guess init profile [A^2/ps]
+            self._d0 = d0 * (10**9)/(10**12)
         elif type(d0) == list:
             self._d0 = [d * (10**9)/(10**12) for d in d0]
-            print(self._d0)
         self._init_model()     # Initial model
         self._init_profiles()  # Initial Profiles
         self._cosine_model()   # Set basis of Fourier series
@@ -235,7 +231,7 @@ class CosineModel(Model):
             print(df_model)
 
     def _create_basis_center(self):
-        """This function creates the basis part of the Fourier series for the
+        r"""This function creates the basis part of the Fourier series for the
         free energy and the radial diffusion profile.
         For a bin the basis is calculated with
 
@@ -259,7 +255,7 @@ class CosineModel(Model):
         self._diff_radial_basis = np.array(basis_diff_radial).transpose()
 
     def _create_basis_border(self):
-        """This function creates the basis part in every bin of the Fourier
+        r"""This function creates the basis part in every bin of the Fourier
         series for the diffusion :math:`\\ln \\ (D)`.
         At the bin border the basis is calculated with
 
@@ -282,7 +278,7 @@ class CosineModel(Model):
 
 
 class StepModel(Model):
-    """This class sets the Step Model to calculate the free energy profile and
+    r"""This class sets the Step Model to calculate the free energy profile and
     the diffusion profile. This model based on a spline calculation.
     In contrast to the Cosine Model the determined profile has not the typical
     oscillation and receives a profile which is better interpretable.
@@ -396,7 +392,7 @@ class StepModel(Model):
             print("\n")
 
     def _create_basis_center(self):
-        """This function creates the basis part in every bin of the Step model
+        r"""This function creates the basis part in every bin of the Step model
         for the free energy and the radial diffusion profile. The following
         explanation is for the free energy profile. For the radial diffusion
         profile the number of free energy coefficients :math:`n_{\\mathrm{df}}` has to
@@ -429,7 +425,7 @@ class StepModel(Model):
         self._df_basis = np.array(basis).transpose()
 
     def _create_basis_border(self):
-        """This function creates the basis part in every bin of the Step model
+        r"""This function creates the basis part in every bin of the Step model
         for the diffusion profile. The dimension of the basis matrix is
         :math:`n_{bin} \\times n_{diff}`. At the bin border the basis is
         calculated with

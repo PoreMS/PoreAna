@@ -5,8 +5,6 @@
 ################################################################################
 
 
-import math
-import itertools
 import scipy as sp
 import numpy as np
 import pandas as pd
@@ -20,7 +18,7 @@ import poreana.utils as utils
 # Diffusion - Bin #
 ###################
 def cui(link, pore_id="shape_00", z_dist=0, ax_area=[0.2, 0.8], intent="", is_fit=False, is_plot=True):
-    """This function samples and calculates the diffusion coefficient of a
+    r"""This function samples and calculates the diffusion coefficient of a
     molecule group in a pore in both axial and radial direction, as described
     in the paper of `Cui <https://doi.org/10.1063/1.1989314>`_.
 
@@ -100,30 +98,22 @@ def cui(link, pore_id="shape_00", z_dist=0, ax_area=[0.2, 0.8], intent="", is_fi
     len_window = int(inp["len_window"])
     len_step = inp["len_step"]
     len_frame = inp["len_frame"]
-    bins = int(inp["bin_num"]) if not z_dist else math.floor(z_dist/sample["data"]["width"])
-    msd_z = [0 for x in range(len_window)]
-    msd_r = [0 for x in range(len_window)]
-    norm_z = [0 for x in range(len_window)]
-    norm_r = [0 for x in range(len_window)]
+    bins = int(inp["bin_num"]) if not z_dist else int(z_dist / sample["data"]["width"])
 
-    # Sum up all bins
-    for i in range(bins):
-        for j in range(len_window):
-            msd_z[j] += sample["data"][pore_id]["z_tot"][i][j]
-            norm_z[j] += sample["data"][pore_id]["n_tot"][i][j]
+    z_tot = np.array(sample["data"][pore_id]["z_tot"])   # (bin_num, len_window)
+    r_tot = np.array(sample["data"][pore_id]["r_tot"])
+    n_tot = np.array(sample["data"][pore_id]["n_tot"])
 
-    for i in range(int(inp["bin_num"])):
-        for j in range(len_window):
-            msd_r[j] += sample["data"][pore_id]["r_tot"][i][j]
-            norm_r[j] += sample["data"][pore_id]["n_tot"][i][j]
+    norm_z = n_tot[:bins].sum(axis=0)
+    msd_z  = z_tot[:bins].sum(axis=0)
+    norm_r = n_tot.sum(axis=0)
+    msd_r  = r_tot.sum(axis=0)
 
-    # Normalize
-    msd_z_n = [msd_z[i]/norm_z[i] if norm_z[i] > 0 else 0 for i in range(len_window)]
-    msd_r_n = [msd_r[i]/norm_r[i] if norm_r[i] > 0 else 0 for i in range(len_window)]
+    msd_z_n = np.where(norm_z > 0, msd_z / norm_z, 0.0)
+    msd_r_n = np.where(norm_r > 0, msd_r / norm_r, 0.0)
 
-    # Define time axis and range
-    time_ax = [x*len_step*len_frame for x in range(len_window)]
-    t_range = (len_window-1)*len_step*len_frame
+    time_ax = np.arange(len_window) * len_step * len_frame
+    t_range = (len_window - 1) * len_step * len_frame
 
     # Calculate axial coefficient
     if not intent or intent == "axial":
@@ -138,16 +128,18 @@ def cui(link, pore_id="shape_00", z_dist=0, ax_area=[0.2, 0.8], intent="", is_fi
             x = x if isinstance(x, list) or isinstance(x, np.ndarray) else [x]
 
             # Get bessel function zeros
-            jz = sp.special.jnp_zeros(1, math.ceil(b))
-            # Calculate sum
-            sm = [[8/(z**2*(z**2-1))*math.exp(-(z/c)**2*a*t) for z in jz] for t in x]
+            jz = sp.special.jnp_zeros(1, int(np.ceil(b)))
+            # Calculate sum using numpy for speed
+            z_arr = np.array(jz)
+            coeffs = 8 / (z_arr ** 2 * (z_arr ** 2 - 1))
+            sm = [coeffs * np.exp(-(z_arr / c) ** 2 * a * t) for t in x]
             # Final equation
-            return [c**2*(1-sum(s)) for s in sm]
+            return [c ** 2 * (1 - s.sum()) for s in sm]
 
         # Fit function
         popt, pcov = sp.optimize.curve_fit(diff_rad, [x*1e12 for x in time_ax], msd_r_n, p0=[1, 20, float(pore["diam"])/2-0.2], bounds=(0, np.inf))
 
-        print("Diffusion radial: "+"%.3f" % (popt[0]*1e3)+" 10^-9 m^2 s^-1; Number of zeros: "+"%2i" % (math.ceil(popt[1]))+"; Radius: "+"%5.2f" % popt[2])
+        print("Diffusion radial: "+"%.3f" % (popt[0]*1e3)+" 10^-9 m^2 s^-1; Number of zeros: "+"%2i" % int(np.ceil(popt[1]))+"; Radius: "+"%5.2f" % popt[2])
 
     # Plot
     if is_plot:
@@ -235,17 +227,18 @@ def bins(link, ax_area=[0.2, 0.8], is_norm=False):
             len_step = inp["len_step"]
             len_frame = inp["len_frame"]
 
-            # Normalize
-            msd_norm = [[msd_z[i][j]/norm[i][j] if norm[i][j] > 0 else 0 for j in range(len_window)] for i in range(int(inp["bin_num"])+1)]
+            msd_arr = np.array(msd_z, dtype=float)
+            norm_arr = np.array(norm, dtype=float)
+            msd_norm = np.where(norm_arr > 0, msd_arr / norm_arr, 0.0)
 
-            # Calculate slope
-            f_start = int(ax_area[0]*len_window)
-            f_end = int(ax_area[1]*len_window)
-            time_ax = [x*len_step*len_frame for x in range(len_window)]
-            slope = [(msd_norm[i][f_end]-msd_norm[i][f_start])/(time_ax[f_end]-time_ax[f_start]) for i in range(int(inp["bin_num"])+1)]
+            f_start = int(ax_area[0] * len_window)
+            f_end = int(ax_area[1] * len_window)
+            time_ax = np.arange(len_window) * len_step * len_frame
+            dt = time_ax[f_end] - time_ax[f_start]
+            slope = (msd_norm[:, f_end] - msd_norm[:, f_start]) / dt
 
-            # Calculate diffusion coefficient
-            diff[pore_id] = [msd*1e-9**2/2*1e2**2*1e5 for msd in slope]  # 10^-9 m^2s^-1
+            # 10^-9 m^2s^-1: nm^2/ps → m^2/s factor = 1e-18/1e-12 = 1e-6; /2 and *1e9 → *0.5e3
+            diff[pore_id] = list(slope * 1e-9 ** 2 / 2 * 1e2 ** 2 * 1e5)
 
     return {"width": width, "diff": diff, "is_norm": is_norm}
 
@@ -294,7 +287,7 @@ def bins_plot(data, pore_id="shape_00" ,intent="plot", kwargs={}):
 
 
 def mean(diff_data, dens_data, ax_area=[0.2, 0.8], is_print=True):
-    """This function uses the diffusion coefficient slope obtained from
+    r"""This function uses the diffusion coefficient slope obtained from
     function :func:`poreana.diffusion.bins` and the density slope of function
     :func:`poreana.density.bins` to calculate a weighted diffusion
     coefficient inside the pore
@@ -357,7 +350,7 @@ def mean(diff_data, dens_data, ax_area=[0.2, 0.8], is_print=True):
                 # only consider effective radius
                 if dens_y[dens_bin]>0:
                     # Find closest bins in diffusion
-                    diff_bins = [math.floor(dens_x_val/diff_w), math.ceil(dens_x_val/diff_w)]
+                    diff_bins = [int(np.floor(dens_x_val/diff_w)), int(np.ceil(dens_x_val/diff_w))]
 
                     if diff_bins[1]>=len(diff_y):
                         diff_bins[1] = diff_bins[0]
@@ -483,7 +476,7 @@ def mc_trans_mat(link, step, kwargs={}, is_norm=False, is_diagonal=False, is_len
 # Diffusion - MC #
 ##################
 def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=True, kwargs_scatter={}, kwargs_line={}):
-    """This function uses the diffusion profiles over box length which are
+    r"""This function uses the diffusion profiles over box length which are
     calculated in the function :func:`poreana.mc.MC.run` to estimate
     the final diffusion coefficient. For that a line is fitted of the averaged
     diffusion profiles :math:`D_{\\mathrm{mean}}({\\Delta t_{\\alpha}})` for the
@@ -724,7 +717,7 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
 
     # Set data frame for the used lag times
     data = [str("%.2f" % D_mean[i] ) for i in range(len(len_step))]
-    diff_table = pd.DataFrame(data, index=list(len_step), columns=list(['$D_\mathrm{mean} \ (10^{-9} \mathrm{m^2s^{-1}})$']))
+    diff_table = pd.DataFrame(data, index=list(len_step), columns=list([r'$D_\mathrm{mean} \ (10^{-9} \mathrm{m^2s^{-1}})$']))
     diff_table = pd.DataFrame(diff_table.rename_axis('Step Length', axis=1))
     styler = diff_table.style.set_caption('Selected step length')
     diff_table = styler.set_properties(**{'text-align': 'right'})
@@ -745,7 +738,7 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
         sns.scatterplot(x=lag_time_vec, y=D_mean_vec, **kwargs_scatter)
         #plt.errorbar(x=lag_time_vec, y=D_mean_vec, yerr=[D_mean_vec[i]-diff_profiles_error_up[i] for i in range(len(D_mean_vec))], fmt="o", **kwargs_scatter)
         sns.lineplot(x=x_vec, y=(fit.intercept + fit.slope*x_vec), **kwargs_line)
-        legend = ["$D_{\mathrm{fit}}$", "$D_{\mathrm{mean}}(\\Delta t_{\\alpha})$"]
+        legend = [r"$D_{\mathrm{fit}}$", r"$D_{\mathrm{mean}}(\Delta t_{\alpha})$"]
         plt.legend(legend)
         plt.xlabel(r"Inverse lag time ($10^{12} \ \mathrm{s^{-1}})$")
         plt.ylabel(r"Diff. coeff. ($10^{-9} \ \mathrm{m^2s^{-1}}$)")
@@ -754,7 +747,7 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
 
 
 def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True, is_error=True, kwargs={}):
-    """This function plots the diffusion profile for an infinity
+    r"""This function plots the diffusion profile for an infinity
     lag time (:math:`\\Delta t_{\\alpha} \\rightarrow \\infty`) over the box
     fitted with the specified :math:`\\mathrm{len}\_\\mathrm{step}` list.
     Additionally, it is possible to display the diffusion profiles for the
@@ -968,7 +961,7 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
 # Diffusion - MC - Radial #
 ###########################
 # def mc_fit_radial(link, len_step=None):
-#     """This function uses the diffusion profiles over box length which are
+#     r"""This function uses the diffusion profiles over box length which are
 #     calculated in the function :func:`do_mc_cycles` to estimate the final
 #     diffusion coefficient. For that a line is fitted of the averaged diffusion
 #     profiles :math:`D_{\\mathrm{mean}}({\\Delta_{ij}t_{\\alpha}})` for the
@@ -1070,7 +1063,7 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
 #
 #
 # def mc_profile_radial(link, len_step=None, avg=False):
-#     """This function plots the radial diffusion profile for a infinity
+#     r"""This function plots the radial diffusion profile for a infinity
 #     lag time (:math:`\\Delta_{ij}t_{\\alpha} \\rightarrow \\infty`) over the box
 #     fitted with the specified :math:`\\mathrm{len}\_\\mathrm{step}` list.
 #     Additionally, it is possible to display the diffusion profiles for the

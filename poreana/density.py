@@ -5,7 +5,6 @@
 ################################################################################
 
 
-import math
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -141,41 +140,48 @@ def bins(link_data, area=[[10, 90], [10, 90]], target_dens=0, is_print=True):
 
     ## Interior
     if is_pore:
-        for pore_id in pore_props.keys():     
+        for pore_id in pore_props.keys():
             volume[pore_id] = {}
-            if pore_props[pore_id]["pore_type"] in ["CYLINDER","CONE"]:
-                volume[pore_id]["in"] = [math.pi*(pore_props[pore_id]["length"]-2*entry)*(width[pore_id]["in"][i+1]**2-width[pore_id]["in"][i]**2) for i in range(0, bin_num+1)]
-            elif pore_props[pore_id]["pore_type"]=="SLIT" and inp["avg_slit"]:
-                volume[pore_id]["in"] = [box[0]*(pore_props[pore_id]["length"]-2*entry)*(width[pore_id]["in"][i+1]-width[pore_id]["in"][i])*2 for i in range(0, bin_num+1)]
-            elif pore_props[pore_id]["pore_type"]=="SLIT" and not inp["avg_slit"]:
-                print(res,entry)
-                volume[pore_id]["in"] = [box[0]*(pore_props[pore_id]["length"]-2*entry)*(width[pore_id]["in"][i+1]-width[pore_id]["in"][i]) for i in range(0, bin_num+1)]
+            w = np.array(width[pore_id]["in"])
+            plen = pore_props[pore_id]["length"] - 2 * entry
+            if pore_props[pore_id]["pore_type"] in ["CYLINDER", "CONE"]:
+                volume[pore_id]["in"] = list(np.pi * plen * (w[1:] ** 2 - w[:-1] ** 2))
+            elif pore_props[pore_id]["pore_type"] == "SLIT" and inp["avg_slit"]:
+                volume[pore_id]["in"] = list(box[0] * plen * (w[1:] - w[:-1]) * 2)
+            elif pore_props[pore_id]["pore_type"] == "SLIT" and not inp["avg_slit"]:
+                volume[pore_id]["in"] = list(box[0] * plen * (w[1:] - w[:-1]))
 
-            ## Exterior  ###Update fehlt hier noch 
+            ## Exterior
             if remove_pore_from_res and pore_props[pore_id]["pore_type"] in ["CYLINDER","CONE"]:
-                volume["ex"] = [2*width["ex"][1]*(box[0]*box[1]-math.pi*(pore_props[pore_id]["diam"]/2)**2) for i in range(bin_num+1)]
+                ex_vol = 2*width["ex"][1]*(box[0]*box[1]-math.pi*(pore_props[pore_id]["diam"]/2)**2)
             elif remove_pore_from_res and pore_props[pore_id]["pore_type"]=="SLIT":
-                volume["ex"] = [2*width["ex"][1]*box[0]*(box[1]-pore_props[pore_id]["diam"]) for i in range(bin_num+1)]
+                ex_vol = 2*width["ex"][1]*box[0]*(box[1]-pore_props[pore_id]["diam"])
             else:
-                volume["ex"] = [2*width["ex"][1]*box[0]*box[1] for i in range(bin_num+1)]
+                ex_vol = 2*width["ex"][1]*box[0]*box[1]
+            volume["ex"] = [ex_vol] * (bin_num + 1)
     else:
-        # For calculating density over one box length
         try:
             direction = inp["direction"]
-            directions = [i for i in range(3) if i!= direction]
+            directions = [i for i in range(3) if i != direction]
             surface = box[directions[0]]*box[directions[1]]
-        # Except to ensure compliance with older calculations 
-        except:
+        except KeyError:
             surface = box[0]*box[1]
-        volume["ex"] = [width["ex"][1]*surface for i in range(bin_num+1)]
+        volume["ex"] = [width["ex"][1]*surface] * (bin_num + 1)
 
     # Calculate the number density
     num_dens = {}
-    for pore_id in pore_props.keys(): 
+    for pore_id in pore_props.keys():
         num_dens[pore_id] = {}
-        num_dens[pore_id]["in"] = [bins[pore_id]["in"][i]/volume[pore_id]["in"][i]/num_frame for i in range(bin_num+1)] if is_pore else []
+        if is_pore:
+            bins_in = np.array(bins[pore_id]["in"], dtype=float)
+            vol_in = np.array(volume[pore_id]["in"], dtype=float)
+            num_dens[pore_id]["in"] = list(bins_in / vol_in / num_frame)
+        else:
+            num_dens[pore_id]["in"] = []
     if res != 0:
-        num_dens["ex"] = [bins["ex"][i]/volume["ex"][i]/num_frame for i in range(bin_num+1)]
+        bins_ex = np.array(bins["ex"], dtype=float)
+        vol_ex = np.array(volume["ex"], dtype=float)
+        num_dens["ex"] = list(bins_ex / vol_ex / num_frame)
 
     # Calculate the mean in the selected area
     mean = {}
@@ -333,28 +339,16 @@ def mean(density, is_print=True, int_limit=2.5):
     num_dens_weight = {}
     dens_weight = {}
 
-    # Loop over different pores
-    for pore_id in density["sample"]["pore"].keys():     
-            if pore_id[:5]=="shape":
-                bin_num = len(density["sample"]["data"][pore_id]["in_width"][:-1])
-                width = density["sample"]["data"][pore_id]["in_width"][:-1]
-                num_dens = density["num_dens"][pore_id]["in"]
-                mass = density["sample"]["inp"]["mass"]
+    for pore_id in density["sample"]["pore"].keys():
+        if pore_id[:5] == "shape":
+            w = np.array(density["sample"]["data"][pore_id]["in_width"])
+            nd = np.array(density["num_dens"][pore_id]["in"])
+            mass = density["sample"]["inp"]["mass"]
 
-                # Integrate density
-                num_dens_int = 0
-                sum_surf = 0
-                for i in range(bin_num-1):
-                    if num_dens[i]>0:
-                        if (width[i]<int_limit):
-                            num_dens_int += num_dens[i]*(width[i+1]**2-width[i]**2)
-                            sum_surf += (width[i+1]**2-width[i]**2)
-
-                # Normalize
-                num_dens_weight[pore_id] = num_dens_int/sum_surf
-
-                # Mass denisty
-                dens_weight[pore_id] = mass*10/6.022*num_dens_weight[pore_id]
+            dA = w[1:] ** 2 - w[:-1] ** 2
+            mask = (nd > 0) & (w[:-1] < int_limit)
+            num_dens_weight[pore_id] = float(np.dot(nd[mask], dA[mask]) / dA[mask].sum())
+            dens_weight[pore_id] = mass * 10 / 6.022 * num_dens_weight[pore_id]
 
     if is_print:
         for pore_id in num_dens_weight.keys():
