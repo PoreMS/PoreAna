@@ -149,7 +149,8 @@ class MC:
 
         # If is parallel is true, each lag time MC run is calculated on one CPU
         if is_parallel:
-            pool = mp.Pool(processes=n_proc)
+            _ctx = mp.get_context("fork") if sys.platform != "win32" else mp
+            pool = _ctx.Pool(processes=n_proc)
             results = [pool.apply_async(self._run_helper, args=(model,list(step), do_radial)) for step in len_step_cpu]
             pool.close()
             pool.join()

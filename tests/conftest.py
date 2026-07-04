@@ -73,11 +73,11 @@ def sample_output(change_to_tests_dir):
     sample.init_density("output/dens_cyl_p.obj")
     sample.init_gyration("output/gyr_cyl_p.obj")
     sample.init_diffusion_bin("output/diff_cyl_p.obj")
-    sample.sample(is_parallel=False, is_pbc=False)
+    sample.sample(is_parallel=True, is_pbc=False)
 
     sample = pa.Sample("data/pore_system_cylinder_new.yml", "data/traj_cylinder.xtc", mol_B)
     sample.init_diffusion_mc("output/diff_mc_cyl_p.obj", len_step=[1, 2, 5, 10, 20, 30, 40])
-    sample.sample(is_parallel=False, is_pbc=True)
+    sample.sample(is_parallel=True, is_pbc=True, n_proc=6)
 
     # Pre-compute a small MC output for file_to_text and other tests
     model = pa.CosineModel("output/diff_mc_cyl_s.obj", 6, 10)

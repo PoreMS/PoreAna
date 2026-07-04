@@ -730,7 +730,8 @@ class Sample:
                         frame_end[i] = frame_end[-1] - max_step
 
             frame_np = [list(range(frame_start[i], frame_end[i])) for i in range(n_proc)]
-            pool = mp.Pool(processes=n_proc)
+            _ctx = mp.get_context("fork") if sys.platform != "win32" else mp
+            pool = _ctx.Pool(processes=n_proc)
             results = [pool.apply_async(self._sample_helper, args=(fl, shift, is_pbc, is_broken))
                        for fl in frame_np]
             pool.close()
