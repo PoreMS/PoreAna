@@ -58,6 +58,7 @@ Key changes driving the speedup:
 * GitHub Actions: added ruff linting workflow (`lint.yml`)
 * GitHub Actions: added pip-audit security scan workflow (`security.yml`)
 * CI matrix updated: Python 3.12–3.13; `python_requires` bumped to `>=3.12`
+* Migrated from `setup.py` + `MANIFEST.in` to a single `pyproject.toml` (PEP 517/621)
 
 ### Administrative
 * `setup.py`: version 1.0.0, `python_requires='>=3.12'`, author email updated, chemfiles unpinned, porems dependency bumped to `>=1.0.0`
