@@ -128,7 +128,7 @@ sample.init_angle("output/angle.obj", [0, 3], normals=normals)
 ```
 
 
-For more information on shapes, visit the [PoreMS documentation](https://ajax23.github.io/PoreMS/api.html#shape).
+For more information on shapes, visit the [PoreMS documentation](https://porems.github.io/PoreMS/autoapi/index.html).
 The angles can then be calculated and visualized as a function
 of distance inside and outside the pore respectively
 

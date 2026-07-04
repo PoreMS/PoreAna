@@ -197,25 +197,8 @@ class MC:
         # Print MC Calculation is done
         print("MC Calculation Done.")
 
-        # Save inp and output data (remove if hdf5 is ready)
-        #utils.save({"inp": inp, "model": model_inp, model._system: model._sys_props, "output": output}, link_out)
-
-        # pickle directory to save late in hdf5
         results = {"inp": inp, "model": model_inp, model._system: model._sys_props, "output": output, "type": "mc"}
-
-        utils.save(results,link_out)
-
-
-        # # Save txt file
-        # # Calculated diffusion coefficient
-        # diff_fit = diffusion.mc_fit(link_out)
-        # diff_prof = diffusion.mc_profile(link_out, infty_profile=True)
-        #
-        # if model._system == "pore":
-        #     diff_fit_pore = diffusion.mc_fit(link_out, section = "pore")
-        #     diff_fit_res = diffusion.mc_fit(link_out, section = "reservoir")
-        #
-        # if is_txt:
+        utils.save(results, link_out)
 
         return
 
@@ -372,79 +355,6 @@ class MC:
             
             diff_fluc_per_bin[self._len_step] = self._fluctuation_diff_bin
             df_fluc_per_bin[self._len_step] = self._fluctuation_df_bin
-
-            #############################
-            # Start Radial MC Algorithm #
-            #############################
-            # # Radial diffusion
-            # if do_radial:
-            #     # Start MC calculation for the radial diffusion
-            #     print("## Calculate radial diffusion")
-            #
-            #     # Calculated the initialize likelihood and bessel function
-            #     self.setup_bessel_box(model)
-            #     self._log_like_radial = self.log_likelihood_radial(model, model._diff_radial_bin)
-            #
-            #     # Print first likelihood
-            #     if self._print_output:
-            #         if self._log_like==0:
-            #                 print("likelihood init", self._log_like_radial, "\n")
-            #         print("### Start equilibration\n")
-            #
-            #     # Start MC Algorithm for the radial diffusion
-            #     for imc in range(self._nmc_radial+self._nmc_eq_radial):
-            #
-            #         # Do a MC move in the radial diffusion profile
-            #         self._mcmove_diffusion_radial(model)
-            #
-            #         # Update the MC movewidth
-            #         self._update_movewidth_mc(imc, True)
-            #
-            #         # Calculate the fluctuation and start the production
-            #         if imc >= self._nmc_eq_radial:
-            #
-            #             # Add all profiles
-            #             diff_radial_profile_flk += copy.deepcopy(model._diff_radial_bin)
-            #
-            #             # Calculate the mean profile over all runs
-            #             mean_diff_radial_profile_flk = [diff_radial_profile_flk[i]/((imc-self._nmc_eq_radial)+1) for i in range(model._bin_num)]
-            #
-            #             # Calculate the difference between the current profile and the mean of all profiles
-            #             delta_diff_radial = ((model._diff_radial_bin) -
-            #                                  mean_diff_radial_profile_flk)**2
-            #
-            #             # Determine the fluctuation
-            #             self._fluctuation_diff_radial = np.sqrt(
-            #                 (self._fluctuation_diff_radial + np.mean(delta_diff_radial))/(imc+1))
-            #
-            #             # Print output in production phase
-            #             if imc == self._nmc_eq_radial and self._print_output:
-            #                 print("### Start production\n")
-            #                 print("------------------------------------------------")
-            #                 print("imc | accepted_rdiff(%) | fluktuation_rdiff    |" )
-            #                 print("------------------------------------------------")
-            #                 mjmlll
-            #             if (imc % self._print_freq == 0) and imc > self._nmc_eq_radial and self._print_output:
-            #                 sys.stdout.write(str(imc)+" "+ str("%.2f"%(self._nacc_diff*100/(imc+1)))+" "+ str("%.2e"%self._fluctuation_diff) +"\r")
-            #                 sys.stdout.flush()
-            #                 if imc%2000==0:
-            #                     print(str(imc)+" "+ str("%.2f"%(self._nacc_df*100/(imc+1))) +" "+ str("%.2f"%(self._nacc_diff*100/(imc+1)))+" "+str("%.2e"%self._fluctuation_df) +" "+ str("%.2e"%self._fluctuation_diff))
-            #
-            #                 print(imc, "\t", "%.6f" % self._log_like_radial, "\t", "%.2f" % (float(self._nacc_diff_radial)*100/(
-            #                     imc+1)), "\t\t\t", "%.5f" % self._delta_diff_radial, "\t", "\t", "%.4e" % self._fluctuation_diff_radial)
-            #                 print(self._nacc_diff_radial)
-            #                 print(np.mean(np.exp(model._diff_radial_bin + model._diff_radial_unit)) * 10**-6)
-            #     if self._print_output:
-            #         print("--------------------------------------------------------------------------------\n")
-            #
-            #     # Save results for the current lag time
-            #     # copy.deepcopy(model._diff_radial_bin)
-            #     list_diff_radial_profile[self._len_step] = mean_diff_radial_profile_flk
-            #     list_diff_radial_coeff[self._len_step] = copy.deepcopy(model._diff_radial_coeff)
-            #     list_diff_radial_fluc[self._len_step] = self._fluctuation_diff_radial
-            #
-            #     # Mean over all lag times calculations
-            #     nacc_diff_radial_mean[self._len_step] = copy.deepcopy(self._nacc_diff_radial)
 
             # If no radial diffusion is calculated set the initialize condition on the result lists
             if not do_radial:
@@ -607,62 +517,6 @@ class MC:
                 self._nacc_df_coeff[idx] += 1
                 self._nacc_df += 1
                 self._nacc_df_update += 1
-
-    # def _mcmove_diffusion_radial(self,model):
-    #     r"""This function do the MC move for the radial diffusion profile and
-    #     adjust the coefficents of the model. A MC move in the parameter space
-    #     is defined by
-    #
-    #     .. math::
-    #
-    #         a_{k,\\mathrm{new}}= a_{k} + \\Delta_\\text{MC} \\cdot (R - 0.5)
-    #
-    #     with :math:`\\Delta_\\text{MC}` as the MC step movewidth and :math:`R`
-    #     as a random number between :math:`0` and :math:`1`. The choice of the
-    #     coefficient is also made by determining a random number.
-    #
-    #     Parameters
-    #     ----------
-    #     model : Model
-    #         Model object which set before with the model class
-    #     """
-    #     # Caclulate a random number to choose a random coefficient
-    #     ## The first coefficent of the diffusion profile is fixed 0 all the time
-    #     idx = np.random.randint(0,model._n_diff_radial)
-    #
-    #     # Calculate one new coefficient
-    #     diff_radial_coeff_temp = copy.deepcopy(model._diff_radial_coeff)
-    #     diff_radial_coeff_temp[idx] += self._delta_diff_radial * (np.random.random() - 0.5)
-    #
-    #     # Use the new coeff to calculate a new diffusion profile
-    #     diff_radial_bin_temp = model._calc_profile(diff_radial_coeff_temp, model._diff_radial_basis)
-    #
-    #     # Calculate a new likelihood to check acceptance of the step
-    #     log_like_try = self.log_likelihood_radial(model,diff_radial_bin_temp)
-    #
-    #     # Propagtor behavior (propagator is well behaved - :TODO: implement)
-    #     if log_like_try is not None and not np.isnan(log_like_try):
-    #         # Calculate different between new and old likelihood
-    #         dlog = log_like_try - self._log_like_radial
-    #
-    #         # Calculate a random number for the acceptance criterion
-    #         r = np.random.random()  #in [0,1[
-    #
-    #         # acceptance criterion
-    #         if r < np.exp(dlog / self._temp):
-    #             # Save new diffusion profile (after MC step)
-    #             model._diff_radial_bin[:] = diff_radial_bin_temp[:]
-    #
-    #             # Save new coefficent vector
-    #             model._diff_radial_coeff[:] = diff_radial_coeff_temp[:]
-    #
-    #             #Save new likelihood
-    #             self._log_like_radial = log_like_try
-    #
-    #             # Update MC statistics
-    #             self._nacc_diff_radial_coeff[idx] += 1
-    #             self._nacc_diff_radial += 1
-    #             self._nacc_diff_radial_update += 1
 
     def _update_movewidth_mc(self, imc, radial=False):
         r"""This function sets a new MC move width after a define number of MC
