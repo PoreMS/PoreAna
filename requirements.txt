@@ -1,8 +1,0 @@
-pandas
-scipy
-seaborn
-h5py>=3.0.0
-porems>=1.0.0
-chemfiles
-jinja2
-pyyaml

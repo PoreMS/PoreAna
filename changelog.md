@@ -58,7 +58,9 @@ Key changes driving the speedup:
 * GitHub Actions: added ruff linting workflow (`lint.yml`)
 * GitHub Actions: added pip-audit security scan workflow (`security.yml`)
 * CI matrix updated: Python 3.12–3.13; `python_requires` bumped to `>=3.12`
-* Migrated from `setup.py` + `MANIFEST.in` to a single `pyproject.toml` (PEP 517/621)
+* Migrated from `setup.py` + `MANIFEST.in` to a single `pyproject.toml` (PEP 517/621); `[tool.ruff]` config added
+* CI migrated from `pip` to `uv` (`astral-sh/setup-uv@v5`); `requirements.txt` removed (deps resolved via `pyproject.toml`)
+* `codeql.yml`: updated actions from `@v2` to `@v3`; removed irrelevant `javascript` language scan
 
 ### Administrative
 * `setup.py`: version 1.0.0, `python_requires='>=3.12'`, author email updated, chemfiles unpinned, porems dependency bumped to `>=1.0.0`
