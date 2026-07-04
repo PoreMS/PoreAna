@@ -40,7 +40,7 @@ def test_sample(sample_output):
 
     sample = pa.Sample("data/pore_system_cylinder_new.yml", "data/traj_cylinder.xtc", mol)
     sample.init_angle("output/angle_cyl.obj", [0, 3])
-    sample.sample(is_parallel=True, is_pbc=False)
+    sample.sample(is_parallel=False, is_pbc=False)
 
     sample = pa.Sample("data/pore_system_slit_new.yml", "data/traj_slit.xtc", mol3)
     sample.init_angle("output/angle_cyl.obj", [0, 3])
@@ -229,7 +229,7 @@ def test_diffusion_mc_mc(sample_output):
     assert abs(diff_pore[0] - 1.2) < 0.3
     plt.close("all")
 
-    pa.MC().run(model, "output/diff_test_mc.obj", nmc_eq=8000, nmc=2000, is_print=False, is_parallel=True)
+    pa.MC().run(model, "output/diff_test_mc.obj", nmc_eq=8000, nmc=2000, is_print=False, is_parallel=False)
     diff = pa.diffusion.mc_fit("output/diff_test_mc.obj")
     diff_pore = pa.diffusion.mc_fit("output/diff_test_mc.obj", section="pore")
     assert abs(diff[0] - 1.6) < 0.3
