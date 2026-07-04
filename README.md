@@ -18,7 +18,7 @@ The docs include examples for [density analysis](https://porems.github.io/PoreAn
 
 ## Dependencies
 
-PoreAna requires Python 3.10+.
+PoreAna requires Python 3.12+.
 
 Installation requires [numpy](https://numpy.org/), [pandas](https://pandas.pydata.org/),
 [chemfiles](https://pypi.org/project/chemfiles/), [seaborn](https://seaborn.pydata.org/),
