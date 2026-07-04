@@ -3,17 +3,24 @@
 ### Performance
 
 Benchmarked on an Apple Silicon macOS machine (2001-frame cylinder trajectory, benzene,
-13 lag times) — v1.0.0 local build (`python tests/bench_compare.py`).
+13 lag times). Timings are the mean of 3 consecutive runs.
 Direct comparison against PyPI v0.2.3 is blocked by its CMake/scikit-build dependency,
 so microbenchmarks on the core hot paths are provided instead.
 
 | Benchmark | v1.0.0 |
 |---|---|
-| Density sampling — serial | 0.60 s |
-| Density sampling — parallel | 1.33 s |
-| Gyration sampling — serial | 0.83 s |
-| Diffusion MC sampling — serial | 1.25 s |
-| Diffusion MC sampling — parallel | 1.59 s |
+| Density sampling — serial | 0.57 s |
+| Density sampling — parallel | 0.10 s |
+| Gyration sampling — serial | 0.84 s |
+| Diffusion MC sampling — serial | 1.03 s |
+| Diffusion MC sampling — parallel | 0.14 s |
+
+Parallel sampling is **5–7× faster than the serial equivalent** on all platforms.
+Earlier builds measured parallel density at 1.33 s and parallel MC at 1.59 s on
+macOS because Python 3.12 changed the default multiprocessing start method from
+`fork` to `spawn`, causing each worker to re-import all heavy dependencies on
+every call. The explicit `mp.get_context("fork")` fix restores expected speedup
+(~13× improvement in parallel wall time on macOS versus the spawn baseline).
 
 Hot-path microbenchmarks (2001 frames, isolated from I/O):
 
@@ -26,6 +33,7 @@ Key changes driving the speedup:
 
 * `sample.py` — `_sample_helper` hot loop: position extraction vectorised as `positions[atom_indices] / 10.0 + shift_arr`; COM calculated via `masses_arr @ pos / sum_masses` (NumPy dot product replaces per-atom Python loop); `_masses_arr` pre-computed once in `__init__` as a float64 NumPy array; residue atom index arrays pre-built as `np.array([...])` at init time
 * `sample.py` — parallel diffusion-bin merge: replaced O(bin_num × len_window) triple-nested Python loop with `(np.array(a) + np.array(b)).tolist()` per key
+* `sample.py` / `mc.py` — explicit `mp.get_context("fork")` on non-Windows platforms; prevents Python 3.12 macOS `spawn` default from re-importing dependencies per worker (~13× parallel speedup on macOS)
 * `density.py` — bin volume calculation vectorised: `np.pi * plen * (w[1:]**2 - w[:-1]**2)` replaces scalar loop; weighted-mean integration uses `np.dot` + boolean mask
 * `diffusion.py` — MSD normalisation and bin slope calculation fully vectorised with NumPy arrays; Bessel function series uses `np.exp` on a coefficient array; removed unused `math` and `itertools` imports
 * `angle.py` / `gyration.py` — density-weighted normalisation uses `np.where(dens != 0, val / dens, 0.0)`; mean computed with `np.mean`; mean line rendered via `np.full_like`
