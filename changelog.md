@@ -71,7 +71,7 @@ Key changes driving the speedup:
 * `codeql.yml`: updated actions from `@v2` to `@v3`; removed irrelevant `javascript` language scan
 
 ### Administrative
-* `setup.py`: version 1.0.0, `python_requires='>=3.12'`, author email updated, chemfiles unpinned, porems dependency bumped to `>=1.0.0`
+* `pyproject.toml`: version 1.0.0, `requires-python = ">=3.12"`, author email updated, chemfiles unpinned, porems dependency bumped to `>=1.0.0`; `[project.optional-dependencies]` dev group added (`pytest`, `pytest-cov`)
 * README: updated image paths, Python version, PyPI badge, testing and installation instructions
 
 
