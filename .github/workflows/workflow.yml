@@ -20,8 +20,6 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install porems from source
-        run: uv pip install git+https://github.com/PoreMS/PoreMS.git@optimization
       - name: Install dependencies
         run: uv pip install ".[dev]"
       - name: Run unit tests
@@ -42,8 +40,6 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
-      - name: Install porems from source
-        run: uv pip install git+https://github.com/PoreMS/PoreMS.git@optimization
       - name: Install dependencies
         run: uv pip install pytest .
       - name: Run integration tests
@@ -58,8 +54,6 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
-      - name: Install porems from source
-        run: uv pip install git+https://github.com/PoreMS/PoreMS.git@optimization
       - name: Install dependencies
         run: uv pip install -r docs/requirements.txt .
       - name: Build Sphinx docs

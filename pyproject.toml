@@ -25,6 +25,9 @@ dev = ["pytest", "pytest-cov"]
 [project.urls]
 Homepage = "https://github.com/PoreMS/PoreAna"
 
+[tool.uv.sources]
+porems = { git = "https://github.com/PoreMS/PoreMS.git", branch = "optimization" }
+
 [tool.ruff]
 line-length = 88
 
