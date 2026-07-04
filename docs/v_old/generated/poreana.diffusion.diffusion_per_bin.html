@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>diffusion_per_bin &#8212; PoreAna 0.3.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../_static/bootstrap-sphinx.css?v=cab96e3b" />
+    <script src="../_static/documentation_options.js?v=4621528c"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+<meta charset='utf-8'>
+<meta http-equiv='X-UA-Compatible' content='IE=edge,chrome=1'>
+<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1'>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<script type="text/javascript" src="../_static/js/jquery-1.12.4.min.js"></script>
+<script type="text/javascript" src="../_static/js/jquery-fix.js"></script>
+<script type="text/javascript" src="../_static/bootstrap-3.4.1/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="../_static/bootstrap-sphinx.js"></script>
+
+  </head><body>
+
+  <div id="navbar" class="navbar navbar-default navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <!-- .btn-navbar is used as the toggle for collapsed navbar content -->
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".nav-collapse">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="../index.html">
+          PoreAna</a>
+        <span class="navbar-text navbar-version pull-left"><b>0.3</b></span>
+      </div>
+
+        <div class="collapse navbar-collapse nav-collapse">
+          <ul class="nav navbar-nav">
+            
+                <li><a href="../api.html">API</a></li>
+                <li><a href="../sample.html">Sample</a></li>
+                <li><a href="../density.html">Density</a></li>
+                <li><a href="../diffusion_bin.html">Diffusion (Bin)</a></li>
+                <li><a href="../diffusion_mc.html">Diffusion (MC)</a></li>
+                <li><a href="../diffusion_vacf.html">Diffusion (VACF)</a></li>
+                <li><a href="../further_props.html">Further Properties</a></li>
+            
+            
+              <li class="dropdown globaltoc-container">
+  <a role="button"
+     id="dLabelGlobalToc"
+     data-toggle="dropdown"
+     data-target="#"
+     href="../index.html">Site <b class="caret"></b></a>
+  <ul class="dropdown-menu globaltoc"
+      role="menu"
+      aria-labelledby="dLabelGlobalToc"></ul>
+</li>
+              
+                <li class="dropdown">
+  <a role="button"
+     id="dLabelLocalToc"
+     data-toggle="dropdown"
+     data-target="#"
+     href="#">Page <b class="caret"></b></a>
+  <ul class="dropdown-menu localtoc"
+      role="menu"
+      aria-labelledby="dLabelLocalToc"><ul>
+<li><a class="reference internal" href="#">diffusion_per_bin</a><ul>
+<li><a class="reference internal" href="#poreana.diffusion.diffusion_per_bin"><code class="docutils literal notranslate"><span class="pre">diffusion_per_bin()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</ul>
+</li>
+              
+            
+            
+            
+            
+            
+          </ul>
+
+          
+            
+<form class="navbar-form navbar-right" action="../search.html" method="get">
+ <div class="form-group">
+  <input type="text" name="q" class="form-control" placeholder="Search" />
+ </div>
+  <input type="hidden" name="check_keywords" value="yes" />
+  <input type="hidden" name="area" value="default" />
+</form>
+          
+        </div>
+    </div>
+  </div>
+
+<div class="container">
+  <div class="row">
+      <div class="col-md-3">
+        <div id="sidebar" class="bs-sidenav" role="complementary"><ul>
+<li><a class="reference internal" href="#">diffusion_per_bin</a><ul>
+<li><a class="reference internal" href="#poreana.diffusion.diffusion_per_bin"><code class="docutils literal notranslate"><span class="pre">diffusion_per_bin()</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+<div id="sourcelink">
+  <a href="../_sources/generated/poreana.diffusion.diffusion_per_bin.rst.txt"
+     rel="nofollow">Source</a>
+</div>
+<form action="../search.html" method="get">
+ <div class="form-group">
+  <input type="text" name="q" class="form-control" placeholder="Search" />
+ </div>
+  <input type="hidden" name="check_keywords" value="yes" />
+  <input type="hidden" name="area" value="default" />
+</form>
+        </div>
+      </div>
+    <div class="body col-md-9 content" role="main">
+      
+  </div>
+<div class=col-md-9 content><section id="diffusion-per-bin">
+<h1>diffusion_per_bin<a class="headerlink" href="#diffusion-per-bin" title="Link to this heading">¶</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="poreana.diffusion.diffusion_per_bin">
+<span class="sig-prename descclassname"><span class="pre">poreana.diffusion.</span></span><span class="sig-name descname"><span class="pre">diffusion_per_bin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">link_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">section</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mean_over_time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove_low_density_bins</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_axis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_selection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'xyzrtam'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">combine_bins</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pore_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#poreana.diffusion.diffusion_per_bin" title="Link to this definition">¶</a></dt>
+<dd><p>Plot the diffusion coefficient per bin from the integrated VACF data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>link_data</strong><span class="classifier">str</span></dt><dd><p>The path to the data file containing the VACF data.</p>
+</dd>
+<dt><strong>section</strong><span class="classifier">list, string, optional</span></dt><dd><p>List to specify an area for the mean_diffusion calculation
+If <span class="math notranslate nohighlight">\(\mathrm{section} = \mathrm{&quot;pore&quot;}\)</span> the pore section is
+fitted.
+If <span class="math notranslate nohighlight">\(\mathrm{section} = \mathrm{&quot;reservoir&quot;}\)</span> the left reservoir
+area is fitted.
+If <span class="math notranslate nohighlight">\(\mathrm{section} = \mathrm{[a,b]}\)</span> the box area between a
+and b is fitted.</p>
+</dd>
+<dt><strong>mean_over_time</strong><span class="classifier">float or tuple, optional</span></dt><dd><p>If float, Time in s at the end to average the diffusion coefficient over. 
+If tuple, (start_time, end_time) in s to average the diffusion coefficient over.
+If None, no average and last value is taken (default is None).</p>
+</dd>
+<dt><strong>remove_low_density_bins</strong><span class="classifier">float, optional</span></dt><dd><p>Threshold as minimum average number of particles per bin to calculate 
+the diffusion coefficient. Can be used to remove bins with low density 
+(default is 0.0, no removal).</p>
+</dd>
+<dt><strong>plot_axis</strong><span class="classifier">matplotlib.axes.Axes or True, optional</span></dt><dd><p>The axis on which to plot the diffusion coefficient. If True, a new figure and axis are created.
+If None, no plot is created (default is None).</p>
+</dd>
+<dt><strong>plot_selection</strong><span class="classifier">str, optional</span></dt><dd><p>Selection of directions of diffusion to plot.
+Options are (mean) and ‘x’, ‘y’, ‘z’ for box systems and ‘r’, ‘t’, ‘a’ 
+for pore systems or combination. Default is ‘xyzrtam’ (all directions
+regardless of system).</p>
+</dd>
+<dt><strong>combine_bins</strong><span class="classifier">int, optional</span></dt><dd><p>Number of bins to combine for averaging the diffusion coefficient. Default is 1 (no combining).</p>
+</dd>
+<dt><strong>pore_id</strong><span class="classifier">str, optional</span></dt><dd><p>The pore ID to analyze.</p>
+</dd>
+<dt><strong>kwargs</strong><span class="classifier">dict, optional</span></dt><dd><p>Additional keyword arguments for plotting, such as line style, color, etc.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>diffusion</strong><span class="classifier">np.ndarray</span></dt><dd><p>Diffusion coefficient in 10^-9 m^2/s for each bin, in x, y, and z directions, in shape (num_bins, 3).</p>
+</dd>
+<dt><strong>mean_diffusion</strong><span class="classifier">np.ndarray</span></dt><dd><p>Mean diffusion coefficient in 10^-9 m^2/s across all bins or the specify section, in (x, y, and z) or (r, t and a) directions.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+    </div>
+      
+  </div>
+</div>
+<footer class="footer">
+  <div class="container">
+    <p class="pull-right">
+      <a href="#">Back to top</a>
+      
+    </p>
+    <p>
+        &copy; Copyright 2021, Hamzeh Kraus.<br/>
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 7.4.5.<br/>
+    </p>
+  </div>
+</footer>
+  </body>
+</html>

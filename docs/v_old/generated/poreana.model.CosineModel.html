@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>CosineModel &#8212; PoreAna 0.2.3 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../_static/bootstrap-sphinx.css?v=cab96e3b" />
+    <script src="../_static/documentation_options.js?v=a47416a6"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+<meta charset='utf-8'>
+<meta http-equiv='X-UA-Compatible' content='IE=edge,chrome=1'>
+<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1'>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<script type="text/javascript" src="../_static/js/jquery-1.12.4.min.js"></script>
+<script type="text/javascript" src="../_static/js/jquery-fix.js"></script>
+<script type="text/javascript" src="../_static/bootstrap-3.4.1/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="../_static/bootstrap-sphinx.js"></script>
+
+  </head><body>
+
+  <div id="navbar" class="navbar navbar-default navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <!-- .btn-navbar is used as the toggle for collapsed navbar content -->
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".nav-collapse">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="../index.html">
+          PoreAna</a>
+        <span class="navbar-text navbar-version pull-left"><b>0.2</b></span>
+      </div>
+
+        <div class="collapse navbar-collapse nav-collapse">
+          <ul class="nav navbar-nav">
+            
+                <li><a href="../api.html">API</a></li>
+                <li><a href="../sample.html">Sample</a></li>
+                <li><a href="../density.html">Density</a></li>
+                <li><a href="../diffusion_bin.html">Diffusion (Bin)</a></li>
+                <li><a href="../diffusion_mc.html">Diffusion (MC)</a></li>
+                <li><a href="../further_props.html">Further Properties</a></li>
+            
+            
+              <li class="dropdown globaltoc-container">
+  <a role="button"
+     id="dLabelGlobalToc"
+     data-toggle="dropdown"
+     data-target="#"
+     href="../index.html">Site <b class="caret"></b></a>
+  <ul class="dropdown-menu globaltoc"
+      role="menu"
+      aria-labelledby="dLabelGlobalToc"></ul>
+</li>
+              
+                <li class="dropdown">
+  <a role="button"
+     id="dLabelLocalToc"
+     data-toggle="dropdown"
+     data-target="#"
+     href="#">Page <b class="caret"></b></a>
+  <ul class="dropdown-menu localtoc"
+      role="menu"
+      aria-labelledby="dLabelLocalToc"><ul>
+<li><a class="reference internal" href="#">CosineModel</a><ul>
+<li><a class="reference internal" href="#poreana.model.CosineModel"><code class="docutils literal notranslate"><span class="pre">CosineModel</span></code></a></li>
+</ul>
+</li>
+</ul>
+</ul>
+</li>
+              
+            
+            
+            
+            
+            
+          </ul>
+
+          
+            
+<form class="navbar-form navbar-right" action="../search.html" method="get">
+ <div class="form-group">
+  <input type="text" name="q" class="form-control" placeholder="Search" />
+ </div>
+  <input type="hidden" name="check_keywords" value="yes" />
+  <input type="hidden" name="area" value="default" />
+</form>
+          
+        </div>
+    </div>
+  </div>
+
+<div class="container">
+  <div class="row">
+      <div class="col-md-3">
+        <div id="sidebar" class="bs-sidenav" role="complementary"><ul>
+<li><a class="reference internal" href="#">CosineModel</a><ul>
+<li><a class="reference internal" href="#poreana.model.CosineModel"><code class="docutils literal notranslate"><span class="pre">CosineModel</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+<div id="sourcelink">
+  <a href="../_sources/generated/poreana.model.CosineModel.rst.txt"
+     rel="nofollow">Source</a>
+</div>
+<form action="../search.html" method="get">
+ <div class="form-group">
+  <input type="text" name="q" class="form-control" placeholder="Search" />
+ </div>
+  <input type="hidden" name="check_keywords" value="yes" />
+  <input type="hidden" name="area" value="default" />
+</form>
+        </div>
+      </div>
+    <div class="body col-md-9 content" role="main">
+      
+  </div>
+<div class=col-md-9 content><section id="cosinemodel">
+<h1>CosineModel<a class="headerlink" href="#cosinemodel" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="poreana.model.CosineModel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">poreana.model.</span></span><span class="sig-name descname"><span class="pre">CosineModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_link</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_diff</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_df</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_diff_radial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">d0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_print</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coeff</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#poreana.model.CosineModel" title="Link to this definition">¶</a></dt>
+<dd><p>This class sets the Cosine Model to calculate the free energy profile
+and the diffusion profile. The profiles have the typical cosine oscillation.
+These profiles over the bins are expressed by the following Fourier
+series. The diffusion profile is calculated between bin i and i+1  over
+the bin border with</p>
+<div class="math notranslate nohighlight">
+\[\ln \left(D_{i+ \frac{1}{2}}\right)=a_{0}+\sum_{k=1}^{n_b} a_{k} \cdot \cos \left(\frac{2\pi ki}{n}\right).\]</div>
+<p>Similarly, the free energy Fourier series can be written:</p>
+<div class="math notranslate nohighlight">
+\[F_{i} = a_{0}+\sum_{k=1}^{n_b} a_{k} \cdot \cos \left(\frac{2\pi ki}{n} \right),\]</div>
+<p>with the number of bins <span class="math notranslate nohighlight">\(n\)</span>, the index of a bin <span class="math notranslate nohighlight">\(i\)</span>,
+the coefficients <span class="math notranslate nohighlight">\(a_{k}\)</span> of the Fourier series and <span class="math notranslate nohighlight">\(k\)</span> as the
+number of coefficents. The free energy is calculated in the bin center.</p>
+<p>For the free energy the coefficient it is assumed that <span class="math notranslate nohighlight">\(a_{0} = 0\)</span>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>data_link</strong><span class="classifier">string</span></dt><dd><p>Data link to the pickle data from <a class="reference internal" href="poreana.sample.Sample.init_diffusion_mc.html#poreana.sample.Sample.init_diffusion_mc" title="poreana.sample.Sample.init_diffusion_mc"><code class="xref py py-func docutils literal notranslate"><span class="pre">poreana.sample.Sample.init_diffusion_mc()</span></code></a></p>
+</dd>
+<dt><strong>n_diff</strong><span class="classifier">integer, optional</span></dt><dd><p>Number of the Fourier coefficients for the diffusion profile</p>
+</dd>
+<dt><strong>n_df</strong><span class="classifier">integer, optional</span></dt><dd><p>Number of the Fourier coefficients for the free energy profile</p>
+</dd>
+<dt><strong>n_diff_radial</strong><span class="classifier">integer, optional</span></dt><dd><p>Number of the Fourier coefficients for the radial diffusion profile</p>
+</dd>
+<dt><strong>d0</strong><span class="classifier">double, optional</span></dt><dd><p>Initial guess of diffusion coefficient <span class="math notranslate nohighlight">\(\left( 10^{-9} \frac{m^2}{s}\right)\)</span></p>
+</dd>
+<dt><strong>is_print</strong><span class="classifier">bool, optional</span></dt><dd><p>True to print output</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Methods</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="poreana.model.CosineModel._calc_profile.html#poreana.model.CosineModel._calc_profile" title="poreana.model.CosineModel._calc_profile"><code class="xref py py-obj docutils literal notranslate"><span class="pre">_calc_profile</span></code></a>(coeff, basis)</p></td>
+<td><p>This function calculates the diffusion and free energy profile over the bins.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="poreana.model.CosineModel._cosine_model.html#poreana.model.CosineModel._cosine_model" title="poreana.model.CosineModel._cosine_model"><code class="xref py py-obj docutils literal notranslate"><span class="pre">_cosine_model</span></code></a>()</p></td>
+<td><p>This function sets a Fourier Cosine Series Model for the MC Diffusion Calculation and determines the initialize profiles.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="poreana.model.CosineModel._create_basis_border.html#poreana.model.CosineModel._create_basis_border" title="poreana.model.CosineModel._create_basis_border"><code class="xref py py-obj docutils literal notranslate"><span class="pre">_create_basis_border</span></code></a>()</p></td>
+<td><p>This function creates the basis part in every bin of the Fourier series for the diffusion <span class="math notranslate nohighlight">\(\ln \ (D)\)</span>.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="poreana.model.CosineModel._create_basis_center.html#poreana.model.CosineModel._create_basis_center" title="poreana.model.CosineModel._create_basis_center"><code class="xref py py-obj docutils literal notranslate"><span class="pre">_create_basis_center</span></code></a>()</p></td>
+<td><p>This function creates the basis part of the Fourier series for the free energy and the radial diffusion profile.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="poreana.model.CosineModel._init_model.html#poreana.model.CosineModel._init_model" title="poreana.model.CosineModel._init_model"><code class="xref py py-obj docutils literal notranslate"><span class="pre">_init_model</span></code></a>()</p></td>
+<td><p>This function initializes the coefficient list for the Fourier series and the profile list for the free energy and diffusion profile.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="poreana.model.CosineModel._init_profiles.html#poreana.model.CosineModel._init_profiles" title="poreana.model.CosineModel._init_profiles"><code class="xref py py-obj docutils literal notranslate"><span class="pre">_init_profiles</span></code></a>()</p></td>
+<td><p>This function initializes the normal diffusion, radial diffusion and free energy profile over the bins.</p></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</section>
+
+
+    </div>
+      
+  </div>
+</div>
+<footer class="footer">
+  <div class="container">
+    <p class="pull-right">
+      <a href="#">Back to top</a>
+      
+    </p>
+    <p>
+        &copy; Copyright 2021, Hamzeh Kraus.<br/>
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 7.4.5.<br/>
+    </p>
+  </div>
+</footer>
+  </body>
+</html>
