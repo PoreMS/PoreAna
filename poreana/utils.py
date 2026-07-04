@@ -4,14 +4,15 @@
 """Here popular basic methods are noted."""
 ################################################################################
 
-
-import os
-import time
-import yaml
-import pickle
 import datetime
+import os
+import pickle
+import time
+
 import numpy as np
 import pandas as pd
+import yaml
+
 import poreana as pa
 
 
@@ -172,7 +173,9 @@ def file_to_text(link, link_output, link_dens=[]):
     ###############################
     if data["type"] == "gyr_bin":
         if not link_dens:
-            print("Gyration calculation needs a density sampling file. Check documentation and set a link_dens.")
+            print(
+                "Gyration calculation needs a density sampling file. Check documentation and set a link_dens."
+            )
             return
 
         if "pore" in data:
@@ -184,20 +187,36 @@ def file_to_text(link, link_output, link_dens=[]):
                 [float(pore["box"]["res"])],
                 [pore[first_shape]["type"]],
             ]
-            df_system = pd.DataFrame(data_system,
-                                     index=["Box dimension (nm)", "Pore diameter (nm)", "reservoir (nm)", "type"],
-                                     columns=["Value"])
+            df_system = pd.DataFrame(
+                data_system,
+                index=[
+                    "Box dimension (nm)",
+                    "Pore diameter (nm)",
+                    "reservoir (nm)",
+                    "type",
+                ],
+                columns=["Value"],
+            )
         elif "box" in data:
             box = data["box"]["length"]
-            df_system = pd.DataFrame([[[f"{x:.2f}" for x in box]]],
-                                     index=["Box dimension (nm)"], columns=["Value"])
+            df_system = pd.DataFrame(
+                [[[f"{x:.2f}" for x in box]]],
+                index=["Box dimension (nm)"],
+                columns=["Value"],
+            )
         df_system = df_system.rename_axis("# Identifier", axis=1)
 
-        inp_table = [[data["inp"]["bin_num"]], [data["inp"]["entry"]],
-                     [data["inp"]["num_frame"]], [data["inp"]["mass"]]]
-        df_inputs = pd.DataFrame(inp_table,
-                                 index=["Bin number", "Entry", "Frame number", "Mass"],
-                                 columns=["Value"])
+        inp_table = [
+            [data["inp"]["bin_num"]],
+            [data["inp"]["entry"]],
+            [data["inp"]["num_frame"]],
+            [data["inp"]["mass"]],
+        ]
+        df_inputs = pd.DataFrame(
+            inp_table,
+            index=["Bin number", "Entry", "Frame number", "Mass"],
+            columns=["Value"],
+        )
         df_inputs = df_inputs.rename_axis("# Identifier", axis=1)
 
         gyr_in = pa.gyration.bins_plot(link, link_dens, intent="ex")
@@ -205,9 +224,18 @@ def file_to_text(link, link_output, link_dens=[]):
         gyr_pd = gyr_pd.rename_axis("# Identifier", axis=1)
 
         with open(link_output, "w", encoding="utf-8") as f:
-            f.write("# This file was created " + datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") + "\n")
+            f.write(
+                "# This file was created "
+                + datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                + "\n"
+            )
             f.write("# Analysis created using PoreAna\n")
-            f.write("# Object file : " + os.path.dirname(os.path.abspath(__file__)) + link + "\n\n")
+            f.write(
+                "# Object file : "
+                + os.path.dirname(os.path.abspath(__file__))
+                + link
+                + "\n\n"
+            )
             f.write("[System]\n")
             f.write(df_system.to_string())
             f.write("\n\n[Input]\n")
@@ -220,7 +248,9 @@ def file_to_text(link, link_output, link_dens=[]):
     ##########################
     elif data["type"] == "diff_bin":
         if not link_dens:
-            print("Bin diffusion needs a density sampling file. Check documentation and set a link_dens.")
+            print(
+                "Bin diffusion needs a density sampling file. Check documentation and set a link_dens."
+            )
             return
 
         bins = pa.diffusion.bins(link, is_norm=True)
@@ -236,16 +266,30 @@ def file_to_text(link, link_output, link_dens=[]):
                 [float(pore["box"]["res"])],
                 [pore[first_shape]["type"]],
             ]
-            df_system = pd.DataFrame(data_system,
-                                     index=["Box dimension (nm)", "Pore diameter (nm)", "reservoir (nm)", "type"],
-                                     columns=["Value"])
+            df_system = pd.DataFrame(
+                data_system,
+                index=[
+                    "Box dimension (nm)",
+                    "Pore diameter (nm)",
+                    "reservoir (nm)",
+                    "type",
+                ],
+                columns=["Value"],
+            )
             df_system = df_system.rename_axis("# Identifier", axis=1)
 
-        inp_table = [[data["inp"]["bin_num"]], [data["inp"]["entry"]],
-                     [data["inp"]["num_frame"]], [data["inp"]["mass"]], [bins["is_norm"]]]
-        df_inputs = pd.DataFrame(inp_table,
-                                 index=["Bin number", "Entry", "Frame number", "Mass", "is_norm"],
-                                 columns=["Value"])
+        inp_table = [
+            [data["inp"]["bin_num"]],
+            [data["inp"]["entry"]],
+            [data["inp"]["num_frame"]],
+            [data["inp"]["mass"]],
+            [bins["is_norm"]],
+        ]
+        df_inputs = pd.DataFrame(
+            inp_table,
+            index=["Bin number", "Entry", "Frame number", "Mass", "is_norm"],
+            columns=["Value"],
+        )
         df_inputs = df_inputs.rename_axis("# Identifier", axis=1)
 
         df_data_dict = {}
@@ -255,9 +299,18 @@ def file_to_text(link, link_output, link_dens=[]):
         df_data = pd.DataFrame(df_data_dict)
 
         with open(link_output, "w", encoding="utf-8") as f:
-            f.write("# This file was created " + datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") + "\n")
+            f.write(
+                "# This file was created "
+                + datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                + "\n"
+            )
             f.write("# Analysis created using PoreAna\n")
-            f.write("# Object file : " + os.path.dirname(os.path.abspath(__file__)) + link + "\n")
+            f.write(
+                "# Object file : "
+                + os.path.dirname(os.path.abspath(__file__))
+                + link
+                + "\n"
+            )
             f.write("# Units\n# Diffusion D(10^-9 m^2s^-1)\n\n")
             f.write("[System]\n")
             f.write(df_system.to_string())
@@ -282,12 +335,22 @@ def file_to_text(link, link_output, link_dens=[]):
                 [float(pore["box"]["res"])],
                 [pore[first_shape]["type"]],
             ]
-            df_system = pd.DataFrame(data_system,
-                                     index=["Box dimension (nm)", "Pore diameter (nm)", "reservoir (nm)", "type"],
-                                     columns=["Value"])
+            df_system = pd.DataFrame(
+                data_system,
+                index=[
+                    "Box dimension (nm)",
+                    "Pore diameter (nm)",
+                    "reservoir (nm)",
+                    "type",
+                ],
+                columns=["Value"],
+            )
         elif "box" in data:
-            df_system = pd.DataFrame([[[f"{x:.2f}" for x in data["box"]["length"]]]],
-                                     index=["Box dimension (nm)"], columns=["Value"])
+            df_system = pd.DataFrame(
+                [[[f"{x:.2f}" for x in data["box"]["length"]]]],
+                index=["Box dimension (nm)"],
+                columns=["Value"],
+            )
         df_system = df_system.rename_axis("# Identifier", axis=1)
 
         inp_table = [
@@ -297,10 +360,17 @@ def file_to_text(link, link_output, link_dens=[]):
             [bool(data["inp"]["remove_pore_from_res"])],
             [f"{data['inp']['mass']:.2f}"],
         ]
-        df_inputs = pd.DataFrame(inp_table,
-                                 index=["Bin number", "Entry", "Frame number",
-                                        "Remove pore from reservoir", "Mass"],
-                                 columns=["Value"])
+        df_inputs = pd.DataFrame(
+            inp_table,
+            index=[
+                "Bin number",
+                "Entry",
+                "Frame number",
+                "Remove pore from reservoir",
+                "Mass",
+            ],
+            columns=["Value"],
+        )
         df_inputs = df_inputs.rename_axis("# Identifier", axis=1)
 
         dens = pa.density.bins(link)
@@ -309,22 +379,28 @@ def file_to_text(link, link_output, link_dens=[]):
             df_ads = pd.DataFrame(ads).rename_axis("# Identifier", axis=1)
             shape_ids = [k for k in data["data"] if k.startswith("shape")]
             mean_rows = [
-                [dens["mean"][pid]["in"], dens["dens"][pid]["in"]]
-                for pid in shape_ids
+                [dens["mean"][pid]["in"], dens["dens"][pid]["in"]] for pid in shape_ids
             ] + [[dens["mean"]["ex"], dens["dens"]["ex"]]]
-            mean_idx = [f"Density inside {pid}" for pid in shape_ids] + ["Density outside pore"]
+            mean_idx = [f"Density inside {pid}" for pid in shape_ids] + [
+                "Density outside pore"
+            ]
             df_mean = pd.DataFrame(
-                mean_rows, index=mean_idx,
+                mean_rows,
+                index=mean_idx,
                 columns=["Density (#/nm^3)", "Density (kg/m^3)"],
             )
         else:
-            df_mean = pd.DataFrame([[dens["mean"]["ex"], dens["dens"]["ex"]]],
-                                   index=["Density box"],
-                                   columns=["Density (#/nm^3)", "Density (kg/m^3)"])
+            df_mean = pd.DataFrame(
+                [[dens["mean"]["ex"], dens["dens"]["ex"]]],
+                index=["Density box"],
+                columns=["Density (#/nm^3)", "Density (kg/m^3)"],
+            )
         df_mean = df_mean.rename_axis("# Identifier", axis=1)
 
-        data_dens = {"# Ex width": dens["sample"]["data"]["ex_width"],
-                     "Density (Ex)": dens["num_dens"]["ex"]}
+        data_dens = {
+            "# Ex width": dens["sample"]["data"]["ex_width"],
+            "Density (Ex)": dens["num_dens"]["ex"],
+        }
         if "pore" in data:
             first_pid = next(k for k in data["data"] if k.startswith("shape"))
             data_dens["In width"] = dens["sample"]["data"][first_pid]["in_width"][1:]
@@ -332,9 +408,18 @@ def file_to_text(link, link_output, link_dens=[]):
         df_data = pd.DataFrame(data_dens)
 
         with open(link_output, "w", encoding="utf-8") as f:
-            f.write("# This file was created " + datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") + "\n")
+            f.write(
+                "# This file was created "
+                + datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                + "\n"
+            )
             f.write("# Analysis created using PoreAna\n")
-            f.write("# Object file : " + os.path.dirname(os.path.abspath(__file__)) + link + "\n\n")
+            f.write(
+                "# Object file : "
+                + os.path.dirname(os.path.abspath(__file__))
+                + link
+                + "\n\n"
+            )
             f.write("[System]\n")
             f.write(df_system.to_string())
             f.write("\n\n[Inputs]\n")
@@ -361,12 +446,22 @@ def file_to_text(link, link_output, link_dens=[]):
                 [float(pore["box"]["res"])],
                 [pore[first_shape]["type"]],
             ]
-            df_system = pd.DataFrame(sys_data,
-                                     index=["Box dimension (nm)", "Pore diameter (nm)", "reservoir (nm)", "type"],
-                                     columns=["Value"])
+            df_system = pd.DataFrame(
+                sys_data,
+                index=[
+                    "Box dimension (nm)",
+                    "Pore diameter (nm)",
+                    "reservoir (nm)",
+                    "type",
+                ],
+                columns=["Value"],
+            )
         elif "box" in data:
-            df_system = pd.DataFrame([[[f"{x:.2f}" for x in data["box"]["length"]]]],
-                                     index=["Box dimension (nm)"], columns=["Value"])
+            df_system = pd.DataFrame(
+                [[[f"{x:.2f}" for x in data["box"]["length"]]]],
+                index=["Box dimension (nm)"],
+                columns=["Value"],
+            )
         df_system = df_system.rename_axis("# Identifier", axis=1)
 
         diff = pa.diffusion.mc_profile(link, is_plot=False, infty_profile=True)
@@ -380,14 +475,30 @@ def file_to_text(link, link_output, link_dens=[]):
             profile_data["Free energy [-]"] = free_energy[0][i]
         df_data = pd.DataFrame(profile_data)
 
-        df_inputs = pa.tables.mc_inputs(link, print_con=False).rename_axis("# Identifier", axis=1)
-        df_model = pa.tables.mc_model(link, print_con=False).rename_axis("# Identifier", axis=1)
-        df_results = pa.tables.mc_results(link, print_con=False).rename_axis("# Identifier", axis=1)
+        df_inputs = pa.tables.mc_inputs(link, print_con=False).rename_axis(
+            "# Identifier", axis=1
+        )
+        df_model = pa.tables.mc_model(link, print_con=False).rename_axis(
+            "# Identifier", axis=1
+        )
+        df_results = pa.tables.mc_results(link, print_con=False).rename_axis(
+            "# Identifier", axis=1
+        )
 
         with open(link_output, "w", encoding="utf-8") as f:
-            f.write("# This file was created " + datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") + "\n")
+            f.write(
+                "# This file was created "
+                + datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                + "\n"
+            )
             f.write("# Analysis created using PoreAna\n")
-            f.write("# Object file : " + os.path.dirname(os.path.abspath(__file__)) + "/" + link + "\n")
+            f.write(
+                "# Object file : "
+                + os.path.dirname(os.path.abspath(__file__))
+                + "/"
+                + link
+                + "\n"
+            )
             f.write("# Units\n# Diffusion D(10^-9 m^2s^-1)\n# Lag time  t(ps)\n\n")
             f.write("[System]\n")
             f.write(df_system.to_string())
@@ -424,7 +535,9 @@ def num_dens_to_mass_dens(dens):
     factor = dens["sample"]["inp"]["mass"] * 10 / 6.022
     return {
         "ex": [factor * d for d in dens["num_dens"]["ex"]],
-        "in": [factor * d for d in dens["num_dens"]["in"]] if "pore" in dens["sample"] else [],
+        "in": [factor * d for d in dens["num_dens"]["in"]]
+        if "pore" in dens["sample"]
+        else [],
     }
 
 

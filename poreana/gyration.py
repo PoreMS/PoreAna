@@ -4,15 +4,22 @@
 """Analyse gyration radius in a pore."""
 ################################################################################
 
-
+import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-import matplotlib.pyplot as plt
 
 import poreana.utils as utils
 
 
-def bins_plot(data_link_gyr, data_link_dens, intent="", pore_id="shape_00", is_mean=False, is_norm=False, kwargs={}):
+def bins_plot(
+    data_link_gyr,
+    data_link_dens,
+    intent="",
+    pore_id="shape_00",
+    is_mean=False,
+    is_norm=False,
+    kwargs={},
+):
     """This function plots the gyration radius. If an intent is given instead,
     only a plot-function will be called. Available options for ``intent`` are
 
@@ -49,11 +56,15 @@ def bins_plot(data_link_gyr, data_link_dens, intent="", pore_id="shape_00", is_m
 
     is_pore = "pore" in gyr
 
-    width_in_raw = np.array(gyr["data"][pore_id]["in_width"][:-1]) if is_pore else np.array([])
+    width_in_raw = (
+        np.array(gyr["data"][pore_id]["in_width"][:-1]) if is_pore else np.array([])
+    )
     width_ex_raw = np.array(gyr["data"]["ex_width"])
 
     if is_norm:
-        width_in = width_in_raw / width_in_raw[-1] if len(width_in_raw) else width_in_raw
+        width_in = (
+            width_in_raw / width_in_raw[-1] if len(width_in_raw) else width_in_raw
+        )
         width_ex = width_ex_raw / width_ex_raw[-1]
     else:
         width_in = width_in_raw
@@ -64,7 +75,9 @@ def bins_plot(data_link_gyr, data_link_dens, intent="", pore_id="shape_00", is_m
     gyr_in = np.array(gyr["data"][pore_id]["in"]) if is_pore else np.array([])
     gyr_ex = np.array(gyr["data"]["ex"])
 
-    gyration_in = np.where(dens_in != 0, gyr_in / dens_in, 0.0) if is_pore else np.array([])
+    gyration_in = (
+        np.where(dens_in != 0, gyr_in / dens_in, 0.0) if is_pore else np.array([])
+    )
     gyration_ex = np.where(dens_ex != 0, gyr_ex / dens_ex, 0.0)
 
     mean = {}

@@ -4,15 +4,22 @@
 """Analyse the molecule angle in a pore."""
 ################################################################################
 
-
+import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-import matplotlib.pyplot as plt
 
 import poreana.utils as utils
 
 
-def bins_plot(data_link_angle, data_link_dens, pore_id="shape_00", intent="", is_mean=False, is_norm=False, kwargs={}):
+def bins_plot(
+    data_link_angle,
+    data_link_dens,
+    pore_id="shape_00",
+    intent="",
+    is_mean=False,
+    is_norm=False,
+    kwargs={},
+):
     """This function plots the angle. If an intent is given instead, only a
     plot-function will be called. Available options for ``intent`` are
 
@@ -49,11 +56,15 @@ def bins_plot(data_link_angle, data_link_dens, pore_id="shape_00", intent="", is
 
     is_pore = "pore" in agl
 
-    width_in_raw = np.array(agl["data"][pore_id]["in_width"][:-1]) if is_pore else np.array([])
+    width_in_raw = (
+        np.array(agl["data"][pore_id]["in_width"][:-1]) if is_pore else np.array([])
+    )
     width_ex_raw = np.array(agl["data"]["ex_width"])
 
     if is_norm:
-        width_in = width_in_raw / width_in_raw[-1] if len(width_in_raw) else width_in_raw
+        width_in = (
+            width_in_raw / width_in_raw[-1] if len(width_in_raw) else width_in_raw
+        )
         width_ex = width_ex_raw / width_ex_raw[-1]
     else:
         width_in = width_in_raw
@@ -64,7 +75,9 @@ def bins_plot(data_link_angle, data_link_dens, pore_id="shape_00", intent="", is
     agl_in = np.array(agl["data"][pore_id]["in"]) if is_pore else np.array([])
     agl_ex = np.array(agl["data"]["ex"])
 
-    angle_in = np.where(dens_in != 0, agl_in / dens_in, 0.0) if is_pore else np.array([])
+    angle_in = (
+        np.where(dens_in != 0, agl_in / dens_in, 0.0) if is_pore else np.array([])
+    )
     angle_ex = np.where(dens_ex != 0, agl_ex / dens_ex, 0.0)
 
     mean = {}

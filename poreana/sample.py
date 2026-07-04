@@ -4,17 +4,17 @@
 """Sample functions to be run on clusters."""
 ################################################################################
 
-
-import sys
 import math
-import scipy
+import multiprocessing as mp
+import sys
+
+import chemfiles as cf
 import numpy as np
 import porems as pms
-import chemfiles as cf
-import multiprocessing as mp
+import scipy
 
-import poreana.utils as utils
 import poreana.geometry as geometry
+import poreana.utils as utils
 
 
 class Sample:
@@ -47,8 +47,13 @@ class Sample:
     frame_end : int, optional
         Set an end frame to stop the analysis earlier
     """
-    def __init__(self, system, link_traj, mol, atoms=[], masses=[], entry=0.5, frame_end=-1):
-        self._pore = utils.load(system, file_type="yml") if isinstance(system, str) else None
+
+    def __init__(
+        self, system, link_traj, mol, atoms=[], masses=[], entry=0.5, frame_end=-1
+    ):
+        self._pore = (
+            utils.load(system, file_type="yml") if isinstance(system, str) else None
+        )
         self._box = system if isinstance(system, list) else []
         self._traj = link_traj
         self._mol = mol
@@ -63,8 +68,16 @@ class Sample:
         self._is_diffusion_mc = False
 
         # Resolve atom indices from names
-        self._atoms = [atom.get_name() for atom in mol.get_atom_list()] if not self._atoms else self._atoms
-        self._atoms = [i for i in range(mol.get_num()) if mol.get_atom_list()[i].get_name() in self._atoms]
+        self._atoms = (
+            [atom.get_name() for atom in mol.get_atom_list()]
+            if not self._atoms
+            else self._atoms
+        )
+        self._atoms = [
+            i
+            for i in range(mol.get_num())
+            if mol.get_atom_list()[i].get_name() in self._atoms
+        ]
 
         # Resolve masses
         if not self._masses:
@@ -95,7 +108,13 @@ class Sample:
         # Build residue → atom-index mapping as numpy arrays for fast slicing
         n_res = int(num_res)
         self._res_list = {
-            res_id: np.array([res_id * mol.get_num() + a for a in range(mol.get_num()) if a in self._atoms])
+            res_id: np.array(
+                [
+                    res_id * mol.get_num() + a
+                    for a in range(mol.get_num())
+                    if a in self._atoms
+                ]
+            )
             for res_id in range(n_res)
         }
 
@@ -115,7 +134,6 @@ class Sample:
                 "dimensions": self._pore["system"]["dimensions"],
                 "res": self._pore["system"]["reservoir"],
             }
-
 
     ########
     # Bins #
@@ -146,7 +164,7 @@ class Sample:
             if pore_id[:5] == "shape":
                 diam = self._pore_props[pore_id]["diam"]
                 n = bin_num + 2
-                pore_surf = diam ** 2
+                pore_surf = diam**2
                 surf_per_bin = pore_surf / n
 
                 matrix_bins = np.zeros((n, n))
@@ -173,7 +191,11 @@ class Sample:
 
     def _bin_ex(self, bin_num):
         """Bin structure for the pore exterior / reservoir."""
-        length = self._pore_props["box"]["res"] if self._pore_props else self._box[self._dens_inp["direction"]]
+        length = (
+            self._pore_props["box"]["res"]
+            if self._pore_props
+            else self._box[self._dens_inp["direction"]]
+        )
         width = list(np.linspace(0, length, bin_num + 1))
         return {"width": width, "bins": [0] * (bin_num + 1)}
 
@@ -188,16 +210,26 @@ class Sample:
 
     def _bin_mc(self, bin_num, direction):
         """Bin structure spanning the full simulation length for MC diffusion."""
-        z_length = self._pore_props["box"]["dimensions"][direction] if self._pore else self._box[direction]
+        z_length = (
+            self._pore_props["box"]["dimensions"][direction]
+            if self._pore
+            else self._box[direction]
+        )
         bins = list(np.linspace(0, z_length, bin_num + 1))
         return {"bins": bins}
-
 
     ###########
     # Density #
     ###########
-    def init_density(self, link_out, bin_num=150, remove_pore_from_res=False,
-                     bin_const_A=False, avg_slit=True, direction=2):
+    def init_density(
+        self,
+        link_out,
+        bin_num=150,
+        remove_pore_from_res=False,
+        bin_const_A=False,
+        avg_slit=True,
+        direction=2,
+    ):
         """Enable density sampling routine.
 
         Parameters
@@ -217,9 +249,12 @@ class Sample:
         """
         self._is_density = True
         self._dens_inp = {
-            "output": link_out, "bin_num": bin_num,
+            "output": link_out,
+            "bin_num": bin_num,
             "remove_pore_from_res": remove_pore_from_res,
-            "bin_const_A": bin_const_A, "avg_slit": avg_slit, "direction": direction,
+            "bin_const_A": bin_const_A,
+            "avg_slit": avg_slit,
+            "direction": direction,
         }
 
     def _density_data(self):
@@ -262,21 +297,28 @@ class Sample:
                 data[pore_id]["in"][index] += 1
 
         elif region == "ex":
-            length = (abs(com[2] - self._pore_props["box"]["dimensions"][2])
-                      if self._pore and com[2] > self._pore_props["box"]["dimensions"][2] / 2
-                      else com[self._dens_inp["direction"]])
+            length = (
+                abs(com[2] - self._pore_props["box"]["dimensions"][2])
+                if self._pore and com[2] > self._pore_props["box"]["dimensions"][2] / 2
+                else com[self._dens_inp["direction"]]
+            )
             index = int(length / data["ex_width"][1])
 
-            if self._pore and self._dens_inp["remove_pore_from_res"] and pore_id == "shape_00":
-                is_add = (index <= bin_num
-                          and dist[pore_id] > self._pore_props[pore_id]["diam"] / 2
-                          and com[2] <= self._pore_props["box"]["dimensions"][2])
+            if (
+                self._pore
+                and self._dens_inp["remove_pore_from_res"]
+                and pore_id == "shape_00"
+            ):
+                is_add = (
+                    index <= bin_num
+                    and dist[pore_id] > self._pore_props[pore_id]["diam"] / 2
+                    and com[2] <= self._pore_props["box"]["dimensions"][2]
+                )
             else:
                 is_add = index <= bin_num
 
             if is_add:
                 data["ex"][index] += 1
-
 
     ############
     # Gyration #
@@ -344,21 +386,24 @@ class Sample:
                 data[pore_id]["in"][index] += r_g
 
         elif region == "ex":
-            length = (abs(com[2] - self._pore_props["box"]["dimensions"][2])
-                      if self._pore and com[2] > self._pore_props["box"]["dimensions"][2] / 2
-                      else com[2])
+            length = (
+                abs(com[2] - self._pore_props["box"]["dimensions"][2])
+                if self._pore and com[2] > self._pore_props["box"]["dimensions"][2] / 2
+                else com[2]
+            )
             index = int(length / data["ex_width"][1])
 
             if self._pore and pore_id != 0:
-                is_add = (index <= bin_num
-                          and dist[pore_id] > self._pore_props[pore_id]["diam"] / 2
-                          and com[2] <= self._pore_props["box"]["dimensions"][2])
+                is_add = (
+                    index <= bin_num
+                    and dist[pore_id] > self._pore_props[pore_id]["diam"] / 2
+                    and com[2] <= self._pore_props["box"]["dimensions"][2]
+                )
             else:
                 is_add = index <= bin_num
 
             if is_add:
                 data["ex"][index] += r_g
-
 
     #########
     # Angle #
@@ -386,21 +431,32 @@ class Sample:
                     if pore_id[:5] == "shape":
                         normals[pore_id] = {}
                         if self._pore_props[pore_id]["type"] == "CYLINDER":
-                            shape = pms.Cylinder({
-                                "centroid": self._pore_props[pore_id]["focal"],
-                                "central": [0, 0, 1],
-                                "length": self._pore_props["box"]["dimensions"][2],
-                                "diameter": self._pore_props[pore_id]["diam"],
-                            })
-                            def normal_in(pos, _s=shape): return _s.normal(pos)
-                            def normal_ex(pos, _pp=self._pore_props): return (
-                                [0, 0, -1] if pos[2] < (_pp["box"]["dimensions"][2] - _pp["box"]["res"])
-                                else [0, 0, 1]
+                            shape = pms.Cylinder(
+                                {
+                                    "centroid": self._pore_props[pore_id]["focal"],
+                                    "central": [0, 0, 1],
+                                    "length": self._pore_props["box"]["dimensions"][2],
+                                    "diameter": self._pore_props[pore_id]["diam"],
+                                }
                             )
+
+                            def normal_in(pos, _s=shape):
+                                return _s.normal(pos)
+
+                            def normal_ex(pos, _pp=self._pore_props):
+                                return (
+                                    [0, 0, -1]
+                                    if pos[2]
+                                    < (_pp["box"]["dimensions"][2] - _pp["box"]["res"])
+                                    else [0, 0, 1]
+                                )
+
                             normals[pore_id] = {"in": normal_in}
                             normals["ex"] = normal_ex
                         else:
-                            print("Angle: Shape normal not predefined yet. Please set the 'normals' variable...")
+                            print(
+                                "Angle: Shape normal not predefined yet. Please set the 'normals' variable..."
+                            )
                             return
             else:
                 normals = {
@@ -408,7 +464,11 @@ class Sample:
                     "ex": lambda pos: [0, 0, 1],
                 }
         self._angle_normals = normals
-        self._angle_inp = {"output": link_out, "vector_atoms": vector_atoms, "bin_num": bin_num}
+        self._angle_inp = {
+            "output": link_out,
+            "vector_atoms": vector_atoms,
+            "bin_num": bin_num,
+        }
 
     def _angle_data(self):
         """Create angle data structure."""
@@ -458,27 +518,37 @@ class Sample:
         elif region == "ex":
             vec = pos[vector_atoms[1]] - pos[vector_atoms[0]]
             angle_val = geometry.angle(vec, normals["ex"](com))
-            length = (abs(com[2] - self._pore_props["box"]["dimensions"][2])
-                      if self._pore and com[2] > self._pore_props["box"]["dimensions"][2] / 2
-                      else com[2])
+            length = (
+                abs(com[2] - self._pore_props["box"]["dimensions"][2])
+                if self._pore and com[2] > self._pore_props["box"]["dimensions"][2] / 2
+                else com[2]
+            )
             index = int(length / data["ex_width"][1])
 
             if self._pore and pore_id != 0:
-                is_add = (index <= bin_num
-                          and dist[pore_id] > self._pore_props[pore_id]["diam"] / 2
-                          and com[2] <= self._pore_props["box"]["dimensions"][2])
+                is_add = (
+                    index <= bin_num
+                    and dist[pore_id] > self._pore_props[pore_id]["diam"] / 2
+                    and com[2] <= self._pore_props["box"]["dimensions"][2]
+                )
             else:
                 is_add = index <= bin_num
 
             if is_add:
                 data["ex"][index] += angle_val
 
-
     #############
     # Diffusion #
     #############
-    def init_diffusion_bin(self, link_out, bin_num=50, len_obs=16e-12, len_frame=2e-12,
-                           len_step=2, bin_step_size=1):
+    def init_diffusion_bin(
+        self,
+        link_out,
+        bin_num=50,
+        len_obs=16e-12,
+        len_frame=2e-12,
+        len_step=2,
+        bin_step_size=1,
+    ):
         """Enable bin-diffusion sampling routine.
 
         Parameters
@@ -508,14 +578,19 @@ class Sample:
         if len_window != int(len_window):
             obs_u = (math.ceil(len_window) - 1) * len_step * len_frame
             obs_d = (math.floor(len_window) - 1) * len_step * len_frame
-            print(f"Observation length not possible. Use len_obs={'%.1e' % obs_u} or {'%.1e' % obs_d}.")
+            print(
+                f"Observation length not possible. Use len_obs={'%.1e' % obs_u} or {'%.1e' % obs_d}."
+            )
             return
         len_window = int(len_window)
 
         self._diff_bin_inp = {
-            "output": link_out, "bin_step_size": bin_step_size,
-            "bin_num": bin_num, "len_step": len_step,
-            "len_frame": len_frame, "len_window": len_window,
+            "output": link_out,
+            "bin_step_size": bin_step_size,
+            "bin_num": bin_num,
+            "len_step": len_step,
+            "len_frame": len_frame,
+            "len_window": len_window,
         }
 
     def _diffusion_bin_data(self):
@@ -536,7 +611,9 @@ class Sample:
         s = self._diff_bin_inp["bin_step_size"]
         return list(range(idx + s, idx - 1, -1)) + list(range(idx - 1, idx - s - 1, -1))
 
-    def _diffusion_bin(self, data, region, pore_in, dist, com_list, idx_list, res_id, com):
+    def _diffusion_bin(
+        self, data, region, pore_in, dist, com_list, idx_list, res_id, com
+    ):
         r"""Sample mean-square displacement for bin-diffusion inside the pore.
 
         Parameters
@@ -569,7 +646,10 @@ class Sample:
         com_list[pore_in][-1][res_id] = com
         idx_list[pore_in][-1][res_id] = index
 
-        if len(com_list[pore_in]) == len_window * len_step and res_id in com_list[pore_in][0]:
+        if (
+            len(com_list[pore_in]) == len_window * len_step
+            and res_id in com_list[pore_in][0]
+        ):
             pos_ref = com_list[pore_in][0][res_id]
             idx_ref = idx_list[pore_in][0][res_id]
 
@@ -586,9 +666,12 @@ class Sample:
                 win_idx = step // len_step
 
                 msd_z[win_idx] += (pos_ref[2] - pos_step[2]) ** 2
-                msd_r[win_idx] += geometry.length(
-                    geometry.vector(pos_ref, [pos_step[0], pos_step[1], pos_ref[2]])
-                ) ** 2
+                msd_r[win_idx] += (
+                    geometry.length(
+                        geometry.vector(pos_ref, [pos_step[0], pos_step[1], pos_ref[2]])
+                    )
+                    ** 2
+                )
                 norm[win_idx] += 1
 
                 if idx_step in self._diffusion_bin_step(idx_ref):
@@ -606,11 +689,12 @@ class Sample:
                         data[pore_in]["r"][idx_ref][i] += msd_r[i]
                         data[pore_in]["n"][idx_ref][i] += norm[i]
 
-
     ################
     # MC Diffusion #
     ################
-    def init_diffusion_mc(self, link_out, len_step, bin_num=100, len_frame=2e-12, direction=2):
+    def init_diffusion_mc(
+        self, link_out, len_step, bin_num=100, len_frame=2e-12, direction=2
+    ):
         r"""Enable MC-diffusion transition-matrix sampling.
 
         Parameters
@@ -630,7 +714,9 @@ class Sample:
             print("Binning and MC-approaches cannot be run in parallel.")
             return
         if direction not in [0, 1, 2]:
-            print("Wrong directional input. Possible inputs are 0 (x-axis), 1 (y-axis), and 2 (z-axis)...")
+            print(
+                "Wrong directional input. Possible inputs are 0 (x-axis), 1 (y-axis), and 2 (z-axis)..."
+            )
             return
 
         self._is_diffusion_mc = True
@@ -638,16 +724,22 @@ class Sample:
         len_step = sorted(len_step)
 
         self._diff_mc_inp = {
-            "output": link_out, "bins": bins,
-            "bin_num": bin_num, "len_step": len_step,
-            "len_frame": len_frame, "is_pbc": True, "direction": int(direction),
+            "output": link_out,
+            "bins": bins,
+            "bin_num": bin_num,
+            "len_step": len_step,
+            "len_frame": len_frame,
+            "is_pbc": True,
+            "direction": int(direction),
         }
 
     def _diffusion_mc_data(self):
         """Create MC-diffusion data structure."""
         bin_num = self._diff_mc_inp["bin_num"]
-        return {step: np.zeros((bin_num + 2, bin_num + 2), int)
-                for step in self._diff_mc_inp["len_step"]}
+        return {
+            step: np.zeros((bin_num + 2, bin_num + 2), int)
+            for step in self._diff_mc_inp["len_step"]
+        }
 
     def _diffusion_mc(self, data, idx_list, com, res_id, frame_list, frame_id):
         """Sample the MC-diffusion transition matrix.
@@ -683,11 +775,12 @@ class Sample:
                 if len(idx_list) >= step + 1:
                     data[step][idx_list[-1][res_id], idx_list[-(step + 1)][res_id]] += 1
 
-
     ############
     # Sampling #
     ############
-    def sample(self, shift=[0, 0, 0], n_proc=0, is_pbc=True, is_broken=False, is_parallel=True):
+    def sample(
+        self, shift=[0, 0, 0], n_proc=0, is_pbc=True, is_broken=False, is_parallel=True
+    ):
         """Run all enabled sampling routines.
 
         Parameters
@@ -716,11 +809,16 @@ class Sample:
         if is_parallel:
             frame_num = math.floor(self._num_frame / n_proc)
             frame_start = [frame_num * i for i in range(n_proc)]
-            frame_end = [frame_num * (i + 1) if i < n_proc - 1 else self._num_frame for i in range(n_proc)]
+            frame_end = [
+                frame_num * (i + 1) if i < n_proc - 1 else self._num_frame
+                for i in range(n_proc)
+            ]
 
             if self._is_diffusion_bin:
                 win = self._diff_bin_inp["len_window"] * self._diff_bin_inp["len_step"]
-                frame_start = [x - win + 1 if i > 0 else x for i, x in enumerate(frame_start)]
+                frame_start = [
+                    x - win + 1 if i > 0 else x for i, x in enumerate(frame_start)
+                ]
 
             if self._is_diffusion_mc:
                 max_step = max(self._diff_mc_inp["len_step"])
@@ -729,58 +827,120 @@ class Sample:
                     if frame_end[i] >= self._num_frame:
                         frame_end[i] = frame_end[-1] - max_step
 
-            frame_np = [list(range(frame_start[i], frame_end[i])) for i in range(n_proc)]
+            frame_np = [
+                list(range(frame_start[i], frame_end[i])) for i in range(n_proc)
+            ]
             _ctx = mp.get_context("fork") if sys.platform != "win32" else mp
             pool = _ctx.Pool(processes=n_proc)
-            results = [pool.apply_async(self._sample_helper, args=(fl, shift, is_pbc, is_broken))
-                       for fl in frame_np]
+            results = [
+                pool.apply_async(
+                    self._sample_helper, args=(fl, shift, is_pbc, is_broken)
+                )
+                for fl in frame_np
+            ]
             pool.close()
             pool.join()
             output = [x.get() for x in results]
             del results
         else:
-            output = [self._sample_helper(list(range(self._num_frame)), shift, is_pbc, is_broken)]
+            output = [
+                self._sample_helper(
+                    list(range(self._num_frame)), shift, is_pbc, is_broken
+                )
+            ]
 
-        system = ({"sys": "pore", "props": self._pore_props}
-                  if self._pore else {"sys": "box", "props": {"length": self._box}})
-        inp = {"num_frame": self._num_frame, "mass": self._mol.get_mass(), "entry": self._entry}
+        system = (
+            {"sys": "pore", "props": self._pore_props}
+            if self._pore
+            else {"sys": "box", "props": {"length": self._box}}
+        )
+        inp = {
+            "num_frame": self._num_frame,
+            "mass": self._mol.get_mass(),
+            "entry": self._entry,
+        }
 
         if self._is_density:
-            inp_dens = {**inp, **{k: v for k, v in self._dens_inp.items() if k != "output"}}
+            inp_dens = {
+                **inp,
+                **{k: v for k, v in self._dens_inp.items() if k != "output"},
+            }
             data_dens = output[0]["density"]
             for out in output[1:]:
                 if self._pore:
                     for pore_id in data_dens:
                         if pore_id[:5] == "shape":
                             data_dens[pore_id]["in"] = [
-                                x + y for x, y in zip(data_dens[pore_id]["in"], out["density"][pore_id]["in"])
+                                x + y
+                                for x, y in zip(
+                                    data_dens[pore_id]["in"],
+                                    out["density"][pore_id]["in"],
+                                )
                             ]
-                data_dens["ex"] = [x + y for x, y in zip(data_dens["ex"], out["density"]["ex"])]
-            utils.save({system["sys"]: system["props"], "inp": inp_dens,
-                        "data": data_dens, "type": "dens_bin"}, self._dens_inp["output"])
+                data_dens["ex"] = [
+                    x + y for x, y in zip(data_dens["ex"], out["density"]["ex"])
+                ]
+            utils.save(
+                {
+                    system["sys"]: system["props"],
+                    "inp": inp_dens,
+                    "data": data_dens,
+                    "type": "dens_bin",
+                },
+                self._dens_inp["output"],
+            )
 
         if self._is_gyration:
-            inp_gyr = {**inp, **{k: v for k, v in self._gyr_inp.items() if k != "output"}}
+            inp_gyr = {
+                **inp,
+                **{k: v for k, v in self._gyr_inp.items() if k != "output"},
+            }
             data_gyr = output[0]["gyration"]
             for out in output[1:]:
                 if self._pore:
                     for pore_id in data_gyr:
                         if pore_id[:5] == "shape":
                             data_gyr[pore_id]["in"] = [
-                                x + y for x, y in zip(data_gyr[pore_id]["in"], out["gyration"][pore_id]["in"])
+                                x + y
+                                for x, y in zip(
+                                    data_gyr[pore_id]["in"],
+                                    out["gyration"][pore_id]["in"],
+                                )
                             ]
-                data_gyr["ex"] = [x + y for x, y in zip(data_gyr["ex"], out["gyration"]["ex"])]
-            utils.save({system["sys"]: system["props"], "inp": inp_gyr,
-                        "data": data_gyr, "type": "gyr_bin"}, self._gyr_inp["output"])
+                data_gyr["ex"] = [
+                    x + y for x, y in zip(data_gyr["ex"], out["gyration"]["ex"])
+                ]
+            utils.save(
+                {
+                    system["sys"]: system["props"],
+                    "inp": inp_gyr,
+                    "data": data_gyr,
+                    "type": "gyr_bin",
+                },
+                self._gyr_inp["output"],
+            )
 
         if self._is_angle:
-            inp_angle = {**inp, **{k: v for k, v in self._angle_inp.items() if k != "output"}}
+            inp_angle = {
+                **inp,
+                **{k: v for k, v in self._angle_inp.items() if k != "output"},
+            }
             data_angle = output[0]["angle"]
-            utils.save({system["sys"]: system["props"], "inp": inp_angle,
-                        "data": data_angle, "type": "angle_bin"}, self._angle_inp["output"])
+            utils.save(
+                {
+                    system["sys"]: system["props"],
+                    "inp": inp_angle,
+                    "data": data_angle,
+                    "type": "angle_bin",
+                },
+                self._angle_inp["output"],
+            )
 
         if self._is_diffusion_bin:
-            inp_diff = {**inp, **{k: v for k, v in self._diff_bin_inp.items() if k != "output"}}
+            inp_diff = {
+                **inp,
+                **{k: v for k, v in self._diff_bin_inp.items() if k != "output"},
+            }
             data_diff = output[0]["diffusion_bin"]
             for out in output[1:]:
                 for pore_id in data_diff:
@@ -789,20 +949,36 @@ class Sample:
                             a = np.array(data_diff[pore_id][key])
                             b = np.array(out["diffusion_bin"][pore_id][key])
                             data_diff[pore_id][key] = (a + b).tolist()
-            utils.save({system["sys"]: system["props"], "inp": inp_diff,
-                        "data": data_diff, "type": "diff_bin"}, self._diff_bin_inp["output"])
+            utils.save(
+                {
+                    system["sys"]: system["props"],
+                    "inp": inp_diff,
+                    "data": data_diff,
+                    "type": "diff_bin",
+                },
+                self._diff_bin_inp["output"],
+            )
 
         if self._is_diffusion_mc:
-            inp_diff = {**inp, **{k: v for k, v in self._diff_mc_inp.items() if k != "output"}}
+            inp_diff = {
+                **inp,
+                **{k: v for k, v in self._diff_mc_inp.items() if k != "output"},
+            }
             data_diff = output[0]["diffusion_mc"]
             for step in self._diff_mc_inp["len_step"]:
                 for out in output[1:]:
                     data_diff[step] += out["diffusion_mc"][step]
             for step in self._diff_mc_inp["len_step"]:
                 data_diff[step] = data_diff[step][1:-1, 1:-1]
-            utils.save({system["sys"]: system["props"], "inp": inp_diff,
-                        "data": data_diff, "type": "diff_mc"}, self._diff_mc_inp["output"])
-
+            utils.save(
+                {
+                    system["sys"]: system["props"],
+                    "inp": inp_diff,
+                    "data": data_diff,
+                    "type": "diff_mc",
+                },
+                self._diff_mc_inp["output"],
+            )
 
     def _sample_helper(self, frame_list, shift, is_pbc, is_broken):
         """Worker function: sample all enabled routines for a list of frames.
@@ -823,8 +999,11 @@ class Sample:
         output : dictionary
             Accumulated sampling data
         """
-        box = (np.array(self._pore_props["box"]["dimensions"])
-               if self._pore else np.array(self._box))
+        box = (
+            np.array(self._pore_props["box"]["dimensions"])
+            if self._pore
+            else np.array(self._box)
+        )
         res = self._pore_props["box"]["res"] if self._pore else 0
         shift_arr = np.array(shift, dtype=float)
 
@@ -898,9 +1077,11 @@ class Sample:
                         if pore_id[:5] == "shape":
                             focal = pp["focal"]
                             if pp["type"] in ("CYLINDER", "CONE"):
-                                dist[pore_id] = float(np.linalg.norm(
-                                    com[:2] - np.array([focal[0], focal[1]])
-                                ))
+                                dist[pore_id] = float(
+                                    np.linalg.norm(
+                                        com[:2] - np.array([focal[0], focal[1]])
+                                    )
+                                )
                             elif pp["type"] == "SLIT":
                                 dist[pore_id] = abs(focal[1] - float(com[1]))
                 else:
@@ -909,13 +1090,23 @@ class Sample:
                 # Region classification
                 region = ""
                 pore_in = 1
-                if self._pore and res + self._entry < com[2] < box[2] - res - self._entry:
+                if (
+                    self._pore
+                    and res + self._entry < com[2] < box[2] - res - self._entry
+                ):
                     region = "in"
                     for pore_id, pp in self._pore_props.items():
                         if pore_id[:5] == "shape":
-                            z_min = res + pp["focal"][2] - pp["length"] / 2 + self._entry
-                            z_max = res + pp["focal"][2] + pp["length"] / 2 - self._entry
-                            if z_min < com[2] < z_max and dist[pore_id] < pp["diam"] * 1.01 / 2:
+                            z_min = (
+                                res + pp["focal"][2] - pp["length"] / 2 + self._entry
+                            )
+                            z_max = (
+                                res + pp["focal"][2] + pp["length"] / 2 - self._entry
+                            )
+                            if (
+                                z_min < com[2] < z_max
+                                and dist[pore_id] < pp["diam"] * 1.01 / 2
+                            ):
                                 pore_in = pore_id
                 elif not self._pore or com[2] < res or com[2] > box[2] - res:
                     region = "ex"
@@ -934,21 +1125,44 @@ class Sample:
                     if self._is_density and pore_in != 1:
                         self._density(output["density"], region, dist, com, pore_in)
                     if self._is_gyration and pore_in != 1:
-                        self._gyration(output["gyration"], region, dist, com_no_pbc, pos, pore_in)
+                        self._gyration(
+                            output["gyration"], region, dist, com_no_pbc, pos, pore_in
+                        )
                     if self._is_angle and pore_in != 1:
                         self._angle(output["angle"], region, dist, com, pos, pore_in)
 
                 if self._is_diffusion_bin and pore_in != 1:
-                    self._diffusion_bin(output["diffusion_bin"], region, pore_in,
-                                        dist, com_list, idx_list, res_id, com)
+                    self._diffusion_bin(
+                        output["diffusion_bin"],
+                        region,
+                        pore_in,
+                        dist,
+                        com_list,
+                        idx_list,
+                        res_id,
+                        com,
+                    )
                 if self._is_diffusion_mc:
-                    self._diffusion_mc(output["diffusion_mc"], idx_list, com, res_id,
-                                       frame_list, frame_id)
+                    self._diffusion_mc(
+                        output["diffusion_mc"],
+                        idx_list,
+                        com,
+                        res_id,
+                        frame_list,
+                        frame_id,
+                    )
 
-            if (frame_id + 1) % 10 == 0 or frame_id == 0 or frame_id == self._num_frame - 1:
+            if (
+                (frame_id + 1) % 10 == 0
+                or frame_id == 0
+                or frame_id == self._num_frame - 1
+            ):
                 sys.stdout.write(
-                    "Finished frame " + frame_fmt % (frame_id + 1) +
-                    "/" + frame_fmt % self._num_frame + "...\r"
+                    "Finished frame "
+                    + frame_fmt % (frame_id + 1)
+                    + "/"
+                    + frame_fmt % self._num_frame
+                    + "...\r"
                 )
                 sys.stdout.flush()
         print()

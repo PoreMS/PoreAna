@@ -4,11 +4,12 @@
 """Print analysis information in table form."""
 ################################################################################
 
-
 import numpy as np
 import pandas as pd
-import poreana.utils as utils
+
 import poreana.diffusion as diffusion
+import poreana.utils as utils
+
 
 ###############################
 # MC - Diffusion, Free Energy #
@@ -42,27 +43,48 @@ def mc_statistics(link, print_con=False):
     nmc_eq = inp["MC steps eq"]
     nmc = inp["MC steps"]
 
-
     nacc_df_mean = results["nacc_df"]
     nacc_diff_mean = results["nacc_diff"]
     list_diff_fluc = results["fluc_diff"]
     list_df_fluc = results["fluc_df"]
 
     # Table for MC Statistics
-    data = [[str("%.4e" % list_df_fluc[i]) for i in len_step],[str("%.4e" % list_diff_fluc[i]) for i in len_step],[str("%.0f" % nacc_df_mean[i]) for i in len_step],[str("%.0f" % nacc_diff_mean[i]) for i in len_step],[str("%.2f" % (nacc_df_mean[i]*100/(nmc+nmc_eq))) for i in len_step],[str("%.2f" % (nacc_diff_mean[i]*100/(nmc+nmc_eq))) for i in len_step]]
+    data = [
+        [str("%.4e" % list_df_fluc[i]) for i in len_step],
+        [str("%.4e" % list_diff_fluc[i]) for i in len_step],
+        [str("%.0f" % nacc_df_mean[i]) for i in len_step],
+        [str("%.0f" % nacc_diff_mean[i]) for i in len_step],
+        [str("%.2f" % (nacc_df_mean[i] * 100 / (nmc + nmc_eq))) for i in len_step],
+        [str("%.2f" % (nacc_diff_mean[i] * 100 / (nmc + nmc_eq))) for i in len_step],
+    ]
 
-    df_results = pd.DataFrame(data,index=list(['fluctuation df','fluctuation diff','acc df steps','acc diff steps','acc df steps (%)','acc diff steps (%)']),columns=list(len_step))
+    df_results = pd.DataFrame(
+        data,
+        index=list(
+            [
+                "fluctuation df",
+                "fluctuation diff",
+                "acc df steps",
+                "acc diff steps",
+                "acc df steps (%)",
+                "acc diff steps (%)",
+            ]
+        ),
+        columns=list(len_step),
+    )
 
     # If the table has to print in console
     if print_con:
-        print('\nStatistics of the MC Algorithm')
+        print("\nStatistics of the MC Algorithm")
         print(df_results)
 
     # Set styler for pandas table in jupyter
-    df_results = pd.DataFrame(df_results.rename_axis('Step Length', axis=1))
-    styler = df_results.style.set_caption('Statistics of the MC Algorithm')
-    df_results = styler.set_properties(**{'text-align': 'right'})
-    df_results = df_results.set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
+    df_results = pd.DataFrame(df_results.rename_axis("Step Length", axis=1))
+    styler = df_results.style.set_caption("Statistics of the MC Algorithm")
+    df_results = styler.set_properties(**{"text-align": "right"})
+    df_results = df_results.set_table_styles(
+        [dict(selector="th", props=[("text-align", "left")])]
+    )
 
     return df_results
 
@@ -106,18 +128,22 @@ def mc_lag_time(link, print_con=False):
         data[i] = [str("%.4e" % diff_coeff[i][j]) for j in range(int(nD))]
 
     # Pandas table
-    diff_coeff = pd.DataFrame(data, index=list(np.arange(1, int(nD)+1)), columns=list(len_step))
-    diff_coeff = pd.DataFrame(diff_coeff.rename_axis('Step Length', axis=1))
+    diff_coeff = pd.DataFrame(
+        data, index=list(np.arange(1, int(nD) + 1)), columns=list(len_step)
+    )
+    diff_coeff = pd.DataFrame(diff_coeff.rename_axis("Step Length", axis=1))
 
     # If the table has to print in console
     if print_con:
-        print('\nDiffusion coefficients')
+        print("\nDiffusion coefficients")
         print(diff_coeff)
 
     # Set styler for pandas table in jupyter
-    styler = diff_coeff.style.set_caption('Diffusion coefficients')
-    diff_coeff = styler.set_properties(**{'text-align': 'right'})
-    diff_coeff = diff_coeff.set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
+    styler = diff_coeff.style.set_caption("Diffusion coefficients")
+    diff_coeff = styler.set_properties(**{"text-align": "right"})
+    diff_coeff = diff_coeff.set_table_styles(
+        [dict(selector="th", props=[("text-align", "left")])]
+    )
 
     # Initialize data dictionary for the diffusion profile coefficients
     data = {}
@@ -127,18 +153,22 @@ def mc_lag_time(link, print_con=False):
         data[i] = [str("%.4e" % df_coeff[i][j]) for j in range(int(nF))]
 
     # Pandas table
-    df_coeff = pd.DataFrame(data, index=list(np.arange(1, int(nF)+1)), columns=list(len_step))
-    df_coeff = pd.DataFrame(df_coeff.rename_axis('Step Length', axis=1))
+    df_coeff = pd.DataFrame(
+        data, index=list(np.arange(1, int(nF) + 1)), columns=list(len_step)
+    )
+    df_coeff = pd.DataFrame(df_coeff.rename_axis("Step Length", axis=1))
 
     # If the table has to print in console and not in a jupyter notebook
     if print_con:
-        print('\nFree energy coefficients')
+        print("\nFree energy coefficients")
         print(df_coeff)
 
     # Set styler for pandas table in jupyter
-    styler = df_coeff.style.set_caption('Free energy coefficients')
-    df_coeff = styler.set_properties(**{'text-align': 'right'})
-    df_coeff = df_coeff.set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
+    styler = df_coeff.style.set_caption("Free energy coefficients")
+    df_coeff = styler.set_properties(**{"text-align": "right"})
+    df_coeff = df_coeff.set_table_styles(
+        [dict(selector="th", props=[("text-align", "left")])]
+    )
 
     return diff_coeff, df_coeff
 
@@ -183,21 +213,53 @@ def mc_model(link, print_con=False):
     system = "pore" if "pore" in data else "box"
 
     # Len step string
-    len_step_string = ', '.join(str(step) for step in len_step)
+    len_step_string = ", ".join(str(step) for step in len_step)
 
     # Dictionary for model inputs
-    data = [str("%.i" % bin_number), len_step_string, str("%.2e" % (len_frame * 10**(-12))), str("%.i" % frame_num), str("%.i" % nD), str("%.i" % nF), str("%.i" % nDrad), model_string, str("%.2e" % (d * 10**(-6))), system, pbc, str("%.i" % direction)]
-    df_model = pd.DataFrame(data, index=list(['Bin number', 'step length', 'frame length (s)', 'frame number', 'nD', 'nF', 'nDrad', 'model', 'guess diffusion (m2/s-1)', 'system',"pbc", "direction"]), columns=list(['Input']))
+    data = [
+        str("%.i" % bin_number),
+        len_step_string,
+        str("%.2e" % (len_frame * 10 ** (-12))),
+        str("%.i" % frame_num),
+        str("%.i" % nD),
+        str("%.i" % nF),
+        str("%.i" % nDrad),
+        model_string,
+        str("%.2e" % (d * 10 ** (-6))),
+        system,
+        pbc,
+        str("%.i" % direction),
+    ]
+    df_model = pd.DataFrame(
+        data,
+        index=list(
+            [
+                "Bin number",
+                "step length",
+                "frame length (s)",
+                "frame number",
+                "nD",
+                "nF",
+                "nDrad",
+                "model",
+                "guess diffusion (m2/s-1)",
+                "system",
+                "pbc",
+                "direction",
+            ]
+        ),
+        columns=list(["Input"]),
+    )
 
     # If the table has to print in console and not in a jupyter notebook
     if print_con:
-        print('\nModel Inputs')
+        print("\nModel Inputs")
         print(df_model)
 
     # Set styler for pandas table in jupyter
-    #styler = df_model.style.set_caption('Model Inputs')
-    #df_model = styler.set_properties(**{'text-align': 'right'})
-    #df_model = df_model.set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
+    # styler = df_model.style.set_caption('Model Inputs')
+    # df_model = styler.set_properties(**{'text-align': 'right'})
+    # df_model = df_model.set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
 
     return df_model
 
@@ -221,7 +283,6 @@ def mc_inputs(link, print_con=False):
     # Load Results from the output object file
     data = utils.load(link)
 
-
     # Read MC inputs
     inp = data["inp"]
     nmc_eq = inp["MC steps eq"]
@@ -231,22 +292,43 @@ def mc_inputs(link, print_con=False):
     temp = inp["temperature"]
 
     # Table for MC Inputs
-    data = [str("%.i" % nmc_eq), str("%.i" % nmc), temp, str("%.i" % num_mc_update), str("%.i" % print_freq)]
-    df_mc = pd.DataFrame(data, index=list(['MC steps (Equilibrium)', 'MC steps (Production)','temperature (MC)', 'movewidth update frequency', 'print frequency']), columns=list(['Input']))
+    data = [
+        str("%.i" % nmc_eq),
+        str("%.i" % nmc),
+        temp,
+        str("%.i" % num_mc_update),
+        str("%.i" % print_freq),
+    ]
+    df_mc = pd.DataFrame(
+        data,
+        index=list(
+            [
+                "MC steps (Equilibrium)",
+                "MC steps (Production)",
+                "temperature (MC)",
+                "movewidth update frequency",
+                "print frequency",
+            ]
+        ),
+        columns=list(["Input"]),
+    )
 
     # If the table has to print in console and not in a jupyter notebook
     if print_con:
-        print('\nMC Inputs')
+        print("\nMC Inputs")
         print(df_mc)
 
     # Set style for the pandas table
-    #styler = df_mc.style.set_caption('MC Inputs')
-    #df_mc = styler.set_properties(**{'text-align': 'right'})
-    #df_mc = df_mc.set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
+    # styler = df_mc.style.set_caption('MC Inputs')
+    # df_mc = styler.set_properties(**{'text-align': 'right'})
+    # df_mc = df_mc.set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
 
     return df_mc
 
-def mc_results(link, print_con=False, sections={"box": [], "pore": [], "res": []}, len_step = []):
+
+def mc_results(
+    link, print_con=False, sections={"box": [], "pore": [], "res": []}, len_step=[]
+):
     """This function prints the MC results of the diffusion calculation.
     Different areas are defined in the **sections** dectionary. Standard areas
     are calculated by leaving the value list empty
@@ -278,7 +360,11 @@ def mc_results(link, print_con=False, sections={"box": [], "pore": [], "res": []
     len_step = list(model["len_step"]) if not len_step else len_step
 
     # Extract system data
-    box_z = round(data["pore"]["box"]["dimensions"][2], 2) if "pore" in data else round(data["box"]["length"][2], 2)
+    box_z = (
+        round(data["pore"]["box"]["dimensions"][2], 2)
+        if "pore" in data
+        else round(data["box"]["length"][2], 2)
+    )
     res = round(data["pore"]["box"]["res"], 2) if "pore" in data else 0
 
     # Run through sections
@@ -286,29 +372,35 @@ def mc_results(link, print_con=False, sections={"box": [], "pore": [], "res": []
     for key, section in sections.items():
         # Process special cases
         if not section:
-            if key=="box":
+            if key == "box":
                 area = [0, box_z]
-            elif key=="pore":
-                area = [res, round(box_z-res, 2)] if "pore" in data else []
-            elif key=="res":
+            elif key == "pore":
+                area = [res, round(box_z - res, 2)] if "pore" in data else []
+            elif key == "res":
                 area = [0, res] if "pore" in data else []
             else:
-                print("The area of \""+key+"\" needs to be specified")
+                print('The area of "' + key + '" needs to be specified')
                 return
         else:
             area = section
 
         # Calculate diffusion in area
         if area:
-            diff = diffusion.mc_fit(link, section=area, is_print=False, is_plot=False, len_step=len_step)
-            diff_dict[key] = {"Area (nm)": area, "Diffusion (10^-9 m^2s^-1)": diff[0], "Residual (10^-9 m2s^-1)": diff[3]}
+            diff = diffusion.mc_fit(
+                link, section=area, is_print=False, is_plot=False, len_step=len_step
+            )
+            diff_dict[key] = {
+                "Area (nm)": area,
+                "Diffusion (10^-9 m^2s^-1)": diff[0],
+                "Residual (10^-9 m2s^-1)": diff[3],
+            }
 
     # Create pandas table
     df_mc_results = pd.DataFrame.from_dict(diff_dict, orient="index")
 
     # If the table has to print in console and not in a jupyter notebook
     if print_con:
-        print('\nMC Results')
+        print("\nMC Results")
         print(df_mc_results)
 
     return df_mc_results

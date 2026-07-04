@@ -4,12 +4,13 @@
 """Analyse diffusion in a pore."""
 ################################################################################
 
+import itertools
 
-import scipy as sp
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import scipy as sp
 import seaborn as sns
-import matplotlib.pyplot as plt
 
 import poreana.utils as utils
 
@@ -17,7 +18,15 @@ import poreana.utils as utils
 ###################
 # Diffusion - Bin #
 ###################
-def cui(link, pore_id="shape_00", z_dist=0, ax_area=[0.2, 0.8], intent="", is_fit=False, is_plot=True):
+def cui(
+    link,
+    pore_id="shape_00",
+    z_dist=0,
+    ax_area=[0.2, 0.8],
+    intent="",
+    is_fit=False,
+    is_plot=True,
+):
     r"""This function samples and calculates the diffusion coefficient of a
     molecule group in a pore in both axial and radial direction, as described
     in the paper of `Cui <https://doi.org/10.1063/1.1989314>`_.
@@ -100,14 +109,14 @@ def cui(link, pore_id="shape_00", z_dist=0, ax_area=[0.2, 0.8], intent="", is_fi
     len_frame = inp["len_frame"]
     bins = int(inp["bin_num"]) if not z_dist else int(z_dist / sample["data"]["width"])
 
-    z_tot = np.array(sample["data"][pore_id]["z_tot"])   # (bin_num, len_window)
+    z_tot = np.array(sample["data"][pore_id]["z_tot"])  # (bin_num, len_window)
     r_tot = np.array(sample["data"][pore_id]["r_tot"])
     n_tot = np.array(sample["data"][pore_id]["n_tot"])
 
     norm_z = n_tot[:bins].sum(axis=0)
-    msd_z  = z_tot[:bins].sum(axis=0)
+    msd_z = z_tot[:bins].sum(axis=0)
     norm_r = n_tot.sum(axis=0)
-    msd_r  = r_tot.sum(axis=0)
+    msd_r = r_tot.sum(axis=0)
 
     msd_z_n = np.where(norm_z > 0, msd_z / norm_z, 0.0)
     msd_r_n = np.where(norm_r > 0, msd_r / norm_r, 0.0)
@@ -117,12 +126,23 @@ def cui(link, pore_id="shape_00", z_dist=0, ax_area=[0.2, 0.8], intent="", is_fi
 
     # Calculate axial coefficient
     if not intent or intent == "axial":
-        dz = (msd_z_n[int(ax_area[1]*len_window)]-msd_z_n[int(ax_area[0]*len_window)])*1e-9**2/((ax_area[1]-ax_area[0])*t_range)/2*1e2**2*1e5  # 10^-9 m^2s^-1
+        dz = (
+            (
+                msd_z_n[int(ax_area[1] * len_window)]
+                - msd_z_n[int(ax_area[0] * len_window)]
+            )
+            * 1e-9**2
+            / ((ax_area[1] - ax_area[0]) * t_range)
+            / 2
+            * 1e2**2
+            * 1e5
+        )  # 10^-9 m^2s^-1
 
         print(f"Diffusion axial:  {dz:.3f} 10^-9 m^2s^-1")
 
     # Calculate radial coefficient
     if not intent or intent == "radial":
+
         def diff_rad(x, a, b, c):
             # Process input
             x = x if isinstance(x, list) or isinstance(x, np.ndarray) else [x]
@@ -131,34 +151,48 @@ def cui(link, pore_id="shape_00", z_dist=0, ax_area=[0.2, 0.8], intent="", is_fi
             jz = sp.special.jnp_zeros(1, int(np.ceil(b)))
             # Calculate sum using numpy for speed
             z_arr = np.array(jz)
-            coeffs = 8 / (z_arr ** 2 * (z_arr ** 2 - 1))
-            sm = [coeffs * np.exp(-(z_arr / c) ** 2 * a * t) for t in x]
+            coeffs = 8 / (z_arr**2 * (z_arr**2 - 1))
+            sm = [coeffs * np.exp(-((z_arr / c) ** 2) * a * t) for t in x]
             # Final equation
-            return [c ** 2 * (1 - s.sum()) for s in sm]
+            return [c**2 * (1 - s.sum()) for s in sm]
 
         # Fit function
-        popt, pcov = sp.optimize.curve_fit(diff_rad, [x*1e12 for x in time_ax], msd_r_n, p0=[1, 20, float(pore["diam"])/2-0.2], bounds=(0, np.inf))
+        popt, pcov = sp.optimize.curve_fit(
+            diff_rad,
+            [x * 1e12 for x in time_ax],
+            msd_r_n,
+            p0=[1, 20, float(pore["diam"]) / 2 - 0.2],
+            bounds=(0, np.inf),
+        )
 
-        print(f"Diffusion radial: {popt[0]*1e3:.3f} 10^-9 m^2 s^-1; Number of zeros: {int(np.ceil(popt[1])):2d}; Radius: {popt[2]:5.2f}")
+        print(
+            f"Diffusion radial: {popt[0] * 1e3:.3f} 10^-9 m^2 s^-1; Number of zeros: {int(np.ceil(popt[1])):2d}; Radius: {popt[2]:5.2f}"
+        )
 
     # Plot
     if is_plot:
         legend = []
 
     if not intent or intent == "axial":
-        sns.lineplot(x=[x*1e12 for x in time_ax], y=msd_z_n)
+        sns.lineplot(x=[x * 1e12 for x in time_ax], y=msd_z_n)
         if is_plot:
             legend += ["Axial"]
         if is_fit:
-            sns.lineplot(x=[x*1e12 for x in time_ax], y=[dz*2*time_ax[x]/1e5/1e-7**2 for x in range(len_window)])
+            sns.lineplot(
+                x=[x * 1e12 for x in time_ax],
+                y=[dz * 2 * time_ax[x] / 1e5 / 1e-7**2 for x in range(len_window)],
+            )
             legend += ["Fitted Axial"]
 
     if not intent or intent == "radial":
-        sns.lineplot(x=[x*1e12 for x in time_ax], y=msd_r_n)
+        sns.lineplot(x=[x * 1e12 for x in time_ax], y=msd_r_n)
         if is_plot:
             legend += ["Radial"]
         if is_fit:
-            sns.lineplot(x=[x*1e12 for x in time_ax], y=diff_rad([x*1e12 for x in time_ax], *popt))
+            sns.lineplot(
+                x=[x * 1e12 for x in time_ax],
+                y=diff_rad([x * 1e12 for x in time_ax], *popt),
+            )
             legend += ["Fitted Radial"]
 
     if is_plot:
@@ -218,7 +252,7 @@ def bins(link, ax_area=[0.2, 0.8], is_norm=False):
 
     # Load data
     for pore_id in sample["pore"]:
-        if pore_id[:5]=="shape":
+        if pore_id[:5] == "shape":
             inp = sample["inp"]
             width[pore_id] = sample["data"][pore_id]["width"]
             msd_z = sample["data"][pore_id]["z"]
@@ -238,12 +272,12 @@ def bins(link, ax_area=[0.2, 0.8], is_norm=False):
             slope = (msd_norm[:, f_end] - msd_norm[:, f_start]) / dt
 
             # 10^-9 m^2s^-1: nm^2/ps → m^2/s factor = 1e-18/1e-12 = 1e-6; /2 and *1e9 → *0.5e3
-            diff[pore_id] = list(slope * 1e-9 ** 2 / 2 * 1e2 ** 2 * 1e5)
+            diff[pore_id] = list(slope * 1e-9**2 / 2 * 1e2**2 * 1e5)
 
     return {"width": width, "diff": diff, "is_norm": is_norm}
 
 
-def bins_plot(data, pore_id="shape_00" ,intent="plot", kwargs={}):
+def bins_plot(data, pore_id="shape_00", intent="plot", kwargs={}):
     """This function calculates the axial plots the diffusion profile calculated
     by the function :func:`poreana.diffusion.bins`.
 
@@ -266,12 +300,12 @@ def bins_plot(data, pore_id="shape_00" ,intent="plot", kwargs={}):
 
     # Normalize x-axis
     if is_norm:
-        for i in range(len(diff)-1, 0, -1):
+        for i in range(len(diff) - 1, 0, -1):
             if diff[i] > 0:
-                x_max = width[i+1]
+                x_max = width[i + 1]
                 break
 
-        bins_norm = [x/x_max for x in width]
+        bins_norm = [x / x_max for x in width]
 
     # Plot
     if intent == "plot" or intent == "line":
@@ -332,7 +366,7 @@ def mean(diff_data, dens_data, ax_area=[0.2, 0.8], is_print=True):
     """
     diff_weight = {}
     for keys in dens_data["sample"]["data"].keys():
-        if keys[:5]=="shape":
+        if keys[:5] == "shape":
             # Load density
             dens_x = dens_data["sample"]["data"][keys]["in_width"]
             dens_y = dens_data["num_dens"][keys]["in"]
@@ -348,11 +382,14 @@ def mean(diff_data, dens_data, ax_area=[0.2, 0.8], is_print=True):
             diff_int = 0
             for dens_bin, dens_x_val in enumerate(dens_x[:-1]):
                 # only consider effective radius
-                if dens_y[dens_bin]>0:
+                if dens_y[dens_bin] > 0:
                     # Find closest bins in diffusion
-                    diff_bins = [int(np.floor(dens_x_val/diff_w)), int(np.ceil(dens_x_val/diff_w))]
+                    diff_bins = [
+                        int(np.floor(dens_x_val / diff_w)),
+                        int(np.ceil(dens_x_val / diff_w)),
+                    ]
 
-                    if diff_bins[1]>=len(diff_y):
+                    if diff_bins[1] >= len(diff_y):
                         diff_bins[1] = diff_bins[0]
 
                     # Check boundary
@@ -367,16 +404,18 @@ def mean(diff_data, dens_data, ax_area=[0.2, 0.8], is_print=True):
                         diff_y_val = diff_y[diff_bins[0]]
 
                     # Integrate
-                    int_area = (dens_x[dens_bin+1]**2-dens_x[dens_bin]**2)
-                    dens_int += int_area*dens_y[dens_bin]
-                    diff_int += int_area*dens_y[dens_bin]*diff_y_val
+                    int_area = dens_x[dens_bin + 1] ** 2 - dens_x[dens_bin] ** 2
+                    dens_int += int_area * dens_y[dens_bin]
+                    diff_int += int_area * dens_y[dens_bin] * diff_y_val
 
             # Normalize
-            diff_weight[keys] = diff_int/dens_int
+            diff_weight[keys] = diff_int / dens_int
 
             # Output
             if is_print:
-                print(f"Mean Diffusion axial ({keys}): {diff_weight[keys]:.3f} 10^-9 m^2s^-1")
+                print(
+                    f"Mean Diffusion axial ({keys}): {diff_weight[keys]:.3f} 10^-9 m^2s^-1"
+                )
 
     return diff_weight
 
@@ -384,7 +423,9 @@ def mean(diff_data, dens_data, ax_area=[0.2, 0.8], is_print=True):
 ######################################
 # Diffusion - MC - Transition Matrix #
 ######################################
-def mc_trans_mat(link, step, kwargs={}, is_norm=False, is_diagonal=False, is_length=True, limit = 0):
+def mc_trans_mat(
+    link, step, kwargs={}, is_norm=False, is_diagonal=False, is_length=True, limit=0
+):
     """This function plots the occupation of a normalized transition matrix as a
     heatmap. To normalize the transition matrix the number of the frame are used.
     This means that all entries in the transition matrix are divided by the
@@ -429,19 +470,19 @@ def mc_trans_mat(link, step, kwargs={}, is_norm=False, is_diagonal=False, is_len
         bins = model["bins"]
 
     # Calculation of the width of the diagonal occupation of the transition matrix
-    results=[]
+    results = []
 
     # Loop over the rows of the transition matrix
-    for i in range(len(trans_mat[:])-1):
+    for i in range(len(trans_mat[:]) - 1):
         # Right side of the matrix (row)
-        row_right= trans_mat[i][i:]/frame_num
+        row_right = trans_mat[i][i:] / frame_num
         # Left side of the matrix (row)
-        row_left = trans_mat[i][:i]/frame_num
+        row_left = trans_mat[i][:i] / frame_num
         # If a one element is zero call index
-        if np.where(row_right<=limit)[0].size != 0:
-            results.append(np.min(np.where(row_right<=limit)))
-        if np.where(row_left<=limit)[0].size != 0:
-            results.append(i-np.max(np.where(row_left<=limit)))
+        if np.where(row_right <= limit)[0].size != 0:
+            results.append(np.min(np.where(row_right <= limit)))
+        if np.where(row_left <= limit)[0].size != 0:
+            results.append(i - np.max(np.where(row_left <= limit)))
 
     # Get average of index
     idx_avg = np.mean(results)
@@ -449,7 +490,7 @@ def mc_trans_mat(link, step, kwargs={}, is_norm=False, is_diagonal=False, is_len
 
     # Normalized transition matrix with frame number
     if is_norm:
-        trans_mat = trans_mat/frame_num
+        trans_mat = trans_mat / frame_num
 
     # Set diagonal elements of the transition matrix to zero
     if is_diagonal:
@@ -457,14 +498,13 @@ def mc_trans_mat(link, step, kwargs={}, is_norm=False, is_diagonal=False, is_len
 
     # Set x axis from bins to box length
     if is_length:
-        trans_new={}
-        for i in range(len(bins)-1):
-            trans_new[str(round(bins[i],2))] = trans_mat[i]
+        trans_new = {}
+        for i in range(len(bins) - 1):
+            trans_new[str(round(bins[i], 2))] = trans_mat[i]
         trans_mat = pd.DataFrame(trans_new)
 
-
     # Set title with selected lag time
-    plt.title("Lagtime: "+ str(step * frame_length) + " s", fontsize=10)
+    plt.title("Lagtime: " + str(step * frame_length) + " s", fontsize=10)
 
     # Plot the normalized transition matrix in a heatmap
     sns.heatmap(data=trans_mat, **kwargs)
@@ -475,7 +515,16 @@ def mc_trans_mat(link, step, kwargs={}, is_norm=False, is_diagonal=False, is_len
 ##################
 # Diffusion - MC #
 ##################
-def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=True, kwargs_scatter={}, kwargs_line={}):
+def mc_fit(
+    link,
+    len_step=[],
+    section=[],
+    is_std=False,
+    is_print=True,
+    is_plot=True,
+    kwargs_scatter={},
+    kwargs_line={},
+):
     r"""This function uses the diffusion profiles over box length which are
     calculated in the function :func:`poreana.mc.MC.run` to estimate
     the final diffusion coefficient. For that a line is fitted of the averaged
@@ -547,7 +596,7 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
 
     results = data["output"]
     diff_bin = results["diff_profile"]
-    #diff_fluc_bin = results["fluc_diff_bin"]
+    # diff_fluc_bin = results["fluc_diff_bin"]
     model = data["model"]
     bins = model["bins"]
     dt = model["len_frame"]
@@ -565,19 +614,18 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
 
     # Set vector
     diff_bin_vec = {}
-    diff_fluc_bin_vec = {}
 
     # Pore
-    if isinstance(section, str) and section== "pore":
+    if isinstance(section, str) and section == "pore":
         # If only the pore area should be considered
         if "pore" in data:
             # Set section
-            area = [res, box[2]-res]
+            area = [res, box[2] - res]
 
         # If only the pore area should be considered
         else:
             print("obj.-file includes results of a simple box")
-            return;
+            return
 
     # Reservoir
     elif isinstance(section, str) and section == "reservoir":
@@ -585,22 +633,22 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
         # Load pore system
         if "pore" in data:
             # Set section
-            area = [0,res]
+            area = [0, res]
 
         # If only the pore area should be considered
         else:
             print("obj.-file includes results of a simple box")
-            return;
+            return
 
     elif isinstance(section, str) and section not in ["reservoir", "pore"]:
         print("Wrong input for section! Check documentation for available options")
-        return;
+        return
 
-    elif isinstance(section, list) and len(section)>=3:
+    elif isinstance(section, list) and len(section) >= 3:
         print("Wrong input for section! Check documentation for available options")
-        return;
+        return
 
-    #Area section
+    # Area section
     elif isinstance(section, list):
         area = section
 
@@ -614,11 +662,10 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
     index_start = np.digitize(area[0], bins)
     index_end = np.digitize(area[1], bins)
 
-
     for i in len_step:
         diff_bin_vec[i] = [diff_bin[i][j] for j in range(index_start, index_end)]
-        #diff_fluc_bin_vec[i] = [diff_fluc_bin[i][j] for j in range(index_start, index_end)]
-        
+        # diff_fluc_bin_vec[i] = [diff_fluc_bin[i][j] for j in range(index_start, index_end)]
+
     # Calculate mean diffusion coefficient and standard deviation
     # Mean diffusion - average of all possible fourth tuple fitting results
     if is_std:
@@ -632,12 +679,22 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
 
         # Fit to infinity lag time for all combinations
         for i in range(len(a)):
-
             # Set the current tuple
             rand = list(a[i])
 
             # Calculate the mean diffusion (m^2/s) over all bins
-            D_mean = [np.mean(np.exp([diff_bin_vec[i][j] + diff_unit for j in range(len(diff_bin_vec[i]))])) * 10**3 for i in rand]
+            D_mean = [
+                np.mean(
+                    np.exp(
+                        [
+                            diff_bin_vec[i][j] + diff_unit
+                            for j in range(len(diff_bin_vec[i]))
+                        ]
+                    )
+                )
+                * 10**3
+                for i in rand
+            ]
 
             # Calculate the inverse lag time for the linear fit
             lagtime_inverse = [1 / (i * dt * 10**-12) for i in rand]
@@ -655,10 +712,17 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
         diffusion_mean = None
 
     # Calculate the mean diffusion (m^2/s) over all bins
-    D_mean = [np.mean(np.exp([diff_bin_vec[i][j] + diff_unit for j in range(len(diff_bin_vec[i]))])) * 10**3 for i in len_step]
-    #diff_profiles_error_up = [np.mean(np.exp([diff_bin_vec[i][j] + diff_fluc_bin_vec[i][j] + diff_unit for j in range(len(diff_bin_vec[i]))])) * 10 ** 3  for i in len_step]
-    
-    
+    D_mean = [
+        np.mean(
+            np.exp(
+                [diff_bin_vec[i][j] + diff_unit for j in range(len(diff_bin_vec[i]))]
+            )
+        )
+        * 10**3
+        for i in len_step
+    ]
+    # diff_profiles_error_up = [np.mean(np.exp([diff_bin_vec[i][j] + diff_fluc_bin_vec[i][j] + diff_unit for j in range(len(diff_bin_vec[i]))])) * 10 ** 3  for i in len_step]
+
     # Calculate the inverse lag time (1/s) for the linear fit
     lagtime_inverse = [1 / (s * dt * 10**-12) for s in len_step]
 
@@ -671,45 +735,62 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
             print(f"\nDiffusion axial: {fit.intercept * 10**-9:.4e} m^2/s\n")
 
             # Print resudial for fitting
-            print(f"Error of Intercept: {float(fit.intercept_stderr) * 10**-9:.4e} m^2/s\n")
+            print(
+                f"Error of Intercept: {float(fit.intercept_stderr) * 10**-9:.4e} m^2/s\n"
+            )
 
             # If is_std true print the results of the calculations
             if is_std:
                 print(f"Mean Diffusion axial: {diffusion_mean * 10**-9:.4e} m^2/s\n")
 
         # Print the diffusion coefficient in the pore area
-        if section=="pore":
+        if section == "pore":
             print(f"\nDiffusion axial (Pore): {fit.intercept * 10**-9:.4e} m^2/s\n")
 
-
             # Print resudial for fitting
-            print(f"Error of Intercept: {float(fit.intercept_stderr) * 10**-9:.4e} m^2/s\n")
+            print(
+                f"Error of Intercept: {float(fit.intercept_stderr) * 10**-9:.4e} m^2/s\n"
+            )
 
             # If is_std true print the results of the calculations
             if is_std:
-                print(f"Mean Diffusion axial (Pore): {diffusion_mean * 10**-9:.4e} m^2/s\n")
+                print(
+                    f"Mean Diffusion axial (Pore): {diffusion_mean * 10**-9:.4e} m^2/s\n"
+                )
 
         # Print the diffusion coefficient in the reservoir area
-        if section=="reservoir":
-            print(f"\nDiffusion axial (Reservoir): {fit.intercept * 10**-9:.4e} m^2/s\n")
+        if section == "reservoir":
+            print(
+                f"\nDiffusion axial (Reservoir): {fit.intercept * 10**-9:.4e} m^2/s\n"
+            )
 
             # Print resudial for fitting
-            print(f"Error of Intercept: {float(fit.intercept_stderr) * 10**-9:.4e} m^2/s\n")
+            print(
+                f"Error of Intercept: {float(fit.intercept_stderr) * 10**-9:.4e} m^2/s\n"
+            )
 
             # If is_std true print the results of the calculations
             if is_std:
-                print(f"Mean Diffusion axial (Reservoir): {diffusion_mean * 10**-9:.4e} m^2/s\n")
+                print(
+                    f"Mean Diffusion axial (Reservoir): {diffusion_mean * 10**-9:.4e} m^2/s\n"
+                )
 
         # Print the diffusion coefficient in a selected section
-        if (isinstance(section, list)) and len(section)==2:
-            print(f"\nDiffusion axial ([{area[0]:.2f}, {area[1]:.2f}]): {fit.intercept * 10**-9:.4e} m^2/s\n")
+        if (isinstance(section, list)) and len(section) == 2:
+            print(
+                f"\nDiffusion axial ([{area[0]:.2f}, {area[1]:.2f}]): {fit.intercept * 10**-9:.4e} m^2/s\n"
+            )
 
             # Print resudial for fitting
-            print(f"Error of Intercept: {float(fit.intercept_stderr) * 10**-9:.4e} m^2/s\n")
+            print(
+                f"Error of Intercept: {float(fit.intercept_stderr) * 10**-9:.4e} m^2/s\n"
+            )
 
             # If is_std true print the results of the calculations
             if is_std:
-                print(f"Mean Diffusion axial ([{area[0]:.2f}, {area[1]:.2f}]): {diffusion_mean * 10**-9:.4e} m^2/s\n")
+                print(
+                    f"Mean Diffusion axial ([{area[0]:.2f}, {area[1]:.2f}]): {diffusion_mean * 10**-9:.4e} m^2/s\n"
+                )
 
         # Print std deviation
         if is_std:
@@ -717,15 +798,21 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
 
     # Set data frame for the used lag times
     data = [f"{x:.2f}" for x in D_mean]
-    diff_table = pd.DataFrame(data, index=list(len_step), columns=list([r'$D_\mathrm{mean} \ (10^{-9} \mathrm{m^2s^{-1}})$']))
-    diff_table = pd.DataFrame(diff_table.rename_axis('Step Length', axis=1))
-    styler = diff_table.style.set_caption('Selected step length')
-    diff_table = styler.set_properties(**{'text-align': 'right'})
-    diff_table = diff_table.set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
+    diff_table = pd.DataFrame(
+        data,
+        index=list(len_step),
+        columns=list([r"$D_\mathrm{mean} \ (10^{-9} \mathrm{m^2s^{-1}})$"]),
+    )
+    diff_table = pd.DataFrame(diff_table.rename_axis("Step Length", axis=1))
+    styler = diff_table.style.set_caption("Selected step length")
+    diff_table = styler.set_properties(**{"text-align": "right"})
+    diff_table = diff_table.set_table_styles(
+        [dict(selector="th", props=[("text-align", "left")])]
+    )
 
     # Set vectors for plotting
     D_mean_vec = list(D_mean)
-    lag_time_vec = [1 / (s * dt * 10**(-12)) for s in len_step]
+    lag_time_vec = [1 / (s * dt * 10 ** (-12)) for s in len_step]
     x_vec = np.arange(0, max(lag_time_vec) * 2, (max(lag_time_vec) * 2) / 5)
     # Fit a linear line and calculated diffusion coefficent
     fit = sp.stats.linregress(lagtime_inverse, D_mean)
@@ -733,11 +820,11 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
 
     if is_plot:
         # Plot the results
-        plt.xlim(0, 1.5*max(lag_time_vec))
-        plt.ylim(0, 1.5*max(fit.intercept + fit.slope*x_vec))
+        plt.xlim(0, 1.5 * max(lag_time_vec))
+        plt.ylim(0, 1.5 * max(fit.intercept + fit.slope * x_vec))
         sns.scatterplot(x=lag_time_vec, y=D_mean_vec, **kwargs_scatter)
-        #plt.errorbar(x=lag_time_vec, y=D_mean_vec, yerr=[D_mean_vec[i]-diff_profiles_error_up[i] for i in range(len(D_mean_vec))], fmt="o", **kwargs_scatter)
-        sns.lineplot(x=x_vec, y=(fit.intercept + fit.slope*x_vec), **kwargs_line)
+        # plt.errorbar(x=lag_time_vec, y=D_mean_vec, yerr=[D_mean_vec[i]-diff_profiles_error_up[i] for i in range(len(D_mean_vec))], fmt="o", **kwargs_scatter)
+        sns.lineplot(x=x_vec, y=(fit.intercept + fit.slope * x_vec), **kwargs_line)
         legend = [r"$D_{\mathrm{fit}}$", r"$D_{\mathrm{mean}}(\Delta t_{\alpha})$"]
         plt.legend(legend)
         plt.xlabel(r"Inverse lag time ($10^{12} \ \mathrm{s^{-1}})$")
@@ -746,7 +833,15 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
     return diffusion, diffusion_mean, diff_table, float(fit.intercept_stderr)
 
 
-def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True, is_error=True, kwargs={}):
+def mc_profile(
+    link,
+    len_step=[],
+    section=[],
+    infty_profile=True,
+    is_plot=True,
+    is_error=True,
+    kwargs={},
+):
     r"""This function plots the diffusion profile for an infinity
     lag time (:math:`\\Delta t_{\\alpha} \\rightarrow \\infty`) over the box
     fitted with the specified :math:`\\mathrm{len}\_\\mathrm{step}` list.
@@ -780,7 +875,7 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
     is_plot : bool, optional
         Show diffusion profile
     is_error : bool, optional
-        Show error area 
+        Show error area
     kwargs: dict, optional
         Dictionary with plotting parameters
 
@@ -821,49 +916,44 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
     # Set dictionaries
     legend = []
     diff_bin_vec = {}
-    diff_fluc_bin_vec = {}
     diff_profile_fit = []
-    diff_fluc_profile_fit_up = []         
-    diff_fluc_profile_fit_down = []   
     diff_error_bin = []
 
-
     # Pore
-    if isinstance(section, str) and section== "pore":
+    if isinstance(section, str) and section == "pore":
         # If only the pore area should be considered
         # Load pore system
         if "pore" in data:
             # Set section
-            area = [res, box[2]-res-2*(bins[1]-bins[0])]
-
+            area = [res, box[2] - res - 2 * (bins[1] - bins[0])]
 
         # If only the pore area should be considered
         else:
             print("obj.-file includes results of a simple box")
-            return;
+            return
 
     # Reservoir
-    elif isinstance(section, str) and section== "reservoir":
+    elif isinstance(section, str) and section == "reservoir":
         # If only the pore area should be considered
         # Load pore system
         if "pore" in data:
             # Set section
-            area = [0,res]
+            area = [0, res]
 
         # If only the pore area should be considered
         else:
             print("obj.-file includes results of a simple box")
-            return;
+            return
 
     elif isinstance(section, str) and section not in ["reservoir", "pore"]:
         print("Wrong input for section! Check documentation for available options")
-        return;
+        return
 
-    elif isinstance(section, list) and len(section)>=3:
+    elif isinstance(section, list) and len(section) >= 3:
         print("Wrong input for section! Check documentation for available options")
-        return;
+        return
 
-    #Area section
+    # Area section
     elif isinstance(section, list):
         area = section
 
@@ -880,11 +970,10 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
     # Save for all lag times the cutted profile
     for i in len_step:
         diff_bin_vec[i] = [diff_bin[i][j] for j in range(index_start, index_end)]
-        #diff_fluc_bin_vec[i] = [diff_fluc_bin[i][j] for j in range(index_start, index_end)]
+        # diff_fluc_bin_vec[i] = [diff_fluc_bin[i][j] for j in range(index_start, index_end)]
 
     # Set bin list
     bins = [bins[i] for i in range(index_start, index_end)]
-
 
     # Calculate the inverse lag time (1/s) for the linear fit
     lagtime_inverse = [1 / (s * dt * 10**-12) for s in len_step]
@@ -895,19 +984,25 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
     diff_profiles_error_down = {}
 
     for i in len_step:
-        diff_profiles[i] = [np.exp(diff_bin_vec[i][j] + diff_unit) * 10 ** 3 for j in range(len(bins))]
-        #diff_profiles_error_up[i] = [np.exp((diff_bin_vec[i][j] + diff_fluc_bin_vec[i][j] + diff_unit))* 10 ** 3 for j in range(len(bins))]
-        #diff_profiles_error_down[i] = [np.exp((diff_bin_vec[i][j] - diff_fluc_bin_vec[i][j] + diff_unit))* 10 ** 3 for j in range(len(bins))]
- 
+        diff_profiles[i] = [
+            np.exp(diff_bin_vec[i][j] + diff_unit) * 10**3 for j in range(len(bins))
+        ]
+        # diff_profiles_error_up[i] = [np.exp((diff_bin_vec[i][j] + diff_fluc_bin_vec[i][j] + diff_unit))* 10 ** 3 for j in range(len(bins))]
+        # diff_profiles_error_down[i] = [np.exp((diff_bin_vec[i][j] - diff_fluc_bin_vec[i][j] + diff_unit))* 10 ** 3 for j in range(len(bins))]
+
     # If infty_profile is false the profiles for the different lag times are plotted
     if not infty_profile:
         # Plot the profiles for the
         if is_plot:
             for i in len_step:
-                plt.plot(bins, (diff_profiles[i]),**kwargs)       # Diffusion in m^2/s
+                plt.plot(bins, (diff_profiles[i]), **kwargs)  # Diffusion in m^2/s
                 if is_error:
-                    plt.fill_between(bins, diff_profiles_error_down[i], diff_profiles_error_up[i], alpha=0.3)
-
+                    plt.fill_between(
+                        bins,
+                        diff_profiles_error_down[i],
+                        diff_profiles_error_up[i],
+                        alpha=0.3,
+                    )
 
         # Plot the diffusion profiles for the different lag times
         legend = [f"$\\Delta t_{{\\alpha}}$ = {s * dt} ps" for s in len_step]
@@ -917,28 +1012,35 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
         # Initialize fit vector
         # Calculate the mean diffusion over all bins
         for i in range(len(bins)):
-            diff = [np.exp(diff_bin_vec[step][i] + diff_unit) * 10 ** 3 for step in len_step]   # Diffusion in m^2/s
-            #fluc_up = [(np.exp(diff_fluc_bin_vec[step][i] + diff_unit) * 10 ** 3) for step in len_step]
-            #fluc_down = [(np.exp(diff_fluc_bin_vec[step][i] + diff_unit) * 10 ** 3) for step in len_step]
+            diff = [
+                np.exp(diff_bin_vec[step][i] + diff_unit) * 10**3 for step in len_step
+            ]  # Diffusion in m^2/s
+            # fluc_up = [(np.exp(diff_fluc_bin_vec[step][i] + diff_unit) * 10 ** 3) for step in len_step]
+            # fluc_down = [(np.exp(diff_fluc_bin_vec[step][i] + diff_unit) * 10 ** 3) for step in len_step]
 
             # fit a linear line
             fit = sp.stats.linregress(lagtime_inverse, diff)
 
             # Append diffusion at t-> infty
             diff_profile_fit.append(fit.intercept)
-            #diff_fluc_profile_fit_up.append(np.mean(fluc_up))
-            #diff_fluc_profile_fit_down.append(np.mean(fluc_down))
+            # diff_fluc_profile_fit_up.append(np.mean(fluc_up))
+            # diff_fluc_profile_fit_down.append(np.mean(fluc_down))
             diff_error_bin.append(fit.intercept_stderr)
-
 
         # Plot fitted diffusion profile
         if is_plot:
-            sns.lineplot(x=bins, y=diff_profile_fit, **kwargs)   # m^2/s
+            sns.lineplot(x=bins, y=diff_profile_fit, **kwargs)  # m^2/s
             if is_error:
                 if "label" in kwargs:
                     del kwargs["label"]
-                plt.fill_between(bins, [f - e for f, e in zip(diff_profile_fit, diff_error_bin)], [f + e for f, e in zip(diff_profile_fit, diff_error_bin)], alpha=0.3, **kwargs)
-                
+                plt.fill_between(
+                    bins,
+                    [f - e for f, e in zip(diff_profile_fit, diff_error_bin)],
+                    [f + e for f, e in zip(diff_profile_fit, diff_error_bin)],
+                    alpha=0.3,
+                    **kwargs,
+                )
+
     # Set legend for lag times
     if is_plot:
         if not infty_profile and len(len_step) >= 2:
@@ -949,10 +1051,9 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
         # Plot axis title for a entire system
         plt.ylabel(r"Diff. coeff. ($10^{-9} \ \mathrm{m^2s^{-1}}$)")
         plt.xlabel(r"Box length (nm)")
-        plt.xlim([min(bins),max(bins)])
+        plt.xlim([min(bins), max(bins)])
         if legend:
             plt.legend(legend)
-
 
     return diff_profile_fit, diff_profiles, bins
 

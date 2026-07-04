@@ -1,9 +1,10 @@
-import sys
 import copy
-import scipy as sc
+import multiprocessing as mp
+import sys
+
 import numpy as np
 import pandas as pd
-import multiprocessing as mp
+import scipy as sc
 
 import poreana.utils as utils
 
@@ -16,13 +17,29 @@ class MC:
     The MC calculation can be started with :func:`run`.
 
     """
+
     def __init__(self):
         return
 
     ##############
     # MC - Cylce #
     ##############
-    def run(self, model, link_out, nmc_eq=50000, nmc=100000, delta_df=0.05, delta_diff=0.05,  num_mc_update=10, temp=1, n_proc=0, print_freq=100, is_print=False, do_radial=False, is_parallel=True):
+    def run(
+        self,
+        model,
+        link_out,
+        nmc_eq=50000,
+        nmc=100000,
+        delta_df=0.05,
+        delta_diff=0.05,
+        num_mc_update=10,
+        temp=1,
+        n_proc=0,
+        print_freq=100,
+        is_print=False,
+        do_radial=False,
+        is_parallel=True,
+    ):
         r"""This function do the MC Cycle to calculate the diffusion and free
         energy profile over the bins and save the results in an output hdf5
         file. This happens with the adjustment of the coefficient from the model
@@ -90,18 +107,18 @@ class MC:
         """
 
         # Set MC step width
-        self._delta_df = delta_df                            # MC Move width free energy
-        self._delta_diff = delta_diff                        # MC Move width Diffusion
+        self._delta_df = delta_df  # MC Move width free energy
+        self._delta_diff = delta_diff  # MC Move width Diffusion
 
         # Save beginning step width (to initialize it every mc run)
-        self._delta_df_start = delta_df                      # MC Move width free energy
-        self._delta_diff_start = delta_diff                  # MC Move width Diffusion
+        self._delta_df_start = delta_df  # MC Move width free energy
+        self._delta_diff_start = delta_diff  # MC Move width Diffusion
 
         # Set MC options
-        self._nmc = nmc + 1                                  # Number of MC steps
-        self._nmc_eq = nmc_eq                                # Number of MC steps
-        self._num_mc_update = num_mc_update                  # MC steps before update delta
-        self._temp = temp                                    # Temperature for acceptance criterion
+        self._nmc = nmc + 1  # Number of MC steps
+        self._nmc_eq = nmc_eq  # Number of MC steps
+        self._num_mc_update = num_mc_update  # MC steps before update delta
+        self._temp = temp  # Temperature for acceptance criterion
 
         # Set output/print options
         # Bool (If False nothing will be printed in the konsole)
@@ -110,13 +127,33 @@ class MC:
         # print frequency for MC steps (default every 100 steps)
         self._print_freq = print_freq
 
-
         # Set dictionary for model and input informations
         # Set inp data MC algorithm
-        inp = {"MC steps": self._nmc, "MC steps eq": self._nmc_eq, "step width update": self._num_mc_update,  "temperature": self._temp, "print freq": self._print_freq}
+        inp = {
+            "MC steps": self._nmc,
+            "MC steps eq": self._nmc_eq,
+            "step width update": self._num_mc_update,
+            "temperature": self._temp,
+            "print freq": self._print_freq,
+        }
 
         # Set inp data for model
-        model_inp = {"bin number": model._bin_num, "bins": model._bins[:-1], "diffusion unit": model._diff_unit, "len_frame": model._dt, "len_step": model._len_step, "model": model._model, "nD": model._n_diff, "nF": model._n_df, "nDrad": model._n_diff_radial, "guess": model._d0, "pbc": model._pbc, "num_frame": model._frame_num, "data": model._trans_mat, "direction": model._direction}
+        model_inp = {
+            "bin number": model._bin_num,
+            "bins": model._bins[:-1],
+            "diffusion unit": model._diff_unit,
+            "len_frame": model._dt,
+            "len_step": model._len_step,
+            "model": model._model,
+            "nD": model._n_diff,
+            "nF": model._n_df,
+            "nDrad": model._n_diff_radial,
+            "guess": model._d0,
+            "pbc": model._pbc,
+            "num_frame": model._frame_num,
+            "data": model._trans_mat,
+            "direction": model._direction,
+        }
 
         # Print that MC Calculation starts
         if not self._print_output:
@@ -124,22 +161,38 @@ class MC:
             print("...")
         else:
             print("\n")
-            print("--------------------------------------------------------------------------------")
-            print("--------------------------------MC Starts---------------------------------------")
-            print("--------------------------------------------------------------------------------\n")
+            print(
+                "--------------------------------------------------------------------------------"
+            )
+            print(
+                "--------------------------------MC Starts---------------------------------------"
+            )
+            print(
+                "--------------------------------------------------------------------------------\n"
+            )
             print("MC Inputs")
 
             # Table for MC Inputs (set data structure)
             data = [self._nmc_eq, self._nmc, self._num_mc_update, self._print_freq]
-            df_input = pd.DataFrame(data, index=list(['MC step (Equilibrium)', 'MC step (Production)', 'movewidth update', 'print frequency']), columns=list(['Input']))
+            df_input = pd.DataFrame(
+                data,
+                index=list(
+                    [
+                        "MC step (Equilibrium)",
+                        "MC step (Production)",
+                        "movewidth update",
+                        "print frequency",
+                    ]
+                ),
+                columns=list(["Input"]),
+            )
 
             # Table for MC Inputs (set data structure) (Save for radial)
-            #data = [self._nmc_eq, self._nmc, self._nmc_eq_radial, self._nmc_radial, self._num_mc_update, self._print_freq]
-            #df_input = pd.DataFrame(data, index=list(['MC step (Equilibrium)', 'MC step (Production)', 'MC step radial (Equilibrium)', 'MC step radial (Production)', 'movewidth update', 'print frequency']), columns=list(['Input']))
+            # data = [self._nmc_eq, self._nmc, self._nmc_eq_radial, self._nmc_radial, self._num_mc_update, self._print_freq]
+            # df_input = pd.DataFrame(data, index=list(['MC step (Equilibrium)', 'MC step (Production)', 'MC step radial (Equilibrium)', 'MC step radial (Production)', 'movewidth update', 'print frequency']), columns=list(['Input']))
 
             # Table for MC Inputs
             print(df_input)
-
 
         # Get number of cores
         n_proc = n_proc if n_proc and n_proc <= mp.cpu_count() else mp.cpu_count()
@@ -151,7 +204,10 @@ class MC:
         if is_parallel:
             _ctx = mp.get_context("fork") if sys.platform != "win32" else mp
             pool = _ctx.Pool(processes=n_proc)
-            results = [pool.apply_async(self._run_helper, args=(model,list(step), do_radial)) for step in len_step_cpu]
+            results = [
+                pool.apply_async(self._run_helper, args=(model, list(step), do_radial))
+                for step in len_step_cpu
+            ]
             pool.close()
             pool.join()
             output_para = [x.get() for x in results]
@@ -161,7 +217,7 @@ class MC:
 
             # Concatenate output
             output = output_para[0]
-            for out,len_step in zip(output_para[1:],len_step_cpu[1:]):
+            for out, len_step in zip(output_para[1:], len_step_cpu[1:]):
                 for step in len_step:
                     output["diff_profile"][step] = out["diff_profile"][step]
                     output["df_profile"][step] = out["df_profile"][step]
@@ -176,28 +232,73 @@ class MC:
         else:
             output = self._run_helper(model, model._len_step, do_radial)
 
-
         # Print MC statistics
         if self._print_output:
-            print("--------------------------------------------------------------------------------")
-            print("--------------------------------MC Statistics-----------------------------------")
-            print("--------------------------------------------------------------------------------\n")
+            print(
+                "--------------------------------------------------------------------------------"
+            )
+            print(
+                "--------------------------------MC Statistics-----------------------------------"
+            )
+            print(
+                "--------------------------------------------------------------------------------\n"
+            )
 
             # Set data structure fpr pandas table
-            data = [[str("%.4e" % output["fluc_df"][i]) for i in model._len_step], [str("%.4e" % output["fluc_diff"][i]) for i in model._len_step], [str("%.0f" % output["nacc_df"][i]) for i in model._len_step], [str("%.0f" % output["nacc_diff"][i]) for i in model._len_step], [str("%.2f" % (output["nacc_df"][i]*100/(self._nmc_eq+self._nmc))) for i in model._len_step], [str("%.2f" % (output["nacc_diff"][i]*100/(self._nmc_eq+self._nmc))) for i in model._len_step]]
+            data = [
+                [str("%.4e" % output["fluc_df"][i]) for i in model._len_step],
+                [str("%.4e" % output["fluc_diff"][i]) for i in model._len_step],
+                [str("%.0f" % output["nacc_df"][i]) for i in model._len_step],
+                [str("%.0f" % output["nacc_diff"][i]) for i in model._len_step],
+                [
+                    str(
+                        "%.2f"
+                        % (output["nacc_df"][i] * 100 / (self._nmc_eq + self._nmc))
+                    )
+                    for i in model._len_step
+                ],
+                [
+                    str(
+                        "%.2f"
+                        % (output["nacc_diff"][i] * 100 / (self._nmc_eq + self._nmc))
+                    )
+                    for i in model._len_step
+                ],
+            ]
 
             # Set options for pandas table
-            df = pd.DataFrame(data, index=list(['fluctuation df', 'fluctuation diff', 'acc df steps', 'acc diff steps', 'acc df steps (%)', 'acc diff steps (%)']), columns=list(model._len_step))
-            df = pd.DataFrame(df.rename_axis('Step Length', axis=1))
+            df = pd.DataFrame(
+                data,
+                index=list(
+                    [
+                        "fluctuation df",
+                        "fluctuation diff",
+                        "acc df steps",
+                        "acc diff steps",
+                        "acc df steps (%)",
+                        "acc diff steps (%)",
+                    ]
+                ),
+                columns=list(model._len_step),
+            )
+            df = pd.DataFrame(df.rename_axis("Step Length", axis=1))
 
             # Print pandas table for the MC statistics
             print(df)
-            print("--------------------------------------------------------------------------------\n\n")
+            print(
+                "--------------------------------------------------------------------------------\n\n"
+            )
 
         # Print MC Calculation is done
         print("MC Calculation Done.")
 
-        results = {"inp": inp, "model": model_inp, model._system: model._sys_props, "output": output, "type": "mc"}
+        results = {
+            "inp": inp,
+            "model": model_inp,
+            model._system: model._sys_props,
+            "output": output,
+            "type": "mc",
+        }
         utils.save(results, link_out)
 
         return
@@ -245,8 +346,7 @@ class MC:
             lagtime_string = "Lagtime: " + str(self._len_step * model._dt) + " ps"
             if self._print_output:
                 print("\n")
-                print("# "+lagtime_string+"\n")
-
+                print("# " + lagtime_string + "\n")
 
             # Initialize Model for every MC Run
             model._init_model()
@@ -266,7 +366,7 @@ class MC:
             # Set step width for every MC run on the input values
             self._delta_df = copy.deepcopy(self._delta_df_start)
             self._delta_diff = copy.deepcopy(self._delta_diff_start)
-            #self._delta_diff_radial = copy.deepcopy(self._delta_diff_radial_start)
+            # self._delta_diff_radial = copy.deepcopy(self._delta_diff_radial_start)
 
             # Initialize the fluctuation every MC run
             diff_profile_flk = np.float64(np.zeros(model._bin_num))
@@ -300,46 +400,103 @@ class MC:
 
                 # Calculate the fluctuation and start the production
                 if imc >= self._nmc_eq:
-
                     # Add all profiles
                     diff_profile_flk += copy.deepcopy(model._diff_bin)
                     df_profile_flk += copy.deepcopy(model._df_bin)
 
                     # Calculate the mean profile over all runs
-                    mean_diff_profile_flk = [diff_profile_flk[i] / ((imc-self._nmc_eq)+1) for i in range(model._bin_num)]
-                    mean_df_profile_flk = [df_profile_flk[i] / ((imc-self._nmc_eq)+1) for i in range(model._bin_num)]
+                    mean_diff_profile_flk = [
+                        diff_profile_flk[i] / ((imc - self._nmc_eq) + 1)
+                        for i in range(model._bin_num)
+                    ]
+                    mean_df_profile_flk = [
+                        df_profile_flk[i] / ((imc - self._nmc_eq) + 1)
+                        for i in range(model._bin_num)
+                    ]
 
                     # Calculate the difference between the current profile and the mean of all profiles
-                    delta_diff = np.abs((model._diff_bin) - mean_diff_profile_flk)**2
-                    delta_df = np.abs((model._df_bin) - mean_df_profile_flk)**2
+                    delta_diff = np.abs((model._diff_bin) - mean_diff_profile_flk) ** 2
+                    delta_df = np.abs((model._df_bin) - mean_df_profile_flk) ** 2
 
                     # Determine the fluctuation
-                    self._fluctuation_diff = np.sqrt((self._fluctuation_diff + np.mean(delta_diff))/(imc-self._nmc_eq+1))
-                    self._fluctuation_df = np.sqrt((self._fluctuation_df + np.mean(delta_df))/(imc-self._nmc_eq+1))
+                    self._fluctuation_diff = np.sqrt(
+                        (self._fluctuation_diff + np.mean(delta_diff))
+                        / (imc - self._nmc_eq + 1)
+                    )
+                    self._fluctuation_df = np.sqrt(
+                        (self._fluctuation_df + np.mean(delta_df))
+                        / (imc - self._nmc_eq + 1)
+                    )
 
-
-                    self._fluctuation_diff_bin = [np.sqrt((self._fluctuation_diff_bin[i] + delta_diff[i])/(imc-self._nmc_eq+1)) for i in range(model._bin_num)]
-                    self._fluctuation_df_bin = [np.sqrt((self._fluctuation_df_bin[i] + delta_df[i])/(imc-self._nmc_eq+1)) for i in range(model._bin_num)]
+                    self._fluctuation_diff_bin = [
+                        np.sqrt(
+                            (self._fluctuation_diff_bin[i] + delta_diff[i])
+                            / (imc - self._nmc_eq + 1)
+                        )
+                        for i in range(model._bin_num)
+                    ]
+                    self._fluctuation_df_bin = [
+                        np.sqrt(
+                            (self._fluctuation_df_bin[i] + delta_df[i])
+                            / (imc - self._nmc_eq + 1)
+                        )
+                        for i in range(model._bin_num)
+                    ]
 
                     # Start to print the output after the Equilibrium phase and if _print_output is true
                     if imc == self._nmc_eq and self._print_output:
                         print("### Start production\n")
-                        print("--------------------------------------------------------------------------------")
-                        print("imc | accepted_df(%) | accepted_diff(%) | fluktuation_df | fluktuation_diff    |" )
-                        print("--------------------------------------------------------------------------------")
-                    if (imc % self._print_freq == 0) and imc > self._nmc_eq and self._print_output:
-                        sys.stdout.write(str(imc)+" "+ str("%.2f"%(self._nacc_df*100/(imc+1))) +" "+ str("%.2f"%(self._nacc_diff*100/(imc+1)))+" "+str("%.2e"%self._fluctuation_df) +" "+ str("%.2e"%self._fluctuation_diff) +"\r")
+                        print(
+                            "--------------------------------------------------------------------------------"
+                        )
+                        print(
+                            "imc | accepted_df(%) | accepted_diff(%) | fluktuation_df | fluktuation_diff    |"
+                        )
+                        print(
+                            "--------------------------------------------------------------------------------"
+                        )
+                    if (
+                        (imc % self._print_freq == 0)
+                        and imc > self._nmc_eq
+                        and self._print_output
+                    ):
+                        sys.stdout.write(
+                            str(imc)
+                            + " "
+                            + str("%.2f" % (self._nacc_df * 100 / (imc + 1)))
+                            + " "
+                            + str("%.2f" % (self._nacc_diff * 100 / (imc + 1)))
+                            + " "
+                            + str("%.2e" % self._fluctuation_df)
+                            + " "
+                            + str("%.2e" % self._fluctuation_diff)
+                            + "\r"
+                        )
                         sys.stdout.flush()
-                        if imc%2000==0:
-                            print(str(imc)+" "+ str("%.2f"%(self._nacc_df*100/(imc+1))) +" "+ str("%.2f"%(self._nacc_diff*100/(imc+1)))+" "+str("%.2e"%self._fluctuation_df) +" "+ str("%.2e"%self._fluctuation_diff))
+                        if imc % 2000 == 0:
+                            print(
+                                str(imc)
+                                + " "
+                                + str("%.2f" % (self._nacc_df * 100 / (imc + 1)))
+                                + " "
+                                + str("%.2f" % (self._nacc_diff * 100 / (imc + 1)))
+                                + " "
+                                + str("%.2e" % self._fluctuation_df)
+                                + " "
+                                + str("%.2e" % self._fluctuation_diff)
+                            )
 
             if self._print_output:
-                print("--------------------------------------------------------------------------------\n\n")
+                print(
+                    "--------------------------------------------------------------------------------\n\n"
+                )
 
             # Save the profiles over the bins for the current lag time in a list
             # copy.deepcopy(model._diff_bin) #mean_diff_profile_flk
             list_diff_profile[self._len_step] = mean_diff_profile_flk
-            list_df_profile[self._len_step] = mean_df_profile_flk  # copy.deepcopy(model._df_bin)
+            list_df_profile[self._len_step] = (
+                mean_df_profile_flk  # copy.deepcopy(model._df_bin)
+            )
 
             # Save the coefficients of the model for the current lag time in a list
             list_diff_coeff[self._len_step] = model._diff_coeff
@@ -352,32 +509,47 @@ class MC:
             # Mean over all lag times calculations
             nacc_df_mean[self._len_step] = copy.deepcopy(self._nacc_df)
             nacc_diff_mean[self._len_step] = copy.deepcopy(self._nacc_diff)
-            
+
             diff_fluc_per_bin[self._len_step] = self._fluctuation_diff_bin
             df_fluc_per_bin[self._len_step] = self._fluctuation_df_bin
 
             # If no radial diffusion is calculated set the initialize condition on the result lists
             if not do_radial:
                 # Save results for the current lag time
-                list_diff_radial_profile[self._len_step] = np.float64(np.zeros(model._bin_num))
-                list_diff_radial_coeff[self._len_step] = np.float64(np.zeros(model._n_df))
+                list_diff_radial_profile[self._len_step] = np.float64(
+                    np.zeros(model._bin_num)
+                )
+                list_diff_radial_coeff[self._len_step] = np.float64(
+                    np.zeros(model._n_df)
+                )
                 list_diff_radial_fluc[self._len_step] = 0
 
                 # Mean over all lag times calculations
                 nacc_diff_radial_mean[self._len_step] = 0
 
-
         # Set output data
-        output = {"diff_profile": list_diff_profile, "df_profile": list_df_profile, "diff_coeff": list_diff_coeff, "df_coeff": list_df_coeff, "nacc_df": nacc_df_mean, "nacc_diff": nacc_diff_mean, "fluc_df": list_df_fluc, "fluc_diff": list_diff_fluc, "fluc_diff_bin": diff_fluc_per_bin, "fluc_df_bin": df_fluc_per_bin, "list_diff_coeff": list_diff_coeff, "list_df_coeff": list_df_coeff}
+        output = {
+            "diff_profile": list_diff_profile,
+            "df_profile": list_df_profile,
+            "diff_coeff": list_diff_coeff,
+            "df_coeff": list_df_coeff,
+            "nacc_df": nacc_df_mean,
+            "nacc_diff": nacc_diff_mean,
+            "fluc_df": list_df_fluc,
+            "fluc_diff": list_diff_fluc,
+            "fluc_diff_bin": diff_fluc_per_bin,
+            "fluc_df_bin": df_fluc_per_bin,
+            "list_diff_coeff": list_diff_coeff,
+            "list_df_coeff": list_df_coeff,
+        }
 
         return output
-
 
     ###########################
     # Helper functions for MC #
     ###########################
     def _init_stats(self, model):
-        """ This function sets the MC statistic counters to zero after every MC
+        """This function sets the MC statistic counters to zero after every MC
         run.
 
         Parameters
@@ -387,19 +559,21 @@ class MC:
         """
 
         # Number of accepted moves
-        self._nacc_df = 0          # Free energy
-        self._nacc_diff = 0        # Diffusion
-        self._nacc_diff_radial = 0 # Radial diffsuion
+        self._nacc_df = 0  # Free energy
+        self._nacc_diff = 0  # Diffusion
+        self._nacc_diff_radial = 0  # Radial diffsuion
 
         # Number of accepted moves between adjustments
-        self._nacc_df_update = 0          # Free energy
-        self._nacc_diff_update = 0        # Diffsuion
-        self._nacc_diff_radial_update = 0 # Radial diffsuion
+        self._nacc_df_update = 0  # Free energy
+        self._nacc_diff_update = 0  # Diffsuion
+        self._nacc_diff_radial_update = 0  # Radial diffsuion
 
         # Number accepted for different coefficient update
-        self._nacc_df_coeff = np.zeros(model._n_df, int)                   # Free energy
-        self._nacc_diff_coeff = np.zeros(model._n_diff, int)               # Diffusion
-        self._nacc_diff_radial_coeff = np.zeros(model._n_diff_radial, int) # Radial diffusion
+        self._nacc_df_coeff = np.zeros(model._n_df, int)  # Free energy
+        self._nacc_diff_coeff = np.zeros(model._n_diff, int)  # Diffusion
+        self._nacc_diff_radial_coeff = np.zeros(
+            model._n_diff_radial, int
+        )  # Radial diffusion
 
     def _mcmove_diffusion(self, model):
         r"""This function does the MC move for the diffusion profile and adjust
@@ -457,7 +631,6 @@ class MC:
                 self._nacc_diff_coeff[idx] += 1
                 self._nacc_diff += 1
                 self._nacc_diff_update += 1
-
 
     ############
     # MC Moves #
@@ -536,11 +709,14 @@ class MC:
 
         # If _num_mc_update>0 the move width update is on
         if self._num_mc_update > 0:
-
             # Update the move width
-            if ((imc+1) % self._num_mc_update == 0) and not radial:
-                self._delta_df *= np.exp(0.1 * (float(self._nacc_df_update) / self._num_mc_update - 0.3))
-                self._delta_diff *= np.exp(0.1 * (float(self._nacc_diff_update) / self._num_mc_update - 0.3))
+            if ((imc + 1) % self._num_mc_update == 0) and not radial:
+                self._delta_df *= np.exp(
+                    0.1 * (float(self._nacc_df_update) / self._num_mc_update - 0.3)
+                )
+                self._delta_diff *= np.exp(
+                    0.1 * (float(self._nacc_diff_update) / self._num_mc_update - 0.3)
+                )
 
                 self._nacc_df_update = 0
                 self._nacc_diff_update = 0
@@ -548,7 +724,6 @@ class MC:
             # if ((imc+1) % self._num_mc_update == 0) and radial:
             #     self._delta_diff_radial *= np.exp(0.1 * (float(self._nacc_diff_radial_update) / self._num_mc_update - 0.3))
             #     self._nacc_diff_radial_update = 0
-
 
     ###############
     # Rate matrix #
@@ -617,29 +792,28 @@ class MC:
         rate = np.float64(np.zeros((bin_num, bin_num)))
 
         # Off-diagonal elements
-        delta_df_bin = df_bin[1:]-df_bin[:-1]
-        exp1 = diff_bin[:bin_num-1] - 0.5 * delta_df_bin
-        exp2 = diff_bin[:bin_num-1] + 0.5 * delta_df_bin
-        rate.ravel()[bin_num::bin_num+1] = np.exp(exp1)[:bin_num-1]
-        rate.ravel()[1::bin_num+1] = np.exp(exp2)[:bin_num-1]
+        delta_df_bin = df_bin[1:] - df_bin[:-1]
+        exp1 = diff_bin[: bin_num - 1] - 0.5 * delta_df_bin
+        exp2 = diff_bin[: bin_num - 1] + 0.5 * delta_df_bin
+        rate.ravel()[bin_num :: bin_num + 1] = np.exp(exp1)[: bin_num - 1]
+        rate.ravel()[1 :: bin_num + 1] = np.exp(exp2)[: bin_num - 1]
 
         # Corners and periodic boundary conditions
-        rate[0, -1] = np.exp(diff_bin[-1]-0.5*(df_bin[0]-df_bin[-1]))
-        rate[-1, 0] = np.exp(diff_bin[-1]-0.5*(df_bin[-1]-df_bin[0]))
-        rate[0, 0] = - rate[1, 0] - rate[-1, 0]
-        rate[-1, -1] = - rate[-2, -1] - rate[0, -1]
+        rate[0, -1] = np.exp(diff_bin[-1] - 0.5 * (df_bin[0] - df_bin[-1]))
+        rate[-1, 0] = np.exp(diff_bin[-1] - 0.5 * (df_bin[-1] - df_bin[0]))
+        rate[0, 0] = -rate[1, 0] - rate[-1, 0]
+        rate[-1, -1] = -rate[-2, -1] - rate[0, -1]
 
         # Diagonal elements
-        for i in range(1, bin_num-1):
-            rate[i, i] = - rate[i-1, i] - rate[i+1, i]
+        for i in range(1, bin_num - 1):
+            rate[i, i] = -rate[i - 1, i] - rate[i + 1, i]
 
         return rate
-
 
     ##############
     # Likelihood #
     ##############
-    def _log_likelihood_z(self, model,  temp=None):
+    def _log_likelihood_z(self, model, temp=None):
         r"""This function estimate the likelihood of the current free energy or
         diffusion profile over the bins in a simulation box. It is used to
         calculated the diffusion in z-direction over z-coordinate. This
@@ -672,10 +846,12 @@ class MC:
 
         # Calculate the current rate matrix for a trajectory with periodic boundary condition
         if temp is None:
-            rate = self._init_rate_matrix_pbc(model._bin_num, model._diff_bin, model._df_bin)
+            rate = self._init_rate_matrix_pbc(
+                model._bin_num, model._diff_bin, model._df_bin
+            )
         else:
             if self._choice > 0.5:
-                rate = self._init_rate_matrix_pbc(model._bin_num,  temp, model._df_bin)
+                rate = self._init_rate_matrix_pbc(model._bin_num, temp, model._df_bin)
             else:
                 rate = self._init_rate_matrix_pbc(model._bin_num, model._diff_bin, temp)
 

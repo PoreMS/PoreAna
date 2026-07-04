@@ -4,7 +4,6 @@
 """Here basic geometric functions are noted."""
 ################################################################################
 
-
 import numpy as np
 
 

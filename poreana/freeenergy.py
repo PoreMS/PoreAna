@@ -4,10 +4,10 @@
 """Analyse free energy in a pore."""
 ################################################################################
 
-
-import seaborn as sns
-import poreana.utils as utils
 import matplotlib.pyplot as plt
+import seaborn as sns
+
+import poreana.utils as utils
 
 
 ####################
@@ -57,7 +57,6 @@ def mc_profile(link, len_step=[], is_plot=True, kwargs={}):
     # Set legend
     legend = [f"$\\Delta t_{{\\alpha}}$ = {s * dt} ps" for s in len_step]
 
-
     # Plot the free energy profiles
     if is_plot:
         for i in len_step:
@@ -67,6 +66,6 @@ def mc_profile(link, len_step=[], is_plot=True, kwargs={}):
         plt.xlabel("Box length (nm)")
         plt.ylabel("Free energy (-)")
         plt.legend(legend)
-        plt.xlim([0,max(bins)])
+        plt.xlim([0, max(bins)])
 
     return df_bin, bins
