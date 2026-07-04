@@ -55,7 +55,7 @@ def mc_profile(link, len_step=[], is_plot=True, kwargs={}):
         len_step = model["len_step"]
 
     # Set legend
-    legend = ["$\\Delta t_{\\alpha}$ = " + str(len_step[i] * dt) + " ps" for i in range(len(len_step))]
+    legend = [f"$\\Delta t_{{\\alpha}}$ = {s * dt} ps" for s in len_step]
 
 
     # Plot the free energy profiles

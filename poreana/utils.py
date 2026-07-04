@@ -113,7 +113,7 @@ def save(obj, link):
     ext = link.split(".")[-1]
 
     if ext == "yml":
-        with open(link, "w") as f:
+        with open(link, "w", encoding="utf-8") as f:
             f.write(yaml.dump(_to_python(obj)))
     elif ext == "obj":
         with open(link, "wb") as f:
@@ -141,7 +141,7 @@ def load(link, file_type=""):
     ext = file_type if file_type else link.split(".")[-1]
 
     if ext == "yml":
-        with open(link, "r") as f:
+        with open(link, "r", encoding="utf-8") as f:
             return yaml.load(f, Loader=yaml.SafeLoader)
     elif ext == "obj":
         with open(link, "rb") as f:
@@ -179,7 +179,7 @@ def file_to_text(link, link_output, link_dens=[]):
             pore = data["pore"]
             first_shape = next(k for k in pore if k.startswith("shape"))
             data_system = [
-                [["%.2f" % i for i in pore["box"]["dimensions"]]],
+                [[f"{x:.2f}" for x in pore["box"]["dimensions"]]],
                 [float(pore[first_shape]["diam"])],
                 [float(pore["box"]["res"])],
                 [pore[first_shape]["type"]],
@@ -189,7 +189,7 @@ def file_to_text(link, link_output, link_dens=[]):
                                      columns=["Value"])
         elif "box" in data:
             box = data["box"]["length"]
-            df_system = pd.DataFrame([[["%.2f" % i for i in box]]],
+            df_system = pd.DataFrame([[[f"{x:.2f}" for x in box]]],
                                      index=["Box dimension (nm)"], columns=["Value"])
         df_system = df_system.rename_axis("# Identifier", axis=1)
 
@@ -204,7 +204,7 @@ def file_to_text(link, link_output, link_dens=[]):
         gyr_pd = pd.DataFrame(gyr_in, index=["gyration"])
         gyr_pd = gyr_pd.rename_axis("# Identifier", axis=1)
 
-        with open(link_output, "w") as f:
+        with open(link_output, "w", encoding="utf-8") as f:
             f.write("# This file was created " + datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") + "\n")
             f.write("# Analysis created using PoreAna\n")
             f.write("# Object file : " + os.path.dirname(os.path.abspath(__file__)) + link + "\n\n")
@@ -231,7 +231,7 @@ def file_to_text(link, link_output, link_dens=[]):
             pore = data["pore"]
             first_shape = next(k for k in pore if k.startswith("shape"))
             data_system = [
-                [["%.2f" % i for i in pore["box"]["dimensions"]]],
+                [[f"{x:.2f}" for x in pore["box"]["dimensions"]]],
                 [float(pore[first_shape]["diam"])],
                 [float(pore["box"]["res"])],
                 [pore[first_shape]["type"]],
@@ -254,7 +254,7 @@ def file_to_text(link, link_output, link_dens=[]):
             df_data_dict[f"D ({pid})"] = bins["diff"][pid]
         df_data = pd.DataFrame(df_data_dict)
 
-        with open(link_output, "w") as f:
+        with open(link_output, "w", encoding="utf-8") as f:
             f.write("# This file was created " + datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") + "\n")
             f.write("# Analysis created using PoreAna\n")
             f.write("# Object file : " + os.path.dirname(os.path.abspath(__file__)) + link + "\n")
@@ -265,7 +265,7 @@ def file_to_text(link, link_output, link_dens=[]):
             f.write(df_inputs.to_string())
             f.write("\n\n[Diffusion]\n")
             for pid, val in mean.items():
-                f.write("%.2f " % val + "* 10^-9 m^2s^-1  (" + pid + ")\n")
+                f.write(f"{val:.2f} * 10^-9 m^2s^-1  ({pid})\n")
             f.write("\n\n[Bin Diffusion Profiles]\n")
             f.write(df_data.to_string(index=False))
 
@@ -277,7 +277,7 @@ def file_to_text(link, link_output, link_dens=[]):
             pore = data["pore"]
             first_shape = next(k for k in pore if k.startswith("shape"))
             data_system = [
-                [["%.2f" % i for i in pore["box"]["dimensions"]]],
+                [[f"{x:.2f}" for x in pore["box"]["dimensions"]]],
                 [float(pore[first_shape]["diam"])],
                 [float(pore["box"]["res"])],
                 [pore[first_shape]["type"]],
@@ -286,7 +286,7 @@ def file_to_text(link, link_output, link_dens=[]):
                                      index=["Box dimension (nm)", "Pore diameter (nm)", "reservoir (nm)", "type"],
                                      columns=["Value"])
         elif "box" in data:
-            df_system = pd.DataFrame([[["%.2f" % i for i in data["box"]["length"]]]],
+            df_system = pd.DataFrame([[[f"{x:.2f}" for x in data["box"]["length"]]]],
                                      index=["Box dimension (nm)"], columns=["Value"])
         df_system = df_system.rename_axis("# Identifier", axis=1)
 
@@ -295,7 +295,7 @@ def file_to_text(link, link_output, link_dens=[]):
             [data["inp"]["entry"]],
             [data["inp"]["num_frame"]],
             [bool(data["inp"]["remove_pore_from_res"])],
-            ["%.2f" % data["inp"]["mass"]],
+            [f"{data['inp']['mass']:.2f}"],
         ]
         df_inputs = pd.DataFrame(inp_table,
                                  index=["Bin number", "Entry", "Frame number",
@@ -331,7 +331,7 @@ def file_to_text(link, link_output, link_dens=[]):
             data_dens["Density (In)"] = dens["num_dens"][first_pid]["in"]
         df_data = pd.DataFrame(data_dens)
 
-        with open(link_output, "w") as f:
+        with open(link_output, "w", encoding="utf-8") as f:
             f.write("# This file was created " + datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") + "\n")
             f.write("# Analysis created using PoreAna\n")
             f.write("# Object file : " + os.path.dirname(os.path.abspath(__file__)) + link + "\n\n")
@@ -356,7 +356,7 @@ def file_to_text(link, link_output, link_dens=[]):
             pore = data["pore"]
             first_shape = next(k for k in pore if k.startswith("shape"))
             sys_data = [
-                [["%.2f" % i for i in pore["box"]["dimensions"]]],
+                [[f"{x:.2f}" for x in pore["box"]["dimensions"]]],
                 [float(pore[first_shape]["diam"])],
                 [float(pore["box"]["res"])],
                 [pore[first_shape]["type"]],
@@ -365,7 +365,7 @@ def file_to_text(link, link_output, link_dens=[]):
                                      index=["Box dimension (nm)", "Pore diameter (nm)", "reservoir (nm)", "type"],
                                      columns=["Value"])
         elif "box" in data:
-            df_system = pd.DataFrame([[["%.2f" % i for i in data["box"]["length"]]]],
+            df_system = pd.DataFrame([[[f"{x:.2f}" for x in data["box"]["length"]]]],
                                      index=["Box dimension (nm)"], columns=["Value"])
         df_system = df_system.rename_axis("# Identifier", axis=1)
 
@@ -384,7 +384,7 @@ def file_to_text(link, link_output, link_dens=[]):
         df_model = pa.tables.mc_model(link, print_con=False).rename_axis("# Identifier", axis=1)
         df_results = pa.tables.mc_results(link, print_con=False).rename_axis("# Identifier", axis=1)
 
-        with open(link_output, "w") as f:
+        with open(link_output, "w", encoding="utf-8") as f:
             f.write("# This file was created " + datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") + "\n")
             f.write("# Analysis created using PoreAna\n")
             f.write("# Object file : " + os.path.dirname(os.path.abspath(__file__)) + "/" + link + "\n")

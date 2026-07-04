@@ -119,7 +119,7 @@ def cui(link, pore_id="shape_00", z_dist=0, ax_area=[0.2, 0.8], intent="", is_fi
     if not intent or intent == "axial":
         dz = (msd_z_n[int(ax_area[1]*len_window)]-msd_z_n[int(ax_area[0]*len_window)])*1e-9**2/((ax_area[1]-ax_area[0])*t_range)/2*1e2**2*1e5  # 10^-9 m^2s^-1
 
-        print("Diffusion axial:  "+"%.3f" % dz+" 10^-9 m^2s^-1")
+        print(f"Diffusion axial:  {dz:.3f} 10^-9 m^2s^-1")
 
     # Calculate radial coefficient
     if not intent or intent == "radial":
@@ -139,7 +139,7 @@ def cui(link, pore_id="shape_00", z_dist=0, ax_area=[0.2, 0.8], intent="", is_fi
         # Fit function
         popt, pcov = sp.optimize.curve_fit(diff_rad, [x*1e12 for x in time_ax], msd_r_n, p0=[1, 20, float(pore["diam"])/2-0.2], bounds=(0, np.inf))
 
-        print("Diffusion radial: "+"%.3f" % (popt[0]*1e3)+" 10^-9 m^2 s^-1; Number of zeros: "+"%2i" % int(np.ceil(popt[1]))+"; Radius: "+"%5.2f" % popt[2])
+        print(f"Diffusion radial: {popt[0]*1e3:.3f} 10^-9 m^2 s^-1; Number of zeros: {int(np.ceil(popt[1])):2d}; Radius: {popt[2]:5.2f}")
 
     # Plot
     if is_plot:
@@ -376,7 +376,7 @@ def mean(diff_data, dens_data, ax_area=[0.2, 0.8], is_print=True):
 
             # Output
             if is_print:
-                print("Mean Diffusion axial (" + keys + "): "+"%.3f" % diff_weight[keys] +" 10^-9 m^2s^-1")
+                print(f"Mean Diffusion axial ({keys}): {diff_weight[keys]:.3f} 10^-9 m^2s^-1")
 
     return diff_weight
 
@@ -660,7 +660,7 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
     
     
     # Calculate the inverse lag time (1/s) for the linear fit
-    lagtime_inverse = [1 / (len_step[i] * dt * 10**-12) for i in range(len(len_step))]
+    lagtime_inverse = [1 / (s * dt * 10**-12) for s in len_step]
 
     # Fit a linear line
     fit = sp.stats.linregress(lagtime_inverse, D_mean)
@@ -668,55 +668,55 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
     # Print the diffusion coefficient for an entire system
     if is_print:
         if not section:
-            print("\nDiffusion axial: "+"%.4e" % (fit.intercept * 10 **-9) + " m^2/s\n")
+            print(f"\nDiffusion axial: {fit.intercept * 10**-9:.4e} m^2/s\n")
 
             # Print resudial for fitting
-            print("Error of Intercept: "+"%.4e" % (float(fit.intercept_stderr) * 10 **-9) + " m^2/s\n")
+            print(f"Error of Intercept: {float(fit.intercept_stderr) * 10**-9:.4e} m^2/s\n")
 
             # If is_std true print the results of the calculations
             if is_std:
-                print("Mean Diffusion axial: "+"%.4e" % (diffusion_mean * 10 **-9)  + " m^2/s\n")
+                print(f"Mean Diffusion axial: {diffusion_mean * 10**-9:.4e} m^2/s\n")
 
         # Print the diffusion coefficient in the pore area
         if section=="pore":
-            print("\nDiffusion axial (Pore): "+"%.4e" % (fit.intercept * 10 **-9) + " m^2/s\n")
+            print(f"\nDiffusion axial (Pore): {fit.intercept * 10**-9:.4e} m^2/s\n")
 
 
             # Print resudial for fitting
-            print("Error of Intercept: "+"%.4e" % (float(fit.intercept_stderr) * 10 **-9) + " m^2/s\n")
+            print(f"Error of Intercept: {float(fit.intercept_stderr) * 10**-9:.4e} m^2/s\n")
 
             # If is_std true print the results of the calculations
             if is_std:
-                print("Mean Diffusion axial (Pore): "+"%.4e" % (diffusion_mean * 10 **-9)  + " m^2/s\n")
+                print(f"Mean Diffusion axial (Pore): {diffusion_mean * 10**-9:.4e} m^2/s\n")
 
         # Print the diffusion coefficient in the reservoir area
         if section=="reservoir":
-            print("\nDiffusion axial (Reservoir): "+"%.4e" % (fit.intercept * 10 **-9) + " m^2/s\n")
+            print(f"\nDiffusion axial (Reservoir): {fit.intercept * 10**-9:.4e} m^2/s\n")
 
             # Print resudial for fitting
-            print("Error of Intercept: "+"%.4e" % (float(fit.intercept_stderr) * 10 **-9) + " m^2/s\n")
+            print(f"Error of Intercept: {float(fit.intercept_stderr) * 10**-9:.4e} m^2/s\n")
 
             # If is_std true print the results of the calculations
             if is_std:
-                print("Mean Diffusion axial (Peservoir): "+"%.4e" % (diffusion_mean * 10 **-9) + " m^2/s\n")
+                print(f"Mean Diffusion axial (Reservoir): {diffusion_mean * 10**-9:.4e} m^2/s\n")
 
         # Print the diffusion coefficient in a selected section
         if (isinstance(section, list)) and len(section)==2:
-            print("\nDiffusion axial ([" + "%.2f" % (area[0]) + ", " + "%.2f" % (area[1]) + "]): "+"%.4e" % (fit.intercept * 10 **-9) + " m^2/s\n")
+            print(f"\nDiffusion axial ([{area[0]:.2f}, {area[1]:.2f}]): {fit.intercept * 10**-9:.4e} m^2/s\n")
 
             # Print resudial for fitting
-            print("Error of Intercept: "+"%.4e" % (float(fit.intercept_stderr) * 10 **-9) + " m^2/s\n")
+            print(f"Error of Intercept: {float(fit.intercept_stderr) * 10**-9:.4e} m^2/s\n")
 
             # If is_std true print the results of the calculations
             if is_std:
-                print("Mean Diffusion axial (["+ "%.2f" % (area[0]) + ", " + "%.2f" % (area[1]) +"]): "+"%.4e" % (diffusion_mean * 10 **-9)  + " m^2/s\n")
+                print(f"Mean Diffusion axial ([{area[0]:.2f}, {area[1]:.2f}]): {diffusion_mean * 10**-9:.4e} m^2/s\n")
 
         # Print std deviation
         if is_std:
-            print("Standard deviation: "+"%.4e" % (std * 10 **-9) + " m^2/s\n")
+            print(f"Standard deviation: {std * 10**-9:.4e} m^2/s\n")
 
     # Set data frame for the used lag times
-    data = [str("%.2f" % D_mean[i] ) for i in range(len(len_step))]
+    data = [f"{x:.2f}" for x in D_mean]
     diff_table = pd.DataFrame(data, index=list(len_step), columns=list([r'$D_\mathrm{mean} \ (10^{-9} \mathrm{m^2s^{-1}})$']))
     diff_table = pd.DataFrame(diff_table.rename_axis('Step Length', axis=1))
     styler = diff_table.style.set_caption('Selected step length')
@@ -724,8 +724,8 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
     diff_table = diff_table.set_table_styles([dict(selector='th', props=[('text-align', 'left')])])
 
     # Set vectors for plotting
-    D_mean_vec = [D_mean[i] for i in range(len(lagtime_inverse))]
-    lag_time_vec = [1 / (len_step[i] * dt * 10 **(-12)) for i in range(len(len_step))]
+    D_mean_vec = list(D_mean)
+    lag_time_vec = [1 / (s * dt * 10**(-12)) for s in len_step]
     x_vec = np.arange(0, max(lag_time_vec) * 2, (max(lag_time_vec) * 2) / 5)
     # Fit a linear line and calculated diffusion coefficent
     fit = sp.stats.linregress(lagtime_inverse, D_mean)
@@ -887,7 +887,7 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
 
 
     # Calculate the inverse lag time (1/s) for the linear fit
-    lagtime_inverse = [1 / (len_step[i] * dt * 10**-12) for i in range(len(len_step))]
+    lagtime_inverse = [1 / (s * dt * 10**-12) for s in len_step]
 
     # Calculate diffusion profiles
     diff_profiles = {}
@@ -910,7 +910,7 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
 
 
         # Plot the diffusion profiles for the different lag times
-        legend = ["$\\Delta t_{\\alpha}$ = " + str(len_step[i] * dt) + " ps" for i in range(len(len_step))]
+        legend = [f"$\\Delta t_{{\\alpha}}$ = {s * dt} ps" for s in len_step]
 
     # If infty_profile is True the diffusion profile for a infinity lag times is shwon
     if len(len_step) >= 2 and infty_profile:
@@ -937,7 +937,7 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True,  is_plot=True,
             if is_error:
                 if "label" in kwargs:
                     del kwargs["label"]
-                plt.fill_between(bins, [(diff_profile_fit[i]-diff_error_bin[i]) for i in range(len(diff_profile_fit))], [(diff_profile_fit[i]+diff_error_bin[i]) for i in range(len(diff_profile_fit))],alpha=0.3, **kwargs)
+                plt.fill_between(bins, [f - e for f, e in zip(diff_profile_fit, diff_error_bin)], [f + e for f, e in zip(diff_profile_fit, diff_error_bin)], alpha=0.3, **kwargs)
                 
     # Set legend for lag times
     if is_plot:
