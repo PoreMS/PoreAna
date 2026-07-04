@@ -43,15 +43,14 @@ Or download the repository and install in the top directory via:
 
 ## Testing
 
-A local venv with PoreMS and PoreAna installed in editable mode is provided:
+Install in editable mode with test dependencies:
 
-    python -m venv venv
-    venv/bin/pip install -e /path/to/PoreMS
-    venv/bin/pip install -e .
-    venv/bin/pip install pytest pytest-cov
+    pip install -e ".[dev]"
 
-    venv/bin/python -m pytest tests/test_unit.py          # fast unit tests (no trajectory data needed)
-    venv/bin/python -m pytest tests/test_integration.py   # full integration tests (requires data files, slow)
+Then run the tests:
+
+    pytest tests/test_unit.py          # fast unit tests
+    pytest tests/test_integration.py   # full integration tests (requires data files, slow)
 
 
 ## Development
