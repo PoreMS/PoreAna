@@ -18,6 +18,3 @@ help:
 
 %: Makefile
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
-	@if [ "$@" = "html" ] && [ -d v_old ]; then \
-		cp -r v_old $(BUILDDIR)/html/v_old; \
-	fi
