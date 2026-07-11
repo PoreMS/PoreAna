@@ -18,23 +18,7 @@
 ### Performance
 
 Benchmarked on an Apple Silicon macOS machine (Python 3.13, 16 cores,
-2001-frame cylinder trajectory, benzene, 13 lag times).
-Timings are the median of 3 consecutive runs.
-Direct comparison against PyPI v0.2.3 is blocked by its CMake/scikit-build dependency,
-so microbenchmarks on the core hot paths are provided instead.
-
-| Benchmark | v1.0.0 |
-|---|---|
-| Density sampling — serial | 0.57 s |
-| Density sampling — parallel | 0.09 s |
-| Gyration sampling — serial | 0.83 s |
-| Diffusion MC sampling — serial | 1.25 s |
-| Diffusion MC sampling — parallel | 0.40 s |
-
-Density and gyration parallel sampling is **7× faster than the serial equivalent**.
-MC parallel sampling is **3× faster** than serial; the speedup is bounded by the
-`max_step` frame-overlap between workers relative to per-worker frame count — on 16
-cores with max_step=350 and 2001 frames, each worker processes ~53 % overlap frames.
+2001-frame cylinder trajectory, benzene).
 Earlier builds measured parallel density at 1.33 s and parallel MC at 1.59 s on
 macOS because Python 3.12 changed the default multiprocessing start method from
 `fork` to `spawn`, causing each worker to re-import all heavy dependencies on
