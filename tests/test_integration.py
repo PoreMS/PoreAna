@@ -316,6 +316,25 @@ def test_file_to_text(sample_output):
 # Free energy
 # ---------------------------------------------------------------------------
 
+def test_diffusion_mc_parallel_keys(sample_output):
+    """BUG 5: fluc_diff_bin / fluc_df_bin must be assembled from all workers in parallel MC."""
+    model = pa.CosineModel("output/diff_mc_cyl_s.obj", 6, 10)
+    model._len_step = [10, 20, 40]
+    pa.MC().run(
+        model,
+        "output/diff_test_mc_para.obj",
+        nmc_eq=200,
+        nmc=400,
+        is_print=False,
+        is_parallel=True,
+        n_proc=3,
+    )
+    out = pa.utils.load("output/diff_test_mc_para.obj")["output"]
+    for step in model._len_step:
+        assert step in out["fluc_diff_bin"], f"fluc_diff_bin missing step {step}"
+        assert step in out["fluc_df_bin"], f"fluc_df_bin missing step {step}"
+
+
 def test_freeenergy_mc(sample_output):
     plt.figure()
     pa.freeenergy.mc_profile("data/check_output.obj")

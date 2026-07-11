@@ -229,6 +229,8 @@ class MC:
                     output["fluc_df"][step] = out["fluc_df"][step]
                     output["list_df_coeff"][step] = out["list_df_coeff"][step]
                     output["list_diff_coeff"][step] = out["list_diff_coeff"][step]
+                    output["fluc_diff_bin"][step] = out["fluc_diff_bin"][step]
+                    output["fluc_df_bin"][step] = out["fluc_df_bin"][step]
         else:
             output = self._run_helper(model, model._len_step, do_radial)
 

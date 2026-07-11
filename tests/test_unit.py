@@ -76,6 +76,10 @@ def test_vacf_init(change_to_tests_dir):
     sample.init_diffusion_vacf("output/test_vacf.h5", direction=2)
     assert not sample._is_diffusion_vacf
 
+    # BUG 1: num_res must be set and match the residue map length
+    assert hasattr(sample, "num_res")
+    assert sample.num_res == len(sample._res_list)
+
     # _diffusion_vacf_data returns correct structure after manual setup
     sample = pa.Sample("data/pore_system_cylinder_new.yml", "data/traj_cylinder.xtc", mol)
     sample._is_diffusion_vacf = True
@@ -91,3 +95,22 @@ def test_vacf_init(change_to_tests_dir):
     d = data["shape_00"]
     assert d["vacf_data"].shape == (8, 10, 1, 3)  # bins × corr_steps × n_res × directions
     assert d["density"].shape == (8, 1)
+
+
+def test_vacf_zero_density():
+    """BUG 4: zero-density bins must yield 0.0, not NaN, after VACF normalisation."""
+    # Two bins: bin 0 has 5 hits, bin 1 is empty
+    density = np.array([[5], [0]], dtype=np.int64)  # shape (bins, n_res)
+    vacf_raw = np.ones((2, 3, 1, 3))  # shape (bins, corr_steps, n_res, dirs)
+    vacf_raw[1] = 0.0  # empty bin accumulates nothing
+
+    denom = np.where(density > 0, density, 1)
+    vacf_normed = np.where(
+        density[:, np.newaxis, :, np.newaxis] > 0,
+        vacf_raw / denom[:, np.newaxis, :, np.newaxis],
+        0.0,
+    )
+
+    assert not np.any(np.isnan(vacf_normed)), "zero-density bins must not produce NaN"
+    assert vacf_normed[1, 0, 0, 0] == 0.0, "empty bin must be zero"
+    np.testing.assert_allclose(vacf_normed[0, 0, 0, 0], 1.0 / 5)

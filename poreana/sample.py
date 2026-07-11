@@ -110,6 +110,7 @@ class Sample:
 
         # Build residue → atom-index mapping as numpy arrays for fast slicing
         n_res = int(num_res)
+        self.num_res = n_res
         self._res_list = {
             res_id: np.array(
                 [
@@ -1013,7 +1014,15 @@ class Sample:
                 pore_mask = (z_min < pos_list[pos_pointer, :, 2]) & (
                     pos_list[pos_pointer, :, 2] < z_max
                 )
-                in_wall_mask = pos > self._pore_props[pore_id]["diam"] * 1.01 / 2
+                if self._diff_vacf_inp["direction"] == "radial_cylindrical":
+                    r_from_axis = pos
+                else:
+                    focal = self._pore_props[pore_id]["focal"]
+                    r_from_axis = np.sqrt(
+                        (pos_list[pos_pointer, :, 0] - focal[0]) ** 2
+                        + (pos_list[pos_pointer, :, 1] - focal[1]) ** 2
+                    )
+                in_wall_mask = r_from_axis > self._pore_props[pore_id]["diam"] * 1.01 / 2
             else:
                 data_p = data
                 bin_p = bins

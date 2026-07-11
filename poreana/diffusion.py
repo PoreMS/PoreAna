@@ -1420,9 +1420,12 @@ def integrate_bin_diffusion_vacf(link_data, pore_id=None):
     )
 
     # Calculate the VACF per bin; the normalization by 'density' accounts for every timeorigin and the average number of residues in the bin
-    vacf_data = (
-        data["vacf_data"].copy() / data["density"][:, np.newaxis, :, np.newaxis]
-    )  #
+    denom = np.where(data["density"] > 0, data["density"], 1)
+    vacf_data = np.where(
+        data["density"][:, np.newaxis, :, np.newaxis] > 0,
+        data["vacf_data"] / denom[:, np.newaxis, :, np.newaxis],
+        0.0,
+    )
 
     # Integrate the VACF using the cumulative trapezoid rule
     integrated = sp.integrate.cumulative_trapezoid(
