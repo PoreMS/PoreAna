@@ -5,11 +5,6 @@
 
 # Pore System Analysis Tool
 
-:::{note}
-You are viewing the current documentation. The archived documentation for
-the previous release is available at [v_old docs](v_old/index.html).
-:::
-
 This Python package analyzes GROMACS pore simulations produced with
 [PoreSim](https://porems.github.io/PoreSim/).
 To see the code or report a bug, please visit the
@@ -26,7 +21,7 @@ To see the code or report a bug, please visit the
 
 ## API Reference
 
-Full API documentation is auto-generated from source: [API Reference](autoapi/index.html)
+Full API documentation is auto-generated from source: [API Reference](autoapi/index)
 
 :::{toctree}
 :hidden:
