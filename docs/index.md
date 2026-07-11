@@ -1,8 +1,3 @@
-:::{figure} /pics/logo_text.svg
-:align: center
-:width: 40%
-:::
-
 # Pore System Analysis Tool
 
 This Python package analyzes GROMACS pore simulations produced with
