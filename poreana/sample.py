@@ -868,9 +868,7 @@ class Sample:
         if self._is_numpy:
             print("VACF and numpy-approaches cannot be run in parallel.")
             return
-        if direction not in [0, 1, 2] and not (
-            direction == "radial" and self._pore
-        ):
+        if direction not in [0, 1, 2] and not (direction == "radial" and self._pore):
             print(
                 "Wrong directional input. Options: 0 (x), 1 (y), 2 (z), "
                 "or 'radial' (pore systems only)."
@@ -900,9 +898,7 @@ class Sample:
             if all(s == shapes[0] for s in shapes) and shapes[0] == "CYLINDER":
                 direction = "radial_cylindrical"
             else:
-                print(
-                    "Radial VACF requires all pores to be the same shape."
-                )
+                print("Radial VACF requires all pores to be the same shape.")
                 return
 
         self._is_diffusion_vacf = True
@@ -994,7 +990,7 @@ class Sample:
             np.arange(corr_steps)[::-1] + vel_pointer + corr_steps
         ) % vel_list.shape[0]
 
-        for pore_id in (self._pore.keys() if self._pore else [None]):
+        for pore_id in self._pore.keys() if self._pore else [None]:
             if pore_id is not None:
                 if pore_id[:5] != "shape":
                     continue
@@ -1013,9 +1009,8 @@ class Sample:
                     + self._pore_props[pore_id]["length"] / 2
                     - self._entry
                 )
-                pore_mask = (
-                    (z_min < pos_list[pos_pointer, :, 2])
-                    & (pos_list[pos_pointer, :, 2] < z_max)
+                pore_mask = (z_min < pos_list[pos_pointer, :, 2]) & (
+                    pos_list[pos_pointer, :, 2] < z_max
                 )
                 in_wall_mask = pos > self._pore_props[pore_id]["diam"] * 1.01 / 2
             else:
@@ -1037,7 +1032,9 @@ class Sample:
 
                 if per_res:
                     idx = np.where(mask)[0]
-                    data_p["vacf_data"][bin_id, :, idx, :] += vacf.transpose(0, 1, 2)[:, :, :]
+                    data_p["vacf_data"][bin_id, :, idx, :] += vacf.transpose(0, 1, 2)[
+                        :, :, :
+                    ]
                     data_p["density"][bin_id, idx] += 1
                 else:
                     data_p["vacf_data"][bin_id, :, 0, :] += np.sum(vacf, axis=1)
@@ -1095,17 +1092,13 @@ class Sample:
             Current frame index
         """
         if self._numpy_inp["positions"]:
-            pos = (
-                np.array(positions).reshape((self.num_res, self._num_atoms, 3)) / 10
-            )
+            pos = np.array(positions).reshape((self.num_res, self._num_atoms, 3)) / 10
             data["positions"][frame_id] = (
                 np.sum(pos * self._masses[np.newaxis, :, np.newaxis], axis=1)
                 / self._sum_masses
             )
         if self._numpy_inp["velocities"]:
-            vel = (
-                np.array(velocities).reshape((self.num_res, self._num_atoms, 3)) * 100
-            )
+            vel = np.array(velocities).reshape((self.num_res, self._num_atoms, 3)) * 100
             data["velocities"][frame_id] = (
                 np.sum(vel * self._masses[np.newaxis, :, np.newaxis], axis=1)
                 / self._sum_masses
@@ -1166,12 +1159,8 @@ class Sample:
             if self._is_diffusion_vacf:
                 cs = self._diff_vacf_inp["corr_steps"]
                 nto = self._diff_vacf_inp["new_time_origin_steps"]
-                frame_start = [
-                    max(0, s - s % nto - cs + 1) for s in frame_start
-                ]
-                frame_end = [
-                    min(self._num_frame, e - e % nto + cs) for e in frame_end
-                ]
+                frame_start = [max(0, s - s % nto - cs + 1) for s in frame_start]
+                frame_end = [min(self._num_frame, e - e % nto + cs) for e in frame_end]
 
             frame_np = [
                 list(range(frame_start[i], frame_end[i])) for i in range(n_proc)
@@ -1333,12 +1322,16 @@ class Sample:
             }
             data_diff = output[0]["diffusion_vacf"]
             for out in output[1:]:
-                for pore_id in (self._pore.keys() if self._pore else [None]):
+                for pore_id in self._pore.keys() if self._pore else [None]:
                     if pore_id is not None:
                         if pore_id[:5] != "shape":
                             continue
-                        data_diff[pore_id]["density"] += out["diffusion_vacf"][pore_id]["density"]
-                        data_diff[pore_id]["vacf_data"] += out["diffusion_vacf"][pore_id]["vacf_data"]
+                        data_diff[pore_id]["density"] += out["diffusion_vacf"][pore_id][
+                            "density"
+                        ]
+                        data_diff[pore_id]["vacf_data"] += out["diffusion_vacf"][
+                            pore_id
+                        ]["vacf_data"]
                     else:
                         data_diff["density"] += out["diffusion_vacf"]["density"]
                         data_diff["vacf_data"] += out["diffusion_vacf"]["vacf_data"]
@@ -1470,9 +1463,7 @@ class Sample:
                     _com_vacf = all_com.copy()
                     _vel_vacf = all_vel_com.copy()
                     if self._diff_vacf_inp["direction"] == "radial_cylindrical":
-                        focal = np.array(
-                            self._pore_props["shape_00"]["focal"][:2]
-                        )
+                        focal = np.array(self._pore_props["shape_00"]["focal"][:2])
                         dx = all_com[:, 0] - focal[0]
                         dy = all_com[:, 1] - focal[1]
                         r = np.sqrt(dx**2 + dy**2)
@@ -1503,9 +1494,7 @@ class Sample:
                         )
 
                 if self._is_numpy:
-                    self._numpy(
-                        output["numpy"], positions, frame.velocities, frame_id
-                    )
+                    self._numpy(output["numpy"], positions, frame.velocities, frame_id)
 
             # Manage sliding window lists
             if self._is_diffusion_bin:
