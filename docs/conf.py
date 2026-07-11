@@ -58,6 +58,7 @@ html_favicon = 'favicon.ico'
 
 # _static holds favicon, style, etc.; pics holds logo SVGs (served at _static/ root after build)
 html_static_path = ['_static', 'pics']
+html_css_files = ['style.css']
 
 htmlhelp_basename = 'PoreAnadoc'
 

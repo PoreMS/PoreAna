@@ -1,50 +1,26 @@
-body { color: #444444 !important; }
-
-h1 { font-size: 40px !important; }
-h2 { font-size: 32px !important; }
-h3 { font-size: 24px !important; }
-h4 { font-size: 18px !important; }
-h5 { font-size: 14px !important; }
-h6 { font-size: 10px !important; }
+/* Brand colours */
+a.reference,
+a.reference:visited {
+    color: #c74949;
+}
 
 footer a {
-  color: #c74949 !important;
-}
-a.reference {
-  color: #c74949 !important;
+    color: #c74949;
 }
 
-blockquote p {
-  font-size: 14px !important;
+/* Plot images are generated with black text on a transparent background.
+   In dark mode the page background turns dark and the text becomes unreadable.
+   Adding a white background keeps them legible in both themes. */
+@media (prefers-color-scheme: dark) {
+    article img {
+        background-color: #ffffff;
+        border-radius: 4px;
+        padding: 6px;
+    }
 }
 
-blockquote {
-  padding-top: 4px !important;
-  padding-bottom: 4px !important;
-  margin: 0 0 0px !important;
+html[data-theme="dark"] article img {
+    background-color: #ffffff;
+    border-radius: 4px;
+    padding: 6px;
 }
-
-dl span.classifier {
-  font-weight: normal;
-  font-style: normal;
-}
-
-dd p.last {
-  padding-left: 20px;
-  border-left: 5px solid #EDEDED;
-}
-
-pre {
-  background-color: #f6f6f9 !important;
-}
-
-code {
-  color: #c74949 !important;
-  background-color: #ffffff !important;
-}
-
-dt:target, span.highlighted {
-  background-color: #ffffff !important;
-}
-
-ul               { padding-left: 20px !important; }
