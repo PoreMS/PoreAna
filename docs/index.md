@@ -21,6 +21,7 @@ To see the code or report a bug, please visit the
 - [Density](density.md) — radial and axial density profiles
 - [Diffusion (Binning)](diffusion_bin.md) — mean-squared displacement via binning
 - [Diffusion (MC)](diffusion_mc.md) — Monte Carlo diffusion analysis
+- [Diffusion (VACF)](diffusion_vacf.rst) — velocity autocorrelation function diffusion
 - [Further Properties](further_props.md) — gyration radius, angles, adsorption
 
 ## API Reference
@@ -35,6 +36,7 @@ sample
 density
 diffusion_bin
 diffusion_mc
+diffusion_vacf
 further_props
 autoapi/index
 :::
