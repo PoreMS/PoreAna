@@ -38,7 +38,7 @@ def bins_plot(
     pore_id : string, optional
         Pore shape identifier when multiple shapes are present
     intent : string, optional
-        Intent for plotting — empty, **in**, or **ex**
+        Intent for plotting - empty, **in**, or **ex**
     is_mean : bool, optional
         True to plot mean values
     is_norm : bool, optional

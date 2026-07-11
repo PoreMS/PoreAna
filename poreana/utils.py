@@ -28,22 +28,6 @@ def mkdirp(directory):
         os.makedirs(directory)
 
 
-def column(data):
-    """Convert given row list matrix into column list matrix.
-
-    Parameters
-    ----------
-    data : list
-        Row data matrix
-
-    Returns
-    -------
-    data_col : list
-        Column data matrix
-    """
-    return [list(col) for col in zip(*data)]
-
-
 def tic():
     """MATLAB tic replica - return current time.
 
@@ -120,7 +104,7 @@ def save(obj, link):
         with open(link, "wb") as f:
             pickle.dump(obj, f)
     else:
-        print("Wrong data type — supported formats: .obj, .yml")
+        print("Wrong data type - supported formats: .obj, .yml")
 
 
 def load(link, file_type=""):
@@ -131,7 +115,7 @@ def load(link, file_type=""):
     link : string
         Specific link to load object
     file_type : string, optional
-        Specify filetype - **obj** or **yml** — leave empty for automatic
+        Specify filetype - **obj** or **yml** - leave empty for automatic
         determination from the file extension
 
     Returns
@@ -148,7 +132,7 @@ def load(link, file_type=""):
         with open(link, "rb") as f:
             return pickle.load(f)
     else:
-        print("Wrong data type — supported formats: .obj, .yml")
+        print("Wrong data type - supported formats: .obj, .yml")
         return None
 
 
@@ -470,7 +454,7 @@ def file_to_text(link, link_output, link_dens=[]):
         profile_data = {"# Bins [nm]": diff[2]}
         for i in diff[1]:
             profile_data[f"D (t={t * i})"] = diff[1][i]
-        profile_data["   D (t=∞)"] = diff[0]
+        profile_data["   D (t=inf)"] = diff[0]
         for i in free_energy[0].keys():
             profile_data["Free energy [-]"] = free_energy[0][i]
         df_data = pd.DataFrame(profile_data)
@@ -510,35 +494,6 @@ def file_to_text(link, link_output, link_dens=[]):
             f.write(df_results.to_string())
             f.write("\n\n[Profiles]\n")
             f.write(df_data.to_string(index=False))
-
-
-def num_dens_to_mass_dens(dens):
-    """Convert number density
-    :math:`\\rho \\left(\\frac{\\text{#}}{\\text{nm}^3}\\right)`
-    into mass density
-    :math:`\\rho_{\\text{m}} \\left(\\frac{\\text{kg}}{\\text{m}^3}\\right)`
-
-    .. math::
-
-        \\rho_{m}=\\frac{M \\cdot 10}{6.022} \\cdot \\rho.
-
-    Parameters
-    ----------
-    dens : dictionary
-        Dictionary returned from :func:`pa.density.bins`
-
-    Returns
-    -------
-    mass_dens : dictionary
-        Mass density over the simulation box
-    """
-    factor = dens["sample"]["inp"]["mass"] * 10 / 6.022
-    return {
-        "ex": [factor * d for d in dens["num_dens"]["ex"]],
-        "in": [factor * d for d in dens["num_dens"]["in"]]
-        if "pore" in dens["sample"]
-        else [],
-    }
 
 
 def mumol_m2_to_mols(c, A):

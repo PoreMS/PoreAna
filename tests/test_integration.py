@@ -181,7 +181,7 @@ def test_diffusion_bin(sample_output):
 
 
 # ---------------------------------------------------------------------------
-# MC diffusion — model
+# MC diffusion - model
 # ---------------------------------------------------------------------------
 
 def test_diffusion_mc_model(sample_output):
@@ -195,7 +195,7 @@ def test_diffusion_mc_model(sample_output):
 
 
 # ---------------------------------------------------------------------------
-# MC diffusion — MC run
+# MC diffusion - MC run
 # ---------------------------------------------------------------------------
 
 def test_diffusion_mc_mc(sample_output):
@@ -211,7 +211,7 @@ def test_diffusion_mc_mc(sample_output):
     pa.MC().run(model, "output/diff_test_mc.yml", nmc_eq=1000, nmc=2000, is_print=False, is_parallel=False)
 
     # verify list_diff_coeff holds model coefficients (one per cosine term),
-    # not per-bin profile values — this was the bug that was fixed
+    # not per-bin profile values - this was the bug that was fixed
     mc_out = pa.utils.load("output/diff_test_mc.yml")
     out = mc_out["output"]
     assert "list_diff_coeff" in out
@@ -238,7 +238,7 @@ def test_diffusion_mc_mc(sample_output):
 
 
 # ---------------------------------------------------------------------------
-# MC diffusion — box
+# MC diffusion - box
 # ---------------------------------------------------------------------------
 
 def test_diffusion_mc_box(sample_output):
@@ -270,7 +270,7 @@ def test_parallel_sample(sample_output):
 def test_file_to_text(sample_output):
     import os
 
-    # dens_bin — pore
+    # dens_bin - pore
     pa.utils.file_to_text("output/dens_cyl_s.obj", "output/dens_cyl_s.txt")
     assert os.path.isfile("output/dens_cyl_s.txt")
     with open("output/dens_cyl_s.txt") as f:
@@ -279,7 +279,7 @@ def test_file_to_text(sample_output):
     assert "[Density]" in content
     assert "[Adsorption]" in content
 
-    # dens_bin — box (no pore, no adsorption section)
+    # dens_bin - box (no pore, no adsorption section)
     pa.utils.file_to_text("output/dens_box.obj", "output/dens_box.txt")
     assert os.path.isfile("output/dens_box.txt")
     with open("output/dens_box.txt") as f:
@@ -287,24 +287,24 @@ def test_file_to_text(sample_output):
     assert "[Density]" in content_box
     assert "[Adsorption]" not in content_box
 
-    # diff_bin — requires density link
+    # diff_bin - requires density link
     pa.utils.file_to_text("output/diff_cyl_s.obj", "output/diff_cyl_s.txt",
                           link_dens="output/dens_cyl_s.obj")
     assert os.path.isfile("output/diff_cyl_s.txt")
     with open("output/diff_cyl_s.txt") as f:
         assert "[Diffusion]" in f.read()
 
-    # diff_bin — missing dens link exits gracefully (no file written, no crash)
+    # diff_bin - missing dens link exits gracefully (no file written, no crash)
     pa.utils.file_to_text("output/diff_cyl_s.obj", "output/diff_missing_dens.txt")
 
-    # gyr_bin — requires density link
+    # gyr_bin - requires density link
     pa.utils.file_to_text("output/gyr_cyl_s.obj", "output/gyr_cyl_s.txt",
                           link_dens="output/dens_cyl_s.obj")
     assert os.path.isfile("output/gyr_cyl_s.txt")
     with open("output/gyr_cyl_s.txt") as f:
         assert "[Gyration]" in f.read()
 
-    # mc — full MC output (uses fixture-created mc_fixture.yml)
+    # mc - full MC output (uses fixture-created mc_fixture.yml)
     pa.utils.file_to_text("output/mc_fixture.yml", "output/mc_fixture.txt")
     assert os.path.isfile("output/mc_fixture.txt")
     with open("output/mc_fixture.txt") as f:
@@ -317,7 +317,7 @@ def test_file_to_text(sample_output):
 # ---------------------------------------------------------------------------
 
 def test_diffusion_mc_parallel_keys(sample_output):
-    """BUG 5: fluc_diff_bin / fluc_df_bin must be assembled from all workers in parallel MC."""
+    """Parallel MC must assemble fluc_diff_bin / fluc_df_bin from all workers, not just worker 0."""
     model = pa.CosineModel("output/diff_mc_cyl_s.obj", 6, 10)
     model._len_step = [10, 20, 40]
     pa.MC().run(

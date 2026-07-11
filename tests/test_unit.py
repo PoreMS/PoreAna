@@ -76,7 +76,7 @@ def test_vacf_init(change_to_tests_dir):
     sample.init_diffusion_vacf("output/test_vacf.h5", direction=2)
     assert not sample._is_diffusion_vacf
 
-    # BUG 1: num_res must be set and match the residue map length
+    # num_res must be set and match the residue map length
     assert hasattr(sample, "num_res")
     assert sample.num_res == len(sample._res_list)
 
@@ -93,12 +93,12 @@ def test_vacf_init(change_to_tests_dir):
     data = sample._diffusion_vacf_data()
     assert "shape_00" in data
     d = data["shape_00"]
-    assert d["vacf_data"].shape == (8, 10, 1, 3)  # bins × corr_steps × n_res × directions
+    assert d["vacf_data"].shape == (8, 10, 1, 3)  # bins x corr_steps x n_res x directions
     assert d["density"].shape == (8, 1)
 
 
 def test_vacf_zero_density():
-    """BUG 4: zero-density bins must yield 0.0, not NaN, after VACF normalisation."""
+    """Zero-density bins must yield 0.0, not NaN, after VACF normalisation."""
     # Two bins: bin 0 has 5 hits, bin 1 is empty
     density = np.array([[5], [0]], dtype=np.int64)  # shape (bins, n_res)
     vacf_raw = np.ones((2, 3, 1, 3))  # shape (bins, corr_steps, n_res, dirs)

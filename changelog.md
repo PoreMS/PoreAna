@@ -19,17 +19,17 @@
 
 Benchmarked on an Apple Silicon macOS machine (Python 3.13, 16 cores,
 2001-frame cylinder trajectory, benzene, 13 lag times).
-Timings are the mean of 3 consecutive runs.
+Timings are the median of 3 consecutive runs.
 Direct comparison against PyPI v0.2.3 is blocked by its CMake/scikit-build dependency,
 so microbenchmarks on the core hot paths are provided instead.
 
 | Benchmark | v1.0.0 |
 |---|---|
-| Density sampling — serial | 0.56 s |
-| Density sampling — parallel | 0.08 s |
-| Gyration sampling — serial | 0.78 s |
-| Diffusion MC sampling — serial | 1.21 s |
-| Diffusion MC sampling — parallel | 0.38 s |
+| Density sampling — serial | 0.57 s |
+| Density sampling — parallel | 0.09 s |
+| Gyration sampling — serial | 0.83 s |
+| Diffusion MC sampling — serial | 1.25 s |
+| Diffusion MC sampling — parallel | 0.40 s |
 
 Density and gyration parallel sampling is **7× faster than the serial equivalent**.
 MC parallel sampling is **3× faster** than serial; the speedup is bounded by the
@@ -60,6 +60,11 @@ Key changes driving the speedup:
 * `mc.py` — `n_proc` parameter no longer shadows the `np` (NumPy) import; duplicate `import numpy as numpy` removed; dead commented-out code removed from `__init__`
 
 ### Logic fixes
+* `sample.py` — `self.num_res` was never assigned in `__init__`, causing `AttributeError` on all VACF and NumPy batch-processing code paths
+* `sample.py` — `in_wall_mask` in `_diffusion_vacf` used the binning-axis coordinate instead of the true radial distance from the pore axis for non-radial pore directions, silently misclassifying wall atoms
+* `diffusion.py` — `integrate_bin_diffusion_vacf` divided VACF data by zero for unoccupied bins, producing silent NaN values; unoccupied bins now yield 0.0
+* `mc.py` — parallel MC assembly discarded `fluc_diff_bin` / `fluc_df_bin` from all workers except worker 0, so per-bin fluctuation data was silently incomplete after any parallel run
+* `diffusion.py` — `mc_profile()` `is_error=True` path accessed `diff_profiles_error_down`/`_up` dicts that were always empty (population code was removed years ago), causing `KeyError`; `is_error` parameter removed and the working `fit.intercept_stderr` error band is now always shown when `infty_profile=True`
 * `mc.py` — `list_diff_coeff` was incorrectly assigned `list_diff_profile` (per-bin profile data) instead of the actual per-step model coefficients; silently returned wrong values for all MC diffusion runs
 * `mc.py` / `sample.py` — function parameter `np=0` shadowed the `numpy` alias, causing `AttributeError: 'int' has no attribute 'array'` in all parallel and post-merge code paths; renamed to `n_proc`
 * `diffusion.py` — residual `math.floor` / `math.ceil` calls remained after `import math` was removed; converted to `int(np.floor(...))` / `int(np.ceil(...))`
@@ -69,14 +74,23 @@ Key changes driving the speedup:
 * `model.py` — debug `print` calls for `_d0` and `_diff_bin` removed
 * `model.py` — duplicate `self._sys_props = {}` assignment removed
 
+### Removals
+* `diffusion.py` — `cui()` (183 lines, zero call sites); radial MC stubs `mc_fit_radial()` and `mc_profile_radial()` preserved as comments for future implementation
+* `utils.py` — `column()` and `num_dens_to_mass_dens()` (zero call sites)
+* `tables.py` — `mc_statistics()` and `mc_lag_time()` (zero call sites)
+
 ### Tests
 * Converted `tests/test_simple.py` from unittest to pytest
 * Split into `test_unit.py` (fast, no trajectory) and `test_integration.py` (full pipeline)
 * Session-scoped `conftest.py` fixture runs all trajectory sampling once per session; pre-computes MC output for `file_to_text` tests
 * New coverage: `density.mean()` return values; `adsorption.calculate()` output structure; `density/gyration/angle.bins_plot()` intent "in"/"ex" and normalised x-axis; `diffusion.bins()` output structure; MC output key correctness (`list_diff_coeff` vs `list_diff_profile`); `utils.file_to_text()` for all four output types (dens_bin pore, dens_bin box, diff_bin, gyr_bin, mc); YAML round-trip in `test_utils`
 * `bench_compare.py` added: standalone script for sampling speed comparison (`python tests/bench_compare.py`)
+* New: `test_vacf_init` — asserts `num_res` attribute is set and equals residue map length
+* New: `test_vacf_zero_density` — verifies zero-density bins yield 0.0, not NaN, after VACF normalisation
+* New: `test_diffusion_mc_parallel_keys` — verifies parallel MC assembles `fluc_diff_bin`/`fluc_df_bin` from all workers
 
 ### Documentation
+* `docs/diffusion_vacf.rst` converted to MyST Markdown (`diffusion_vacf.md`)
 * RST source files migrated to MyST Markdown; Sphinx theme updated to furo; API docs via sphinx-autoapi
 * Docs source moved from `docsrc/` to `docs/`; previous built HTML preserved at `docs/v_old/`
 * Copyright year updated to 2026; DESIGN.md added documenting the red color palette

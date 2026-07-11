@@ -986,7 +986,7 @@ class MC:
     #
     #     return log_like
     #
-    # def setup_bessel_box(self,model):
+    # def setup_bessel_box(self, model):
     #     r"""This function set the zeros of the 0th order Bessel first type and
     #     the bessel function for the radial likelihood.
     #
@@ -1003,20 +1003,20 @@ class MC:
     #     """
     #
     #     # Zeros of the bessel funktions of the 0th bessel function (x-values)
-    #     self._bessel0_zeros = sc.special.jn_zeros(0,self._lmax)
+    #     self._bessel0_zeros = sc.special.jn_zeros(0, self._lmax)
     #
     #     # 1st order Bessel function zeropoints - y value of the 1th bessel
     #     # function at zeropoints of 0th bessel function (x-values above)
     #     bessel1_inzeros = sc.special.j1(self._bessel0_zeros)
     #
     #     # Set max r and r_m vector
-    #     rmax = max(model._bins_radial) # maximal radius -> propagtor becomes zero
-    #     r = np.arange(model._bin_radial_width/2,max(model._bins_radial),model._bin_radial_width,dtype=np.float64) # Vektors in the middle of the radial bins
+    #     rmax = max(model._bins_radial)  # maximal radius -> propagtor becomes zero
+    #     r = np.arange(model._bin_radial_width/2, max(model._bins_radial), model._bin_radial_width, dtype=np.float64)  # Vectors in the middle of the radial bins
     #
     #     # set up Bessel functions
-    #     self._bessels = np.zeros((self._lmax,model._bin_num_rad),dtype=np.float64)
+    #     self._bessels = np.zeros((self._lmax, model._bin_num_rad), dtype=np.float64)
     #
     #     # Determine the bessel part of the propogator
     #     for l in range(self._lmax):
     #         # Set bessel part of propagtor
-    #         self._bessels[l,:] = 2 * r * sc.special.j0(r / rmax * self._bessel0_zeros[l]) / bessel1_inzeros[l]**2 / rmax**2
+    #         self._bessels[l, :] = 2 * r * sc.special.j0(r / rmax * self._bessel0_zeros[l]) / bessel1_inzeros[l]**2 / rmax**2

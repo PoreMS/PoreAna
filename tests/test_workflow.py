@@ -1,5 +1,5 @@
 """
-End-to-end workflow test: PoreMS → PoreSim → (GROMACS) → PoreAna
+End-to-end workflow test: PoreMS -> PoreSim -> (GROMACS) -> PoreAna
 
 This test exercises the full analysis pipeline as it would be used in practice:
 
@@ -15,7 +15,7 @@ This test exercises the full analysis pipeline as it would be used in practice:
      analyses the trajectory: density profile, gyration radius, and bin
      diffusion coefficient.
 
-Both poresim and porems are optional dependencies — if either is unavailable
+Both poresim and porems are optional dependencies - if either is unavailable
 the test is skipped rather than erroring.
 """
 
@@ -61,7 +61,7 @@ def porems_output(tmp_path_factory):
 
 
 # ---------------------------------------------------------------------------
-# Step 1 — PoreMS
+# Step 1 - PoreMS
 # ---------------------------------------------------------------------------
 
 def test_porems_generates_yml(porems_output):
@@ -91,7 +91,7 @@ def test_porems_generates_yml(porems_output):
 
 
 # ---------------------------------------------------------------------------
-# Step 2 — PoreSim
+# Step 2 - PoreSim
 # ---------------------------------------------------------------------------
 
 def test_poresim_box_from_porems(porems_output):
@@ -172,7 +172,7 @@ def _rglob(root):
 
 
 # ---------------------------------------------------------------------------
-# Step 3 — PoreAna (using PoreMS yml + pre-recorded GROMACS trajectory)
+# Step 3 - PoreAna (using PoreMS yml + pre-recorded GROMACS trajectory)
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")

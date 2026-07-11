@@ -206,8 +206,8 @@ def print_table(cases, local_res, pypi_res, pypi_version):
         t_pypi  = pypi_res.get(label)
 
         if isinstance(t_local, float) and isinstance(t_pypi, float) and t_pypi > 0:
-            speedup = f"{t_pypi / t_local:.2f}×"
-            marker  = "  ✓" if t_pypi > t_local else "  ="
+            speedup = f"{t_pypi / t_local:.2f}x"
+            marker  = "  ok" if t_pypi > t_local else "  ="
         else:
             speedup = "n/a"
             marker  = ""
@@ -225,7 +225,7 @@ def print_table(cases, local_res, pypi_res, pypi_version):
     ]
     if ratios:
         gmean = math.exp(sum(math.log(r) for r in ratios) / len(ratios))
-        print(f"  Geometric mean speedup: {gmean:.2f}×")
+        print(f"  Geometric mean speedup: {gmean:.2f}x")
     print()
 
 

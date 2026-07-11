@@ -108,7 +108,7 @@ class Sample:
             print("Number of atoms is inconsistent with number of residues.")
             return
 
-        # Build residue → atom-index mapping as numpy arrays for fast slicing
+        # Build residue-to-atom-index mapping as numpy arrays for fast slicing
         n_res = int(num_res)
         self.num_res = n_res
         self._res_list = {
@@ -1450,7 +1450,7 @@ class Sample:
             frame = traj.read_step(frame_id)
             positions = frame.positions  # shape (N, 3) in Angstroms
 
-            # ── VACF / numpy batch processing (all residues at once) ──────────
+            # --- VACF / numpy batch processing (all residues at once) ---
             if self._is_diffusion_vacf or self._is_numpy:
                 all_pos = (
                     np.asarray(positions).reshape(self.num_res, self._atoms_per_mol, 3)[
@@ -1474,7 +1474,7 @@ class Sample:
                             self.num_res, self._atoms_per_mol, 3
                         )[:, self._atoms, :]
                         * 100
-                    )  # Å/ps → m/s
+                    )  # Ang/ps -> m/s
                     all_vel_com = (
                         np.sum(
                             all_vel * self._masses_arr[np.newaxis, :, np.newaxis],
@@ -1535,7 +1535,7 @@ class Sample:
                 com_list.append({})
 
             for res_id, atom_indices in self._res_list.items():
-                # Extract and convert positions: Å → nm, apply shift
+                # Extract and convert positions: Ang -> nm, apply shift
                 pos = positions[atom_indices] / 10.0 + shift_arr  # (n_atoms, 3)
 
                 # Centre of mass without PBC
