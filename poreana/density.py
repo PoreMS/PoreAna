@@ -4,11 +4,11 @@
 """Analyse density in a pore."""
 ################################################################################
 
-
 import math
+
+import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-import matplotlib.pyplot as plt
 
 import poreana.utils as utils
 
@@ -98,7 +98,7 @@ def bins(link_data, area=[[10, 90], [10, 90]], target_dens=0, is_print=True):
     # Load bins
     bins = {}
     for pore_id in sample["data"].keys():
-        if pore_id[:5]=="shape":
+        if pore_id[:5] == "shape":
             bins[pore_id] = {}
             bins[pore_id]["in"] = sample["data"][pore_id]["in"] if is_pore else []
     bins["ex"] = sample["data"]["ex"]
@@ -106,9 +106,11 @@ def bins(link_data, area=[[10, 90], [10, 90]], target_dens=0, is_print=True):
     # Load width
     width = {}
     for pore_id in sample["data"].keys():
-        if pore_id[:5]=="shape":
+        if pore_id[:5] == "shape":
             width[pore_id] = {}
-            width[pore_id]["in"] = sample["data"][pore_id]["in_width"] if is_pore else []
+            width[pore_id]["in"] = (
+                sample["data"][pore_id]["in_width"] if is_pore else []
+            )
     width["ex"] = sample["data"]["ex_width"]
 
     # Load input data
@@ -122,8 +124,8 @@ def bins(link_data, area=[[10, 90], [10, 90]], target_dens=0, is_print=True):
     # Load pore data
     pore_props = {}
     if is_pore:
-        for pore_id in sample["data"].keys():     
-            if pore_id[:5]=="shape":
+        for pore_id in sample["data"].keys():
+            if pore_id[:5] == "shape":
                 pore_props[pore_id] = {}
                 pore = sample["pore"]
                 pore_props[pore_id]["pore_type"] = pore[pore_id]["type"]
@@ -141,83 +143,150 @@ def bins(link_data, area=[[10, 90], [10, 90]], target_dens=0, is_print=True):
 
     ## Interior
     if is_pore:
-        for pore_id in pore_props.keys():     
+        for pore_id in pore_props.keys():
             volume[pore_id] = {}
-            if pore_props[pore_id]["pore_type"] in ["CYLINDER","CONE"]:
-                volume[pore_id]["in"] = [math.pi*(pore_props[pore_id]["length"]-2*entry)*(width[pore_id]["in"][i+1]**2-width[pore_id]["in"][i]**2) for i in range(0, bin_num+1)]
-            elif pore_props[pore_id]["pore_type"]=="SLIT" and inp["avg_slit"]:
-                volume[pore_id]["in"] = [box[0]*(pore_props[pore_id]["length"]-2*entry)*(width[pore_id]["in"][i+1]-width[pore_id]["in"][i])*2 for i in range(0, bin_num+1)]
-            elif pore_props[pore_id]["pore_type"]=="SLIT" and not inp["avg_slit"]:
-                print(res,entry)
-                volume[pore_id]["in"] = [box[0]*(pore_props[pore_id]["length"]-2*entry)*(width[pore_id]["in"][i+1]-width[pore_id]["in"][i]) for i in range(0, bin_num+1)]
+            w = np.array(width[pore_id]["in"])
+            plen = pore_props[pore_id]["length"] - 2 * entry
+            if pore_props[pore_id]["pore_type"] in ["CYLINDER", "CONE"]:
+                volume[pore_id]["in"] = list(np.pi * plen * (w[1:] ** 2 - w[:-1] ** 2))
+            elif pore_props[pore_id]["pore_type"] == "SLIT" and inp["avg_slit"]:
+                volume[pore_id]["in"] = list(box[0] * plen * (w[1:] - w[:-1]) * 2)
+            elif pore_props[pore_id]["pore_type"] == "SLIT" and not inp["avg_slit"]:
+                volume[pore_id]["in"] = list(box[0] * plen * (w[1:] - w[:-1]))
 
-            ## Exterior  ###Update fehlt hier noch 
-            if remove_pore_from_res and pore_props[pore_id]["pore_type"] in ["CYLINDER","CONE"]:
-                volume["ex"] = [2*width["ex"][1]*(box[0]*box[1]-math.pi*(pore_props[pore_id]["diam"]/2)**2) for i in range(bin_num+1)]
-            elif remove_pore_from_res and pore_props[pore_id]["pore_type"]=="SLIT":
-                volume["ex"] = [2*width["ex"][1]*box[0]*(box[1]-pore_props[pore_id]["diam"]) for i in range(bin_num+1)]
+            ## Exterior
+            if remove_pore_from_res and pore_props[pore_id]["pore_type"] in [
+                "CYLINDER",
+                "CONE",
+            ]:
+                ex_vol = (
+                    2
+                    * width["ex"][1]
+                    * (
+                        box[0] * box[1]
+                        - math.pi * (pore_props[pore_id]["diam"] / 2) ** 2
+                    )
+                )
+            elif remove_pore_from_res and pore_props[pore_id]["pore_type"] == "SLIT":
+                ex_vol = (
+                    2 * width["ex"][1] * box[0] * (box[1] - pore_props[pore_id]["diam"])
+                )
             else:
-                volume["ex"] = [2*width["ex"][1]*box[0]*box[1] for i in range(bin_num+1)]
+                ex_vol = 2 * width["ex"][1] * box[0] * box[1]
+            volume["ex"] = [ex_vol] * (bin_num + 1)
     else:
-        # For calculating density over one box length
         try:
             direction = inp["direction"]
-            directions = [i for i in range(3) if i!= direction]
-            surface = box[directions[0]]*box[directions[1]]
-        # Except to ensure compliance with older calculations 
-        except:
-            surface = box[0]*box[1]
-        volume["ex"] = [width["ex"][1]*surface for i in range(bin_num+1)]
+            directions = [i for i in range(3) if i != direction]
+            surface = box[directions[0]] * box[directions[1]]
+        except KeyError:
+            surface = box[0] * box[1]
+        volume["ex"] = [width["ex"][1] * surface] * (bin_num + 1)
 
     # Calculate the number density
     num_dens = {}
-    for pore_id in pore_props.keys(): 
+    for pore_id in pore_props.keys():
         num_dens[pore_id] = {}
-        num_dens[pore_id]["in"] = [bins[pore_id]["in"][i]/volume[pore_id]["in"][i]/num_frame for i in range(bin_num+1)] if is_pore else []
+        if is_pore:
+            bins_in = np.array(bins[pore_id]["in"], dtype=float)
+            vol_in = np.array(volume[pore_id]["in"], dtype=float)
+            num_dens[pore_id]["in"] = list(bins_in / vol_in / num_frame)
+        else:
+            num_dens[pore_id]["in"] = []
     if res != 0:
-        num_dens["ex"] = [bins["ex"][i]/volume["ex"][i]/num_frame for i in range(bin_num+1)]
+        bins_ex = np.array(bins["ex"], dtype=float)
+        vol_ex = np.array(volume["ex"], dtype=float)
+        num_dens["ex"] = list(bins_ex / vol_ex / num_frame)
 
     # Calculate the mean in the selected area
     mean = {}
-    for pore_id in pore_props.keys(): 
+    for pore_id in pore_props.keys():
         mean[pore_id] = {}
-        mean[pore_id]["in"] = np.mean(num_dens[pore_id]["in"][area[0][0]:area[0][1]]) if is_pore else []
+        mean[pore_id]["in"] = (
+            np.mean(num_dens[pore_id]["in"][area[0][0] : area[0][1]]) if is_pore else []
+        )
     if res != 0:
-        mean["ex"] = np.mean(num_dens["ex"][area[1][0]:area[1][1]])
+        mean["ex"] = np.mean(num_dens["ex"][area[1][0] : area[1][1]])
 
     # Calculate Density
     dens = {}
-    for pore_id in pore_props.keys(): 
+    for pore_id in pore_props.keys():
         dens[pore_id] = {}
-        dens[pore_id]["in"] = mass*10/6.022*mean[pore_id]["in"] if is_pore else []
+        dens[pore_id]["in"] = mass * 10 / 6.022 * mean[pore_id]["in"] if is_pore else []
     if res != 0:
-        dens["ex"] = mass*10/6.022*mean["ex"]
+        dens["ex"] = mass * 10 / 6.022 * mean["ex"]
 
     # Calculate difference to target density
     if is_pore:
-        num_diff = (target_dens/mass/10*6.022-mean["ex"])*box[0]*box[1]*res*2 if target_dens else 0
-    else: 
-        num_diff = (target_dens/mass/10*6.022-mean["ex"])*box[0]*box[1]*box[2]*2 if target_dens else 0
+        num_diff = (
+            (target_dens / mass / 10 * 6.022 - mean["ex"]) * box[0] * box[1] * res * 2
+            if target_dens
+            else 0
+        )
+    else:
+        num_diff = (
+            (target_dens / mass / 10 * 6.022 - mean["ex"])
+            * box[0]
+            * box[1]
+            * box[2]
+            * 2
+            if target_dens
+            else 0
+        )
 
     # Output
     if is_print:
         if is_pore:
-            for pore_id in pore_props.keys(): 
-                print("Density inside " +  pore_id + " = "+"%5.3f"%mean[pore_id]["in"]+" #/nm^3 ; "+"%7.3f"%dens[pore_id]["in"]+" kg/m^3")
+            for pore_id in pore_props.keys():
+                print(
+                    "Density inside "
+                    + pore_id
+                    + " = "
+                    + "%5.3f" % mean[pore_id]["in"]
+                    + " #/nm^3 ; "
+                    + "%7.3f" % dens[pore_id]["in"]
+                    + " kg/m^3"
+                )
             if res != 0:
-                print("Density outside Pore Area = "+"%5.3f"%mean["ex"]+" #/nm^3 ; "+"%7.3f"%dens["ex"]+" kg/m^3")
+                print(
+                    "Density outside Pore Area = "
+                    + "%5.3f" % mean["ex"]
+                    + " #/nm^3 ; "
+                    + "%7.3f" % dens["ex"]
+                    + " kg/m^3"
+                )
         else:
-            print("Density = "+"%5.3f"%mean["ex"]+" #/nm^3 ; "+"%7.3f"%dens["ex"]+" kg/m^3")
+            print(
+                "Density = "
+                + "%5.3f" % mean["ex"]
+                + " #/nm^3 ; "
+                + "%7.3f" % dens["ex"]
+                + " kg/m^3"
+            )
         if target_dens:
-            print("Density difference   = "+"%5.3f" % (target_dens-dens["ex"])+" kg/m^3 ; "
-                  +"%4.2f" % ((1-dens["ex"]/target_dens)*100)+" % ; "
-                  +"%3i" % num_diff+" #")
+            print(
+                "Density difference   = "
+                + "%5.3f" % (target_dens - dens["ex"])
+                + " kg/m^3 ; "
+                + "%4.2f" % ((1 - dens["ex"] / target_dens) * 100)
+                + " % ; "
+                + "%3i" % num_diff
+                + " #"
+            )
 
     # Return output
-    return  {"sample": sample, "num_dens": num_dens, "mean": mean, "dens": dens, "diff": num_diff}
+    return {
+        "sample": sample,
+        "num_dens": num_dens,
+        "mean": mean,
+        "dens": dens,
+        "diff": num_diff,
+    }
 
 
-def bins_plot(density, pore_id="shape_00", intent="", target_dens=0, is_mean=False, kwargs={}):
+def bins_plot(
+    density, pore_id="shape_00", intent="", target_dens=0, is_mean=False, kwargs={}
+):
     """This function plots the density of the given object. If an intent is
     given instead, only a plot-function will be called. Available options
     for ``intent`` are
@@ -243,7 +312,11 @@ def bins_plot(density, pore_id="shape_00", intent="", target_dens=0, is_mean=Fal
     """
     # Define bins
     width = {}
-    width["in"] = density["sample"]["data"][pore_id]["in_width"][:-1] if "pore" in density["sample"] else []
+    width["in"] = (
+        density["sample"]["data"][pore_id]["in_width"][:-1]
+        if "pore" in density["sample"]
+        else []
+    )
     width["ex"] = density["sample"]["data"]["ex_width"][:]
 
     # Full plot
@@ -255,7 +328,9 @@ def bins_plot(density, pore_id="shape_00", intent="", target_dens=0, is_mean=Fal
         plt.title(pore_id)
         sns.lineplot(x=width["in"], y=density["num_dens"][pore_id]["in"])
         if is_mean:
-            sns.lineplot(x=width["in"], y=[density["mean"][pore_id]["in"] for x in width["in"]])
+            sns.lineplot(
+                x=width["in"], y=[density["mean"][pore_id]["in"] for x in width["in"]]
+            )
 
         plt.xlim([0, width["in"][-1]])
         plt.xlabel("Distance from pore center (nm)")
@@ -268,7 +343,7 @@ def bins_plot(density, pore_id="shape_00", intent="", target_dens=0, is_mean=Fal
             sns.lineplot(x=width["ex"], y=[density["mean"]["ex"] for x in width["ex"]])
 
         if target_dens:
-            sns.lineplot(x=width["ex"], y=[target_dens]*len(width["ex"]))
+            sns.lineplot(x=width["ex"], y=[target_dens] * len(width["ex"]))
 
         plt.xlim([0, width["ex"][-1]])
         plt.xlabel("Distance from reservoir end (nm)")
@@ -283,8 +358,10 @@ def bins_plot(density, pore_id="shape_00", intent="", target_dens=0, is_mean=Fal
         if intent not in ["in", "ex"]:
             print("Invalid intent. Check documentation for available options.")
             return
-        elif intent=="in":
-            sns.lineplot(x=width[intent], y=density["num_dens"][pore_id][intent], **kwargs)
+        elif intent == "in":
+            sns.lineplot(
+                x=width[intent], y=density["num_dens"][pore_id][intent], **kwargs
+            )
             plt.xlim([0, width[intent][-1]])
         else:
             sns.lineplot(x=width[intent], y=density["num_dens"][intent], **kwargs)
@@ -333,40 +410,39 @@ def mean(density, is_print=True, int_limit=2.5):
     num_dens_weight = {}
     dens_weight = {}
 
-    # Loop over different pores
-    for pore_id in density["sample"]["pore"].keys():     
-            if pore_id[:5]=="shape":
-                bin_num = len(density["sample"]["data"][pore_id]["in_width"][:-1])
-                width = density["sample"]["data"][pore_id]["in_width"][:-1]
-                num_dens = density["num_dens"][pore_id]["in"]
-                mass = density["sample"]["inp"]["mass"]
+    for pore_id in density["sample"]["pore"].keys():
+        if pore_id[:5] == "shape":
+            w = np.array(density["sample"]["data"][pore_id]["in_width"])
+            nd = np.array(density["num_dens"][pore_id]["in"])
+            mass = density["sample"]["inp"]["mass"]
 
-                # Integrate density
-                num_dens_int = 0
-                sum_surf = 0
-                for i in range(bin_num-1):
-                    if num_dens[i]>0:
-                        if (width[i]<int_limit):
-                            num_dens_int += num_dens[i]*(width[i+1]**2-width[i]**2)
-                            sum_surf += (width[i+1]**2-width[i]**2)
-
-                # Normalize
-                num_dens_weight[pore_id] = num_dens_int/sum_surf
-
-                # Mass denisty
-                dens_weight[pore_id] = mass*10/6.022*num_dens_weight[pore_id]
+            dA = w[1:] ** 2 - w[:-1] ** 2
+            mask = (nd > 0) & (w[:-1] < int_limit)
+            num_dens_weight[pore_id] = float(
+                np.dot(nd[mask], dA[mask]) / dA[mask].sum()
+            )
+            dens_weight[pore_id] = mass * 10 / 6.022 * num_dens_weight[pore_id]
 
     if is_print:
         for pore_id in num_dens_weight.keys():
-            print("Mean Density ("+pore_id+"): "+"%.3f" % num_dens_weight[pore_id]+" #/nm^3; "+"%.3f" % dens_weight[pore_id]+" kg/m^3")
+            print(
+                "Mean Density ("
+                + pore_id
+                + "): "
+                + "%.3f" % num_dens_weight[pore_id]
+                + " #/nm^3; "
+                + "%.3f" % dens_weight[pore_id]
+                + " kg/m^3"
+            )
 
     return {"num_dens": num_dens_weight, "dens": dens_weight}
 
+
 def density_from_bins(link_data, convert="", plot_axis=None, **kwargs):
     """
-    For non-pore systems, this function calculates the density from given bin data. 
-    The density is returned as the given conversion type, which can be "kg/m^3", 
-    "atoms/nm^3" or "mol/m^3", or as residues per bin if no conversion is specified. 
+    For non-pore systems, this function calculates the density from given bin data.
+    The density is returned as the given conversion type, which can be "kg/m^3",
+    "atoms/nm^3" or "mol/m^3", or as residues per bin if no conversion is specified.
     Optionally, it can be plotted on the provided axis.
 
     For secondary axes use:
@@ -386,7 +462,7 @@ def density_from_bins(link_data, convert="", plot_axis=None, **kwargs):
         The path to the data file containing the bin data, created by the
         :func:`poreana.sample.Sample.init_density` function.
     convert : str, optional
-        The conversion type for the density. Options are "kg/m^3", "molecules/nm^3", 
+        The conversion type for the density. Options are "kg/m^3", "molecules/nm^3",
         "mol/m^3", or an empty string for residues per bin.
     plot_axis : matplotlib.axes.Axes or True, optional
         The axis on which to plot the density. If True, a new figure and axis are created.
@@ -408,22 +484,24 @@ def density_from_bins(link_data, convert="", plot_axis=None, **kwargs):
     is_pore = "pore" in sample
     data = sample["data"]
 
-    pore_props = {}
     if is_pore:
         pore = sample["pore"]
         box = pore["box"]["dimensions"]
-        res = pore["box"]["res"]
     else:
         box = sample["box"]["length"]
-        res = None
     inp = sample["inp"]
 
-    average_density_per_bin = np.array(data['ex'][:-1]) / inp['num_frame']
+    average_density_per_bin = np.array(data["ex"][:-1]) / inp["num_frame"]
 
     # Calculate volume per bin
     area = np.prod([box[i] for i in range(3) if i != inp["direction"]])
-    volume = area * np.array([data["ex_width"][i+1] - data["ex_width"][i] for i in range(len(data["ex_width"]) - 1)])
-    
+    volume = area * np.array(
+        [
+            data["ex_width"][i + 1] - data["ex_width"][i]
+            for i in range(len(data["ex_width"]) - 1)
+        ]
+    )
+
     # Convert density to desired units
     if convert == "":
         convert = "residues/bin"
@@ -434,32 +512,38 @@ def density_from_bins(link_data, convert="", plot_axis=None, **kwargs):
     elif convert == "mol/m^3":
         average_density_per_bin *= 1000 / volume / 6.022
     else:
-        print(f"Unknown conversion type: {convert}. Using residue per bin without conversion.")
+        print(
+            f"Unknown conversion type: {convert}. Using residue per bin without conversion."
+        )
         convert = "residues/bin"
 
     # Plot if axis is provided
     if plot_axis is not None:
-        bin_centers = [(data["ex_width"][i] + data["ex_width"][i+1]) / 2 for i in range(len(data["ex_width"]) - 1)]
+        bin_centers = [
+            (data["ex_width"][i] + data["ex_width"][i + 1]) / 2
+            for i in range(len(data["ex_width"]) - 1)
+        ]
         plot_kwargs = dict(kwargs)
         plot_kwargs.pop("color", None)
         plot_kwargs.pop("label", None)
         plot_axis.plot(
-            bin_centers, 
-            average_density_per_bin, 
-            color=kwargs.get("color", "black"), 
+            bin_centers,
+            average_density_per_bin,
+            color=kwargs.get("color", "black"),
             label=kwargs.get("label", "Density"),
-            **plot_kwargs
+            **plot_kwargs,
         )
         # Set axis labels
         plot_axis.set_xlabel("xyz"[inp["direction"]] + " / nm")
-        plot_axis.set_ylabel("Density / $\mathrm{" + fr'{convert}' + "}$")
+        plot_axis.set_ylabel(r"Density / $\mathrm{" + rf"{convert}" + r"}$")
 
     return average_density_per_bin
 
+
 def density_from_vacf(link_data, convert="", pore_id=None, plot_axis=None, **kwargs):
     """
-    Calculate the density from given VACF data. The density is returned as the 
-    average number of residues per bin. Optionally, it can be plotted on the 
+    Calculate the density from given VACF data. The density is returned as the
+    average number of residues per bin. Optionally, it can be plotted on the
     provided axis.
 
     For secondary axes use:
@@ -476,10 +560,10 @@ def density_from_vacf(link_data, convert="", pore_id=None, plot_axis=None, **kwa
     Parameters
     ----------
     link_data : str
-        The path to the data file containing the VACF data, created by the 
+        The path to the data file containing the VACF data, created by the
         :func:`poreana.sample.Sample.init_diffusion_vacf` function.
     convert : str, optional
-        The conversion type for the density. Options are "kg/m^3", "molecules/nm^3", 
+        The conversion type for the density. Options are "kg/m^3", "molecules/nm^3",
         "mol/m^3", or an empty string for residues per bin.
     pore_id : str, optional
         The pore ID to calculate the density for. If None, the box density is calculated.
@@ -488,7 +572,7 @@ def density_from_vacf(link_data, convert="", pore_id=None, plot_axis=None, **kwa
         If None, no plot is created.
     **kwargs : dict, optional
         Additional keyword arguments for the plot, such as 'color', 'marker', etc.
-    
+
     Returns
     -------
     average_density_per_bin : np.ndarray
@@ -511,7 +595,6 @@ def density_from_vacf(link_data, convert="", pore_id=None, plot_axis=None, **kwa
 
     if "pore" in sample:
         pore = sample["pore"]
-        res = pore["box"]["res"]
         box = pore["box"]["dimensions"]
     else:
         box = sample["box"]["length"]
@@ -524,11 +607,16 @@ def density_from_vacf(link_data, convert="", pore_id=None, plot_axis=None, **kwa
     if pore_id and "pore" in sample:
         pore_props = sample["pore"][pore_id]
         if pore_props["type"] == "CYLINDER":
-            area = np.array([math.pi * (bins[i+1]**2 - bins[i]**2) for i in range(len(bins)-1)])
+            area = np.array(
+                [
+                    math.pi * (bins[i + 1] ** 2 - bins[i] ** 2)
+                    for i in range(len(bins) - 1)
+                ]
+            )
             volume = area * pore_props["length"]
     else:
         area = np.prod([box[i] for i in range(3) if i != sample["inp"]["direction"]])
-        volume = area * np.array([bins[i+1] - bins[i] for i in range(len(bins) - 1)])
+        volume = area * np.array([bins[i + 1] - bins[i] for i in range(len(bins) - 1)])
     if convert == "":
         convert = "residues/bin"
     elif convert == "kg/m^3":
@@ -538,12 +626,14 @@ def density_from_vacf(link_data, convert="", pore_id=None, plot_axis=None, **kwa
     elif convert == "mol/m^3":
         average_density_per_bin *= 1000 / volume / 6.022
     else:
-        print(f"Unknown conversion type: {convert}. Using residues per bin without conversion.")
+        print(
+            f"Unknown conversion type: {convert}. Using residues per bin without conversion."
+        )
         convert = "residues/bin"
 
     # Plot if axis is provided
     if plot_axis is not None:
-        bin_centers = [(bins[i] + bins[i+1]) / 2 for i in range(len(bins) - 1)]
+        bin_centers = [(bins[i] + bins[i + 1]) / 2 for i in range(len(bins) - 1)]
         plot_kwargs = dict(kwargs)
         plot_kwargs.pop("color", None)
         plot_kwargs.pop("label", None)
@@ -552,13 +642,14 @@ def density_from_vacf(link_data, convert="", pore_id=None, plot_axis=None, **kwa
             average_density_per_bin,
             color=kwargs.get("color", "black"),
             label=kwargs.get("label", "Density"),
-            **plot_kwargs
+            **plot_kwargs,
         )
         # Set axis labels
         plot_axis.set_xlabel("xyzr"[direction] + " / nm")
-        plot_axis.set_ylabel("Density / $\mathrm{" + fr'{convert}' + "}$")
+        plot_axis.set_ylabel(r"Density / $\mathrm{" + rf"{convert}" + r"}$")
 
     return average_density_per_bin
+
 
 def density_from_vacf_per_residue(link_data, pore_id=None):
     """
@@ -574,7 +665,7 @@ def density_from_vacf_per_residue(link_data, pore_id=None):
         :func:`poreana.sample.Sample.init_diffusion_vacf` function.
     pore_id : str, optional
         The pore ID to calculate the density for. If None, the box density is calculated.
-    
+
     Returns
     -------
     avg_res_per_bin : np.ndarray
