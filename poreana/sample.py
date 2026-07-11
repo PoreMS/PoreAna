@@ -1022,7 +1022,9 @@ class Sample:
                         (pos_list[pos_pointer, :, 0] - focal[0]) ** 2
                         + (pos_list[pos_pointer, :, 1] - focal[1]) ** 2
                     )
-                in_wall_mask = r_from_axis > self._pore_props[pore_id]["diam"] * 1.01 / 2
+                in_wall_mask = (
+                    r_from_axis > self._pore_props[pore_id]["diam"] * 1.01 / 2
+                )
             else:
                 data_p = data
                 bin_p = bins
