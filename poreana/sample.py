@@ -66,6 +66,8 @@ class Sample:
         self._is_angle = False
         self._is_diffusion_bin = False
         self._is_diffusion_mc = False
+        self._is_diffusion_vacf = False
+        self._is_numpy = False
 
         # Resolve atom indices from names
         self._atoms = (
@@ -216,6 +218,20 @@ class Sample:
             else self._box[direction]
         )
         bins = list(np.linspace(0, z_length, bin_num + 1))
+        return {"bins": bins}
+
+    def _bin_pore(self, bin_num):
+        """Radial bin structure for the pore interior based on pore diameter."""
+        bins = {}
+        for pore_id in self._pore:
+            if pore_id[:5] == "shape":
+                ptype = self._pore_props[pore_id]["type"]
+                if ptype == "CYLINDER":
+                    bins[pore_id] = np.linspace(
+                        0, self._pore_props[pore_id]["diam"] / 2, bin_num + 1
+                    )
+                else:
+                    return f"{ptype} radial binning not implemented yet."
         return {"bins": bins}
 
     ###########
@@ -569,6 +585,12 @@ class Sample:
         if self._is_diffusion_mc:
             print("Binning and MC-approaches cannot be run in parallel.")
             return
+        if self._is_diffusion_vacf:
+            print("Binning and VACF-approaches cannot be run in parallel.")
+            return
+        if self._is_numpy:
+            print("Binning and numpy-approaches cannot be run in parallel.")
+            return
         if not self._pore:
             print("Bin diffusion currently only usable for pore system.")
             return
@@ -713,6 +735,12 @@ class Sample:
         if self._is_diffusion_bin:
             print("Binning and MC-approaches cannot be run in parallel.")
             return
+        if self._is_diffusion_vacf:
+            print("VACF and MC-approaches cannot be run in parallel.")
+            return
+        if self._is_numpy:
+            print("Numpy and MC-approaches cannot be run in parallel.")
+            return
         if direction not in [0, 1, 2]:
             print(
                 "Wrong directional input. Possible inputs are 0 (x-axis), 1 (y-axis), and 2 (z-axis)..."
@@ -775,6 +803,314 @@ class Sample:
                 if len(idx_list) >= step + 1:
                     data[step][idx_list[-1][res_id], idx_list[-(step + 1)][res_id]] += 1
 
+    ######################
+    # VACF Diffusion     #
+    ######################
+    def init_diffusion_vacf(
+        self,
+        link_out: str,
+        len_correration=2e-11,
+        new_time_origin=2e-13,
+        sample_step=20,
+        len_frame=1e-15,
+        bin_num=32,
+        direction=2,
+        sample_each_residue=False,
+    ):
+        """Enable VACF diffusion sampling for local diffusion coefficients.
+
+        Samples the local velocity autocorrelation function (VACF) to compute
+        direction-resolved diffusion coefficients per spatial bin. For cylindrical
+        pores, ``direction='radial'`` bins in the radial coordinate and computes
+        diffusion in cylindrical coordinates (radial, tangential, axial).
+
+        Parameters
+        ----------
+        link_out : string
+            Output file path
+        len_correration : float, optional
+            Correlation time in seconds
+        new_time_origin : float, optional
+            Time between successive time origins in seconds
+        sample_step : integer, optional
+            Frames between velocity samples
+        len_frame : float, optional
+            Frame length in seconds
+        bin_num : integer, optional
+            Number of spatial bins
+        direction : integer or ``'radial'``, optional
+            Binning direction: 0 (x), 1 (y), 2 (z), or ``'radial'`` for
+            cylindrical pore systems
+        sample_each_residue : bool, optional
+            Sample VACF per residue instead of per bin average
+        """
+        corr_steps = int(round(len_correration / len_frame / sample_step))
+        new_time_origin_steps = int(round(new_time_origin / len_frame / sample_step))
+        if corr_steps < 1 or new_time_origin_steps < 1:
+            print(
+                "VACF needs a correlation time longer than one frame. "
+                "Please adjust len_correration and/or new_time_origin."
+            )
+            return
+        if 2 * corr_steps - 1 >= self._num_frame:
+            print(
+                "VACF correlation time is too long for the number of frames. "
+                "Please reduce len_correration or use a longer trajectory."
+            )
+            return
+
+        if self._is_diffusion_bin:
+            print("Binning and VACF-approaches cannot be run in parallel.")
+            return
+        if self._is_diffusion_mc:
+            print("MC and VACF-approaches cannot be run in parallel.")
+            return
+        if self._is_numpy:
+            print("VACF and numpy-approaches cannot be run in parallel.")
+            return
+        if direction not in [0, 1, 2] and not (
+            direction == "radial" and self._pore
+        ):
+            print(
+                "Wrong directional input. Options: 0 (x), 1 (y), 2 (z), "
+                "or 'radial' (pore systems only)."
+            )
+            return
+        if self._traj.split(".")[-1] != "trr":
+            print("VACF requires a .trr trajectory file with velocities.")
+            return
+
+        if direction == "radial":
+            axes, shapes = [], []
+            for pore_id in self._pore:
+                if pore_id[:5] == "shape":
+                    if self._pore_props[pore_id]["type"] == "CYLINDER":
+                        axes.append(tuple(self._pore_props[pore_id]["focal"][:2]))
+                        shapes.append(self._pore_props[pore_id]["type"])
+                    else:
+                        print(
+                            "Radial VACF only available for cylindrical pore systems."
+                        )
+                        return
+            if not all(a == axes[0] for a in axes):
+                print(
+                    "Radial VACF requires all pores to share the same cylindrical axis."
+                )
+                return
+            if all(s == shapes[0] for s in shapes) and shapes[0] == "CYLINDER":
+                direction = "radial_cylindrical"
+            else:
+                print(
+                    "Radial VACF requires all pores to be the same shape."
+                )
+                return
+
+        self._is_diffusion_vacf = True
+
+        if direction == "radial_cylindrical":
+            bins = self._bin_pore(bin_num)["bins"]
+        else:
+            bins = self._bin_mc(bin_num, direction)["bins"]
+
+        self._diff_vacf_inp = {
+            "output": link_out,
+            "bins": bins,
+            "len_correration": len_correration,
+            "new_time_origin": new_time_origin,
+            "sample_step": sample_step,
+            "len_frame": len_frame,
+            "bin_num": bin_num,
+            "direction": direction,
+            "corr_steps": corr_steps,
+            "new_time_origin_steps": new_time_origin_steps,
+            "num_res": self.num_res,
+            "sample_each_residue": sample_each_residue,
+        }
+
+    def _diffusion_vacf_data(self) -> dict:
+        """Create the VACF diffusion data structure."""
+        bin_num = self._diff_vacf_inp["bin_num"]
+        corr_steps = self._diff_vacf_inp["corr_steps"]
+        per_res = self._diff_vacf_inp["sample_each_residue"]
+        n_res = self.num_res if per_res else 1
+
+        data = {}
+        if self._pore:
+            for pore_id in self._pore:
+                if pore_id[:5] == "shape":
+                    data[pore_id] = {
+                        "vacf_data": np.zeros((bin_num, corr_steps, n_res, 3), float),
+                        "density": np.zeros((bin_num, n_res), int),
+                    }
+        else:
+            data = {
+                "vacf_data": np.zeros((bin_num, corr_steps, n_res, 3), float),
+                "density": np.zeros((bin_num, n_res), int),
+            }
+        return data
+
+    def _diffusion_vacf(
+        self,
+        data: dict,
+        frame_id: int,
+        pos_list: np.ndarray,
+        pos_pointer: int,
+        vel_list: np.ndarray,
+        vel_pointer: int,
+    ):
+        """Sample the local VACF for all bins at one time origin.
+
+        Parameters
+        ----------
+        data : dictionary
+            VACF data structure
+        frame_id : integer
+            Current frame index
+        pos_list : numpy.ndarray
+            Circular buffer of CoM positions, shape (corr_steps, n_res, 3)
+        pos_pointer : integer
+            Current write position in pos_list
+        vel_list : numpy.ndarray
+            Circular buffer of CoM velocities, shape (2*corr_steps-1, n_res, 3)
+        vel_pointer : integer
+            Current write position in vel_list
+        """
+        bins = self._diff_vacf_inp["bins"]
+        direction = self._diff_vacf_inp["direction"]
+        corr_steps = self._diff_vacf_inp["corr_steps"]
+        new_time_origin_steps = self._diff_vacf_inp["new_time_origin_steps"]
+        per_res = self._diff_vacf_inp["sample_each_residue"]
+
+        if direction == "radial_cylindrical":
+            direction = 0
+
+        if (frame_id - corr_steps) % new_time_origin_steps != 0:
+            return
+
+        pos = pos_list[pos_pointer, :, direction]
+        vel_pointer = (vel_pointer + corr_steps - 1) % vel_list.shape[0]
+        forward_idx = (np.arange(corr_steps) + vel_pointer) % vel_list.shape[0]
+        backward_idx = (
+            np.arange(corr_steps)[::-1] + vel_pointer + corr_steps
+        ) % vel_list.shape[0]
+
+        for pore_id in (self._pore.keys() if self._pore else [None]):
+            if pore_id is not None:
+                if pore_id[:5] != "shape":
+                    continue
+                data_p = data[pore_id]
+                bin_p = bins[pore_id]
+                res = self._pore_props["box"]["res"]
+                z_min = (
+                    res
+                    + self._pore_props[pore_id]["focal"][2]
+                    - self._pore_props[pore_id]["length"] / 2
+                    + self._entry
+                )
+                z_max = (
+                    res
+                    + self._pore_props[pore_id]["focal"][2]
+                    + self._pore_props[pore_id]["length"] / 2
+                    - self._entry
+                )
+                pore_mask = (
+                    (z_min < pos_list[pos_pointer, :, 2])
+                    & (pos_list[pos_pointer, :, 2] < z_max)
+                )
+                in_wall_mask = pos > self._pore_props[pore_id]["diam"] * 1.01 / 2
+            else:
+                data_p = data
+                bin_p = bins
+                pore_mask = np.ones(pos.shape, dtype=bool)
+                in_wall_mask = np.zeros(pos.shape, dtype=bool)
+
+            com_bins = np.digitize(pos, bin_p) - 1
+            n_bins = len(bin_p) - 1
+            for bin_id in range(n_bins):
+                mask = (com_bins == bin_id) & pore_mask & ~in_wall_mask
+                if not np.any(mask):
+                    continue
+                vel0 = vel_list[vel_pointer, mask, :]
+                fwd = vel_list[forward_idx][:, mask, :]
+                bwd = vel_list[backward_idx][:, mask, :]
+                vacf = (vel0[np.newaxis] * fwd + vel0[np.newaxis] * bwd) / 2
+
+                if per_res:
+                    idx = np.where(mask)[0]
+                    data_p["vacf_data"][bin_id, :, idx, :] += vacf.transpose(0, 1, 2)[:, :, :]
+                    data_p["density"][bin_id, idx] += 1
+                else:
+                    data_p["vacf_data"][bin_id, :, 0, :] += np.sum(vacf, axis=1)
+                    data_p["density"][bin_id, 0] += np.sum(mask)
+
+    ##################
+    # Numpy Sampling #
+    ##################
+    def init_numpy_file(self, link_out, positions=True, velocities=True):
+        """Enable numpy position/velocity sampling.
+
+        Parameters
+        ----------
+        link_out : string
+            Output ``.npz`` file path
+        positions : bool, optional
+            Sample CoM positions (default True)
+        velocities : bool, optional
+            Sample CoM velocities (default True); requires a ``.trr`` trajectory
+        """
+        if self._is_diffusion_bin or self._is_diffusion_mc or self._is_diffusion_vacf:
+            print("Numpy sampling cannot run in parallel with diffusion sampling.")
+            return
+        if velocities and self._traj.split(".")[-1] != "trr":
+            print("Velocity sampling requires a .trr trajectory file.")
+            return
+        self._is_numpy = True
+        self._numpy_inp = {
+            "output": link_out,
+            "positions": positions,
+            "velocities": velocities,
+        }
+
+    def _numpy_data(self):
+        """Create numpy sampling data structure."""
+        data = {}
+        if self._numpy_inp["positions"]:
+            data["positions"] = np.zeros((self._num_frame, self.num_res, 3), float)
+        if self._numpy_inp["velocities"]:
+            data["velocities"] = np.zeros((self._num_frame, self.num_res, 3), float)
+        return data
+
+    def _numpy(self, data, positions, velocities, frame_id):
+        """Record CoM positions and velocities for one frame.
+
+        Parameters
+        ----------
+        data : dictionary
+            Numpy data structure
+        positions : array-like
+            Raw atom positions for this frame
+        velocities : array-like
+            Raw atom velocities for this frame
+        frame_id : integer
+            Current frame index
+        """
+        if self._numpy_inp["positions"]:
+            pos = (
+                np.array(positions).reshape((self.num_res, self._num_atoms, 3)) / 10
+            )
+            data["positions"][frame_id] = (
+                np.sum(pos * self._masses[np.newaxis, :, np.newaxis], axis=1)
+                / self._sum_masses
+            )
+        if self._numpy_inp["velocities"]:
+            vel = (
+                np.array(velocities).reshape((self.num_res, self._num_atoms, 3)) * 100
+            )
+            data["velocities"][frame_id] = (
+                np.sum(vel * self._masses[np.newaxis, :, np.newaxis], axis=1)
+                / self._sum_masses
+            )
+
     ############
     # Sampling #
     ############
@@ -826,6 +1162,16 @@ class Sample:
                 for i in range(len(frame_end)):
                     if frame_end[i] >= self._num_frame:
                         frame_end[i] = frame_end[-1] - max_step
+
+            if self._is_diffusion_vacf:
+                cs = self._diff_vacf_inp["corr_steps"]
+                nto = self._diff_vacf_inp["new_time_origin_steps"]
+                frame_start = [
+                    max(0, s - s % nto - cs + 1) for s in frame_start
+                ]
+                frame_end = [
+                    min(self._num_frame, e - e % nto + cs) for e in frame_end
+                ]
 
             frame_np = [
                 list(range(frame_start[i], frame_end[i])) for i in range(n_proc)
@@ -980,6 +1326,41 @@ class Sample:
                 self._diff_mc_inp["output"],
             )
 
+        if self._is_diffusion_vacf:
+            inp_diff = {
+                **inp,
+                **{k: v for k, v in self._diff_vacf_inp.items() if k != "output"},
+            }
+            data_diff = output[0]["diffusion_vacf"]
+            for out in output[1:]:
+                for pore_id in (self._pore.keys() if self._pore else [None]):
+                    if pore_id is not None:
+                        if pore_id[:5] != "shape":
+                            continue
+                        data_diff[pore_id]["density"] += out["diffusion_vacf"][pore_id]["density"]
+                        data_diff[pore_id]["vacf_data"] += out["diffusion_vacf"][pore_id]["vacf_data"]
+                    else:
+                        data_diff["density"] += out["diffusion_vacf"]["density"]
+                        data_diff["vacf_data"] += out["diffusion_vacf"]["vacf_data"]
+            utils.save(
+                {
+                    system["sys"]: system["props"],
+                    "inp": inp_diff,
+                    "data": data_diff,
+                    "type": "diff_vacf",
+                },
+                self._diff_vacf_inp["output"],
+            )
+
+        if self._is_numpy:
+            data_np = output[0]["numpy"].copy()
+            for out in output[1:]:
+                if self._numpy_inp["positions"]:
+                    data_np["positions"] += out["numpy"]["positions"]
+                if self._numpy_inp["velocities"]:
+                    data_np["velocities"] += out["numpy"]["velocities"]
+            np.savez(self._numpy_inp["output"], **data_np)
+
     def _sample_helper(self, frame_list, shift, is_pbc, is_broken):
         """Worker function: sample all enabled routines for a list of frames.
 
@@ -1015,6 +1396,15 @@ class Sample:
             com_list = []
             idx_list = []
 
+        # VACF circular buffers
+        if self._is_diffusion_vacf:
+            cs = self._diff_vacf_inp["corr_steps"]
+            _pos_list = np.zeros((cs, self.num_res, 3), float)
+            _pos_ptr = 0
+            _vel_list = np.zeros((2 * cs - 1, self.num_res, 3), float)
+            _vel_ptr = 0
+            _vacf_filled = False
+
         # Initialize per-worker output structures
         output = {}
         if self._is_density:
@@ -1027,6 +1417,10 @@ class Sample:
             output["diffusion_bin"] = self._diffusion_bin_data()
         if self._is_diffusion_mc:
             output["diffusion_mc"] = self._diffusion_mc_data()
+        if self._is_diffusion_vacf:
+            output["diffusion_vacf"] = self._diffusion_vacf_data()
+        if self._is_numpy:
+            output["numpy"] = self._numpy_data()
 
         # Sliding window fill length
         if self._is_diffusion_bin:
@@ -1042,6 +1436,76 @@ class Sample:
         for frame_id in frame_list:
             frame = traj.read_step(frame_id)
             positions = frame.positions  # shape (N, 3) in Angstroms
+
+            # ── VACF / numpy batch processing (all residues at once) ──────────
+            if self._is_diffusion_vacf or self._is_numpy:
+                all_pos = (
+                    np.array(positions).reshape(self.num_res, self._num_atoms, 3) / 10
+                    + shift_arr
+                )  # (n_res, n_atoms, 3) in nm
+                all_com = (
+                    np.sum(
+                        all_pos * self._masses_arr[np.newaxis, :, np.newaxis], axis=1
+                    )
+                    / self._sum_masses
+                )  # (n_res, 3)
+                if is_pbc:
+                    all_com = all_com - np.floor(all_com / box) * box
+
+                if self._is_diffusion_vacf:
+                    all_vel = (
+                        np.array(frame.velocities).reshape(
+                            self.num_res, self._num_atoms, 3
+                        )
+                        * 100
+                    )  # Å/ps → m/s
+                    all_vel_com = (
+                        np.sum(
+                            all_vel * self._masses_arr[np.newaxis, :, np.newaxis],
+                            axis=1,
+                        )
+                        / self._sum_masses
+                    )
+
+                    _com_vacf = all_com.copy()
+                    _vel_vacf = all_vel_com.copy()
+                    if self._diff_vacf_inp["direction"] == "radial_cylindrical":
+                        focal = np.array(
+                            self._pore_props["shape_00"]["focal"][:2]
+                        )
+                        dx = all_com[:, 0] - focal[0]
+                        dy = all_com[:, 1] - focal[1]
+                        r = np.sqrt(dx**2 + dy**2)
+                        r_safe = np.where(r == 0, 1e-8, r)
+                        _com_vacf[:, 0] = r
+                        _com_vacf[:, 1] = np.arctan2(dy, dx)
+                        vr = (all_vel_com[:, 0] * dx + all_vel_com[:, 1] * dy) / r_safe
+                        vt = (all_vel_com[:, 1] * dx - all_vel_com[:, 0] * dy) / r_safe
+                        _vel_vacf[:, 0] = vr
+                        _vel_vacf[:, 1] = vt
+
+                    _pos_list[_pos_ptr] = _com_vacf
+                    _pos_ptr = (_pos_ptr + 1) % cs
+                    _vel_list[_vel_ptr] = _vel_vacf
+                    _vel_ptr += 1
+                    if _vel_ptr >= 2 * cs - 1:
+                        _vel_ptr = 0
+                        _vacf_filled = True
+
+                    if _vacf_filled:
+                        self._diffusion_vacf(
+                            output["diffusion_vacf"],
+                            frame_id,
+                            _pos_list,
+                            _pos_ptr,
+                            _vel_list,
+                            _vel_ptr,
+                        )
+
+                if self._is_numpy:
+                    self._numpy(
+                        output["numpy"], positions, frame.velocities, frame_id
+                    )
 
             # Manage sliding window lists
             if self._is_diffusion_bin:

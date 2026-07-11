@@ -219,7 +219,7 @@ class CosineModel(Model):
         # Create basis (for the free energy)
         self._create_basis_center()
 
-        # Create basis (for the free energy)
+        # Create basis (for the diffusion)
         self._create_basis_border()
 
         # Update diffusion profile
@@ -484,14 +484,14 @@ class StepModel(Model):
         for the free energy and the radial diffusion profile. The following
         explanation is for the free energy profile. For the radial diffusion
         profile the number of free energy coefficients :math:`n_{\\mathrm{df}}` has to
-        exchange with :math:`n_{\\mathrm{diff\_radial}}`. The Dimension of the basis matrix
+        exchange with :math:`n_{\\mathrm{diff\\_radial}}`. The Dimension of the basis matrix
         is :math:`n_{\\mathrm{bin}} \\times n_{\\mathrm{df}}`. For a bin the
         basis is calculated with
 
         .. math::
 
             \\mathrm{basis} = \\begin{cases}
-                            1 & (\\mathrm{bin}+0.5)\\geq \\Delta x\ \\& \ (\\mathrm{bin}+0.5)\\leq n_{\\mathrm{bin}}-\\Delta x \\\\
+                            1 & (\\mathrm{bin}+0.5)\\geq \\Delta x\\; \\& \\; (\\mathrm{bin}+0.5)\\leq n_{\\mathrm{bin}}-\\Delta x \\\\
                             0 & \\mathrm{else}                                 \\
                     \\end{cases}
 
@@ -501,7 +501,7 @@ class StepModel(Model):
 
         .. math::
 
-            \\Delta x = \\left [ 0,i \\cdot \\frac{n_{\\mathrm{bin}}}{n_{\\mathrm{df}} \\cdot 2},\\frac{n_{\\mathrm{bin}}}{2} \\right ]
+            \\Delta x = \\left [ 0,i \\cdot \\frac{n_{\\mathrm{bin}}}{n_{\\mathrm{df}} \\cdot 2},\\frac{n_{\\mathrm{bin}}}{2} \\right ]
 
         with :math:`i = [1,...,n_{\\mathrm{df}}-1]`.
         """
@@ -533,7 +533,7 @@ class StepModel(Model):
 
         .. math::
 
-            \\Delta x = \\left [ 0,i \\cdot \\frac{n_{\\mathrm{bin}}}{n_{\\mathrm{diff}} \\cdot 2},\\frac{n_{\\mathrm{bin}}}{2} \\right ]
+            \\Delta x = \\left [ 0,i \\cdot \\frac{n_{\\mathrm{bin}}}{n_{\\mathrm{diff}} \\cdot 2},\\frac{n_{\\mathrm{bin}}}{2} \\right ]
 
         with :math:`i = [1,...,n_{\\mathrm{diff}}-1]`.
         """
