@@ -95,6 +95,7 @@ class Sample:
 
         # Pre-compute numpy arrays for hot-loop efficiency
         self._masses_arr = np.array(self._masses, dtype=float)
+        self._atoms_per_mol = mol.get_num()
 
         # Get trajectory metadata
         traj = cf.Trajectory(self._traj)
@@ -1092,15 +1093,25 @@ class Sample:
             Current frame index
         """
         if self._numpy_inp["positions"]:
-            pos = np.array(positions).reshape((self.num_res, self._num_atoms, 3)) / 10
+            pos = (
+                np.asarray(positions).reshape((self.num_res, self._atoms_per_mol, 3))[
+                    :, self._atoms, :
+                ]
+                / 10
+            )
             data["positions"][frame_id] = (
-                np.sum(pos * self._masses[np.newaxis, :, np.newaxis], axis=1)
+                np.sum(pos * self._masses_arr[np.newaxis, :, np.newaxis], axis=1)
                 / self._sum_masses
             )
         if self._numpy_inp["velocities"]:
-            vel = np.array(velocities).reshape((self.num_res, self._num_atoms, 3)) * 100
+            vel = (
+                np.asarray(velocities).reshape((self.num_res, self._atoms_per_mol, 3))[
+                    :, self._atoms, :
+                ]
+                * 100
+            )
             data["velocities"][frame_id] = (
-                np.sum(vel * self._masses[np.newaxis, :, np.newaxis], axis=1)
+                np.sum(vel * self._masses_arr[np.newaxis, :, np.newaxis], axis=1)
                 / self._sum_masses
             )
 
@@ -1433,9 +1444,12 @@ class Sample:
             # ── VACF / numpy batch processing (all residues at once) ──────────
             if self._is_diffusion_vacf or self._is_numpy:
                 all_pos = (
-                    np.array(positions).reshape(self.num_res, self._num_atoms, 3) / 10
+                    np.asarray(positions).reshape(self.num_res, self._atoms_per_mol, 3)[
+                        :, self._atoms, :
+                    ]
+                    / 10
                     + shift_arr
-                )  # (n_res, n_atoms, 3) in nm
+                )  # (n_res, n_sel, 3) in nm
                 all_com = (
                     np.sum(
                         all_pos * self._masses_arr[np.newaxis, :, np.newaxis], axis=1
@@ -1447,9 +1461,9 @@ class Sample:
 
                 if self._is_diffusion_vacf:
                     all_vel = (
-                        np.array(frame.velocities).reshape(
-                            self.num_res, self._num_atoms, 3
-                        )
+                        np.asarray(frame.velocities).reshape(
+                            self.num_res, self._atoms_per_mol, 3
+                        )[:, self._atoms, :]
                         * 100
                     )  # Å/ps → m/s
                     all_vel_com = (

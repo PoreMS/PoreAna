@@ -1,21 +1,40 @@
 # v1.0.0
 
+### New Features
+
+* **Radial VACF diffusion for cylindrical pores** — `Sample.init_diffusion_vacf()` samples
+  the velocity autocorrelation function (VACF) to compute local diffusion coefficients per
+  spatial bin. For cylindrical pore systems, `direction='radial'` bins molecules radially
+  and decomposes velocities into cylindrical coordinates (radial, tangential, axial).
+  Requires a `.trr` trajectory with velocities.
+* `diffusion.integrate_bin_diffusion_vacf()` — integrates the sampled VACF using the
+  cumulative trapezoid rule to give a time-resolved diffusion coefficient per bin.
+* `diffusion.plot_correlation_per_bin()` — visualises the integrated VACF per spatial bin.
+* `diffusion.diffusion_per_bin()` — extracts and plots the final diffusion profile.
+* `density.density_from_vacf()` / `density_from_vacf_per_residue()` — compute spatial
+  density from VACF sampling output.
+* `diffusion.mc_profile()` — new `is_legend` parameter to suppress the plot legend.
+
 ### Performance
 
-Benchmarked on an Apple Silicon macOS machine (2001-frame cylinder trajectory, benzene,
-13 lag times). Timings are the mean of 3 consecutive runs.
+Benchmarked on an Apple Silicon macOS machine (Python 3.13, 16 cores,
+2001-frame cylinder trajectory, benzene, 13 lag times).
+Timings are the mean of 3 consecutive runs.
 Direct comparison against PyPI v0.2.3 is blocked by its CMake/scikit-build dependency,
 so microbenchmarks on the core hot paths are provided instead.
 
 | Benchmark | v1.0.0 |
 |---|---|
-| Density sampling — serial | 0.57 s |
-| Density sampling — parallel | 0.10 s |
-| Gyration sampling — serial | 0.84 s |
-| Diffusion MC sampling — serial | 1.03 s |
-| Diffusion MC sampling — parallel | 0.14 s |
+| Density sampling — serial | 0.56 s |
+| Density sampling — parallel | 0.08 s |
+| Gyration sampling — serial | 0.78 s |
+| Diffusion MC sampling — serial | 1.21 s |
+| Diffusion MC sampling — parallel | 0.38 s |
 
-Parallel sampling is **5–7× faster than the serial equivalent** on all platforms.
+Density and gyration parallel sampling is **7× faster than the serial equivalent**.
+MC parallel sampling is **3× faster** than serial; the speedup is bounded by the
+`max_step` frame-overlap between workers relative to per-worker frame count — on 16
+cores with max_step=350 and 2001 frames, each worker processes ~53 % overlap frames.
 Earlier builds measured parallel density at 1.33 s and parallel MC at 1.59 s on
 macOS because Python 3.12 changed the default multiprocessing start method from
 `fork` to `spawn`, causing each worker to re-import all heavy dependencies on

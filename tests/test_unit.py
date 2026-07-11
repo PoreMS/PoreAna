@@ -45,8 +45,12 @@ def test_geometry():
 def test_vacf_init(change_to_tests_dir):
     mol = pms.Molecule(inp="data/benzene.gro")
 
-    # _bin_pore returns correct radial bins for a cylinder pore
+    # Sample init sets _atoms_per_mol correctly
     sample = pa.Sample("data/pore_system_cylinder_new.yml", "data/traj_cylinder.xtc", mol)
+    assert sample._atoms_per_mol == mol.get_num()
+    assert len(sample._atoms) == mol.get_num()
+
+    # _bin_pore returns correct radial bins for a cylinder pore
     result = sample._bin_pore(16)
     assert "bins" in result
     assert len(result["bins"]) >= 1
