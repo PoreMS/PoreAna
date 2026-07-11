@@ -25,6 +25,8 @@ autoapi_options = [
 autoapi_root = 'autoapi'
 autoapi_keep_files = True
 
+myst_enable_extensions = ["colon_fence"]
+
 source_suffix = {'.md': 'myst', '.rst': 'restructuredtext'}
 
 master_doc = 'index'
