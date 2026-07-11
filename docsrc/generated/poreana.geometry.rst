@@ -4,6 +4,11 @@
 .. automodule:: poreana.geometry
 
    
+   
+   
+
+   
+   
    .. rubric:: Functions
 
    .. autosummary::
@@ -15,3 +20,15 @@
       unit
       vector
    
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

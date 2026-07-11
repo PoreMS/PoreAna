@@ -1,4 +1,4 @@
-﻿.. raw:: html
+.. raw:: html
 
     </div>
     <div class=col-md-9 content>
@@ -63,6 +63,14 @@ Sample
     ~Sample.init_diffusion_mc
     ~Sample._diffusion_mc_data
     ~Sample._diffusion_mc
+
+
+  .. rubric:: VACF Diffusion
+
+  .. autosummary::
+
+    ~Sample._diffusion_vacf
+    ~Sample._diffusion_vacf_data
 
 
   .. rubric:: Bin Structure

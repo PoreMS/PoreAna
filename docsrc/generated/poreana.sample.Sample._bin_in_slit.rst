@@ -5,9 +5,9 @@
     </div>
     <div class=col-md-9 content>
 
-Sample.\_diffusion\_bin\_data
-=============================
+Sample.\_bin\_in\_slit
+======================
 
 .. currentmodule:: poreana.sample
 
-.. automethod:: Sample._diffusion_bin_data
+.. automethod:: Sample._bin_in_slit

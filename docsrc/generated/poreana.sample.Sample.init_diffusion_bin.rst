@@ -1,12 +1,12 @@
-:orphan:
+﻿:orphan:
 
 .. raw:: html
 
     </div>
     <div class=col-md-9 content>
 
-Sample\.init\_diffusion\_bin
-============================
+Sample.init\_diffusion\_bin
+===========================
 
 .. currentmodule:: poreana.sample
 
