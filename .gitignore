@@ -12,4 +12,6 @@ __pycache__
 venv
 .vscode
 docs/_build
+docs/generated
+docs/autoapi
 tests/output
