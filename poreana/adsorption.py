@@ -4,7 +4,6 @@
 """Analyse adsorption in a pore."""
 ################################################################################
 
-
 import numpy as np
 
 import poreana.utils as utils
@@ -35,72 +34,44 @@ def calculate(link_data, res_cutoff=1, is_normalize=True):
     Returns
     -------
     adsorption : dictionary
-        Normalized number of molecules outside and insidem and value pair of a
+        Normalized number of molecules outside and inside, and value pair of a
         point on the adsorption isotherm
         :math:`\\left[\\frac{\\text{mmol}}{\\text{l}}\\ ,\\frac{\\mu\\text{mol}}{\\text{m}^2}\\right]`
     """
-    # Load data object
     sample = utils.load(link_data)
 
-    # Load pore properties
     pore = sample["pore"]
     res = pore["box"]["res"]
-    box = pore["box"]["dimensions"]
-    box[2] -= 2*res
+    box = list(pore["box"]["dimensions"])
+    box[2] -= 2 * res
 
-    # Load bins
-    bins = {}
-    bins["ex"] = sample["data"]["ex"]
-    bins["in"] = {}
-    print(sample["data"].keys())
-    for pore_id in sample["pore"].keys():
-        if pore_id[:5]=="shape":
-            print(sample["data"][pore_id].keys())
-            bins["in"][pore_id] = sample["data"][pore_id]["in"]
-            
+    shape_ids = [k for k in pore if k.startswith("shape")]
 
-    # Load Width
-    width = {}
-    width["ex"] = sample["data"]["ex_width"]
-    width["in"] = {}
-    for pore_id in sample["pore"].keys():
-        if pore_id[:5]=="shape":
-            width["in"][pore_id] = sample["data"][pore_id]["in_width"]
-    
+    ex_width = np.array(sample["data"]["ex_width"])
+    ex_bins = np.array(sample["data"]["ex"], dtype=float)
+    mask = (ex_width >= res_cutoff) & (ex_width <= res - res_cutoff)
+    num_ex = float(np.sum(ex_bins[mask]))
 
-    # Load input data
+    num_in = {pid: float(np.sum(sample["data"][pid]["in"])) for pid in shape_ids}
+
     inp = sample["inp"]
     num_frames = inp["num_frame"]
     entry = inp["entry"]
 
-    # Calculate number of molecules
-    num = {}
-    num["ex"] = sum([num_mol for i, num_mol in enumerate(bins["ex"]) if width["ex"][i] <= res-res_cutoff and width["ex"][i] >= res_cutoff])
-    for pore_id in sample["pore"].keys():
-        if pore_id[:5]=="shape":
-            num[pore_id] = {}
-            num[pore_id]["in"] = sum(bins["in"][pore_id])
-    
+    if is_normalize:
+        num_ex /= num_frames
+        num_in = {pid: v / num_frames for pid, v in num_in.items()}
 
-    # Normalize number of instances by the number of frames
-    num["ex"] /= num_frames if is_normalize else 1
-    for pore_id in sample["pore"].keys():
-        if pore_id[:5]=="shape":
-            num[pore_id]["in"] /= num_frames if is_normalize else 1
+    surface = {
+        pid: 2 * np.pi * (pore[pid]["diam"] / 2) * (box[2] - 2 * entry)
+        for pid in shape_ids
+    }
+    volume = 2 * (res - 2 * res_cutoff) * box[0] * box[1]
 
-    # Calculate surface and volume
-    surface = {}
-    for pore_id in sample["pore"].keys():
-        if pore_id[:5]=="shape": 
-            surface[pore_id] = 2*np.pi*(sample["pore"][pore_id]["diam"])/2*(box[2]-2*entry)
-    volume = 2*(res-2*res_cutoff)*box[0]*box[1]
+    conc = {
+        pid: {"mumol_m2": utils.mols_to_mumol_m2(num_in[pid], surface[pid])}
+        for pid in shape_ids
+    }
+    conc["mmol_l"] = utils.mols_to_mmol_l(num_ex, volume)
 
-    # Convert to concentrations
-    conc = {}
-    for pore_id in sample["pore"].keys():
-        if pore_id[:5]=="shape":
-            conc[pore_id] = {}
-            conc[pore_id]["mumol_m2"] = utils.mols_to_mumol_m2(num[pore_id]["in"], surface[pore_id])
-    conc["mmol_l"] = utils.mols_to_mmol_l(num["ex"], volume)
-
-    return {"conc": conc, "num": num}
+    return {"conc": conc, "num": {"ex": num_ex, **num_in}}

@@ -8,4 +8,10 @@ __pycache__
 .ipynb_checkpoints
 .coverage
 .pytest_cache
-.vscode/
+.claude
+venv
+.vscode
+docs/_build
+docs/generated
+docs/autoapi
+tests/output

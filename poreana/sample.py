@@ -4,18 +4,17 @@
 """Sample functions to be run on clusters."""
 ################################################################################
 
-
-import sys
-import os
 import math
-import scipy
+import multiprocessing as mp
+import sys
+
+import chemfiles as cf
 import numpy as np
 import porems as pms
-import chemfiles as cf
-import multiprocessing as mp
+import scipy
 
-import poreana.utils as utils
 import poreana.geometry as geometry
+import poreana.utils as utils
 
 
 class Sample:
@@ -34,8 +33,7 @@ class Sample:
     Parameters
     ----------
     system : string, list
-        Link to poresystem object file or a list of dimensions for a simple box
-        analysisd
+        Link to poresystem object file or a list of box dimensions (nm)
     link_traj : string
         Link to trajectory file (trr or xtc)
     mol : Molecule
@@ -47,11 +45,15 @@ class Sample:
     entry : float, optional
         Remove pore entrance from calculation
     frame_end : int, optional
-        Set an end of trajectory analysis to stop the analysis earlier 
+        Set an end frame to stop the analysis earlier
     """
-    def __init__(self, system, link_traj, mol, atoms=[], masses=[], entry=0.5, frame_end = -1):
-        # Initialize
-        self._pore = utils.load(system, file_type="yml") if isinstance(system, str) else None
+
+    def __init__(
+        self, system, link_traj, mol, atoms=[], masses=[], entry=0.5, frame_end=-1
+    ):
+        self._pore = (
+            utils.load(system, file_type="yml") if isinstance(system, str) else None
+        )
         self._box = system if isinstance(system, list) else []
         self._traj = link_traj
         self._mol = mol
@@ -59,7 +61,6 @@ class Sample:
         self._masses = masses
         self._entry = entry
 
-        # Set analysis routines
         self._is_density = False
         self._is_gyration = False
         self._is_angle = False
@@ -68,282 +69,185 @@ class Sample:
         self._is_diffusion_vacf = False
         self._is_numpy = False
 
-        # Get molecule ids
-        self._atoms = [atom.get_name() for atom in mol.get_atom_list()] if not self._atoms else self._atoms
-        self._atoms = [atom_id for atom_id in range(mol.get_num()) if mol.get_atom_list()[atom_id].get_name() in self._atoms]
+        # Resolve atom indices from names
+        self._atoms = (
+            [atom.get_name() for atom in mol.get_atom_list()]
+            if not self._atoms
+            else self._atoms
+        )
+        self._atoms = [
+            i
+            for i in range(mol.get_num())
+            if mol.get_atom_list()[i].get_name() in self._atoms
+        ]
 
-        self._num_atoms = len(self._atoms)
-        # Check masses
+        # Resolve masses
         if not self._masses:
-            if self._num_atoms==mol.get_num():
+            if len(self._atoms) == mol.get_num():
                 self._masses = mol.get_masses()
-            elif self._num_atoms == 1:
+            elif len(self._atoms) == 1:
                 self._masses = [1]
-        # Convert masses to np array
-        self._masses = np.array(self._masses, float)
         self._sum_masses = sum(self._masses)
 
-        # Check atom mass consistency
-        if self._atoms and not len(self._masses) == self._num_atoms:
+        if self._atoms and len(self._masses) != len(self._atoms):
             print("Length of variables *atoms* and *masses* do not match!")
             return
 
-        # Get number of frames
+        # Pre-compute numpy arrays for hot-loop efficiency
+        self._masses_arr = np.array(self._masses, dtype=float)
+        self._atoms_per_mol = mol.get_num()
+
+        # Get trajectory metadata
         traj = cf.Trajectory(self._traj)
-        if frame_end == -1:
-            self._num_frame = traj.nsteps
-        else:
-            self._num_frame = frame_end
+        self._num_frame = traj.nsteps if frame_end == -1 else frame_end
 
-        # Get numer of residues
         frame = traj.read()
-        num_res = len(frame.topology.atoms)/mol.get_num()
+        num_res = len(frame.topology.atoms) / mol.get_num()
 
-        # Get box dimensions for non-pore systems
-        if self._box == []:
-            c = frame.cell
-            self._box = np.array(c.lengths) / 10
-
-        # Check number of residues
-        if abs(int(num_res)-num_res) >= 1e-5:
+        if abs(int(num_res) - num_res) >= 1e-5:
             print("Number of atoms is inconsistent with number of residues.")
             return
-        self.num_res = int(num_res)
 
-        # Create residue list with all relevant atom ids
-        self._res_list = {}
-        for res_id in range(int(self.num_res)):
-            self._res_list[res_id] = [res_id*mol.get_num()+atom for atom in range(mol.get_num()) if atom in self._atoms]
+        # Build residue-to-atom-index mapping as numpy arrays for fast slicing
+        n_res = int(num_res)
+        self.num_res = n_res
+        self._res_list = {
+            res_id: np.array(
+                [
+                    res_id * mol.get_num() + a
+                    for a in range(mol.get_num())
+                    if a in self._atoms
+                ]
+            )
+            for res_id in range(n_res)
+        }
 
-        # Get pore properties
-        #pore = pms.utils.load("data/pore_system.obj")
+        # Extract pore shape properties
         self._pore_props = {}
-
         if self._pore:
-            for pore_id in self._pore.keys():
-                if pore_id[:5]=="shape":
-                    self._pore_props[pore_id] = {}
-                    self._pore_props[pore_id]["type"] = self._pore[pore_id]["shape"]
-                    self._pore_props[pore_id]["focal"] = self._pore[pore_id]["parameter"]["centroid"]
-                    self._pore_props[pore_id]["length"] = self._pore[pore_id]["parameter"]["length"]
-
-                    # Get pore diameter and define shape
-                    if self._pore_props[pore_id]["type"] == "CYLINDER":
-                        self._pore_props[pore_id]["diam"] = self._pore[pore_id]["diameter"]
-                    elif self._pore_props[pore_id]["type"] == "CONE":
-                        self._pore_props[pore_id]["diam"] = self._pore[pore_id]["diameter"]
-                    elif self._pore_props[pore_id]["type"] == "SLIT":
-                        self._pore_props[pore_id]["diam"] = self._pore[pore_id]["diameter"]
-            self._pore_props["box"] = {}
-            self._pore_props["box"]["dimensions"] = np.array(self._pore["system"]["dimensions"])
-            self._pore_props["box"]["res"] = self._pore["system"]["reservoir"]
-    
+            for pore_id in self._pore:
+                if pore_id[:5] == "shape":
+                    p = self._pore[pore_id]
+                    self._pore_props[pore_id] = {
+                        "type": p["shape"],
+                        "focal": p["parameter"]["centroid"],
+                        "length": p["parameter"]["length"],
+                        "diam": p["diameter"],
+                    }
+            self._pore_props["box"] = {
+                "dimensions": self._pore["system"]["dimensions"],
+                "res": self._pore["system"]["reservoir"],
+            }
 
     ########
     # Bins #
     ########
     def _bin_in(self, bin_num):
-        """This function creates a simple bin structure for the interior of the
-        pore based on the pore diameter.
-
-        Parameters
-        ----------
-        bin_num : integer
-            Number of bins to be used
-
-        Returns
-        -------
-        data : dictionary
-            Dictionary containing a list of the bin width and a data list
-        """
-        # Define bins
+        """Radial bin structure for the pore interior."""
         width = {}
-        for pore_id in self._pore_props.keys():
-            if pore_id[:5]=="shape":
-                width[pore_id]=[]
-                width[pore_id] = [self._pore_props[pore_id]["diam"]/2/bin_num*x for x in range(bin_num+2)]
-        bins = [0 for x in range(bin_num+1)]
-        return {"width": width, "bins": bins}
-    
+        for pore_id in self._pore_props:
+            if pore_id[:5] == "shape":
+                r_max = self._pore_props[pore_id]["diam"] / 2
+                width[pore_id] = [r_max / bin_num * x for x in range(bin_num + 2)]
+        return {"width": width, "bins": [0] * (bin_num + 1)}
+
     def _bin_in_slit(self, bin_num):
-        """This function creates a simple bin structure for the interior of the
-        pore based on the pore diameter.
-
-        Parameters
-        ----------
-        bin_num : integer
-            Number of bins to be used
-
-        Returns
-        -------
-        data : dictionary
-            Dictionary containing a list of the bin width and a data list
-        """
-        # Define bins
+        """Bin structure across the slit pore height."""
+        y_max = self._pore_props["box"]["dimensions"][1]
         width = {}
-        for pore_id in self._pore_props.keys():
-            if pore_id[:5]=="shape":
-                width[pore_id]=[]
-                width[pore_id] = [self._pore_props["box"]["dimensions"][1]/bin_num*x for x in range(bin_num+2)]
-
-        bins = [0 for x in range(bin_num+1)]
-        return {"width": width, "bins": bins}
+        for pore_id in self._pore_props:
+            if pore_id[:5] == "shape":
+                width[pore_id] = [y_max / bin_num * x for x in range(bin_num + 2)]
+        return {"width": width, "bins": [0] * (bin_num + 1)}
 
     def _bin_in_const_A(self, bin_num):
-        """This function creates a bin structure for the interior of the
-        pore based on the pore diameter so that all bins have the same area.
-
-        Parameters
-        ----------
-        bin_num : integer
-            Number of bins to be used
-
-        Returns
-        -------
-        data : dictionary
-            Dictionary containing a list of the bin width and a data list
-        """
-        # Define bins
+        """Radial bin structure with equal bin area for the pore interior."""
         width = {}
-        for pore_id in self._pore.keys():
-            if pore_id[:5]=="shape":
-                width[pore_id] = []
+        bins = None
+        for pore_id in self._pore:
+            if pore_id[:5] == "shape":
                 diam = self._pore_props[pore_id]["diam"]
-                pore_surf = (diam)**2
-                bin_num = bin_num + 2
-                surf_per_bin = (pore_surf/bin_num)
+                n = bin_num + 2
+                pore_surf = diam**2
+                surf_per_bin = pore_surf / n
 
-                matrix_bins = []
-                for i in range(bin_num):
+                matrix_bins = np.zeros((n, n))
+                for i in range(n):
                     if i == 0:
-                        line = [0 for i in range(bin_num)]
-                        line[0] = 1
-                    elif i == (bin_num-1):
-                        line = [0 for i in range(bin_num)]
-                        line[-1] = 0
-                        line[-2] = 1
+                        matrix_bins[i, 0] = 1
+                    elif i == n - 1:
+                        matrix_bins[i, -2] = 1
                     else:
-                        line = [0 for i in range(bin_num)]
-                        line[i]= 1
-                        line[i-1] = -1
-                    matrix_bins.append(line)
-                    res_vec = [surf_per_bin for i in range(bin_num)]
-                    res_vec[-1] = -surf_per_bin + (diam/2) ** 2
-                x = scipy.sparse.linalg.lsmr(np.array(matrix_bins),res_vec)[0]
-                x[-1]=(diam/2)**2
-                width[pore_id] = list(np.sqrt(x)[:-1])
-                width[pore_id].insert(0,0)
+                        matrix_bins[i, i] = 1
+                        matrix_bins[i, i - 1] = -1
 
-                bins = [0 for x in range(bin_num+1)]
+                res_vec = [surf_per_bin] * n
+                res_vec[-1] = -surf_per_bin + (diam / 2) ** 2
+
+                x = scipy.sparse.linalg.lsmr(matrix_bins, res_vec)[0]
+                x[-1] = (diam / 2) ** 2
+                r_vals = list(np.sqrt(x)[:-1])
+                r_vals.insert(0, 0)
+                width[pore_id] = r_vals
+                bins = [0] * (n + 1)
 
         return {"width": width, "bins": bins}
 
     def _bin_ex(self, bin_num):
-        """This function creates a simple bin structure for the exterior of the
-        pore based on the reservoir length.
-
-        Parameters
-        ----------
-        bin_num : integer
-            Number of bins to be used
-
-        Returns
-        -------
-        data : dictionary
-            Dictionary containing a list of the bin width and a data list
-        """
-        # Process system
-        length = self._pore_props["box"]["res"] if self._pore_props else self._box[self._dens_inp["direction"]]
-
-        # Define bins
-        width = [length/bin_num*x for x in range(bin_num+1)]
-        bins = [0 for x in range(bin_num+1)]
-
-        return {"width": width, "bins": bins}
+        """Bin structure for the pore exterior / reservoir."""
+        length = (
+            self._pore_props["box"]["res"]
+            if self._pore_props
+            else self._box[self._dens_inp["direction"]]
+        )
+        width = list(np.linspace(0, length, bin_num + 1))
+        return {"width": width, "bins": [0] * (bin_num + 1)}
 
     def _bin_window(self, bin_num, len_window):
-        """This function creates window list for each bin for the interior of
-        the pore based on the pore diameter.
-
-        Parameters
-        ----------
-        bin_num : integer
-            Number of bins to be used
-        len_window : integer
-            Window length
-
-        Returns
-        -------
-        data : dictionary
-            Dictionary containing a list of the bin width and a data list
-        """
-        # Define bins
+        """Window bin structure for bin-diffusion inside the pore."""
         width = {}
-        for pore_id in self._pore_props.keys():
-            if pore_id[:5]=="shape":
-                width[pore_id] = []
-                width[pore_id] = [self._pore_props[pore_id]["diam"]/2/bin_num*x for x in range(bin_num+2)]
-        bins = [[0 for y in range(len_window)] for x in range(bin_num+1)]
+        for pore_id in self._pore_props:
+            if pore_id[:5] == "shape":
+                r_max = self._pore_props[pore_id]["diam"] / 2
+                width[pore_id] = [r_max / bin_num * x for x in range(bin_num + 2)]
+        return {"width": width, "bins": [[0] * len_window for _ in range(bin_num + 1)]}
 
-        return {"width": width, "bins": bins}
-
-    def _bin_box(self, bin_num, direction):
-        """This function creates a simple bin structure for the pore and
-        resevoir.
-
-        Parameters
-        ----------
-        bin_num : integer
-            Number of bins to be used
-        direction : integer, optional
-            Direction of descretization of the simulation box (x = 0; y = 1; z = 2)
-
-        Returns
-        -------
-        data : dictionary
-            Dictionary containing a list of the bin width and a data list
-        """
-        # Ask for system type (box or pore system)
-        if self._pore:
-            z_length = self._pore_props["box"]["dimensions"][direction]
-        else:
-            z_length = self._box[direction]
-
-        # Define bins
-        bins = [z_length/bin_num*x for x in range(bin_num+1)]
+    def _bin_mc(self, bin_num, direction):
+        """Bin structure spanning the full simulation length for MC diffusion."""
+        z_length = (
+            self._pore_props["box"]["dimensions"][direction]
+            if self._pore
+            else self._box[direction]
+        )
+        bins = list(np.linspace(0, z_length, bin_num + 1))
         return {"bins": bins}
-    
+
     def _bin_pore(self, bin_num):
-        """This function creates a simple bin structure for the interior of the
-        pore based on the pore diameter.
-
-        Parameters
-        ----------
-        bin_num : integer
-            Number of bins to be used
-
-        Returns
-        -------
-        data : dictionary
-            Dictionary containing a list of the bins for each pore
-        """
+        """Radial bin structure for the pore interior based on pore diameter."""
         bins = {}
-        for pore_id in self._pore.keys():
-            if pore_id[:5]=="shape":
-                if self._pore_props[pore_id]["type"] == "CYLINDER":
-                    bins[pore_id] = np.linspace(0, self._pore_props[pore_id]["diam"]/2, bin_num+1)
-                elif self._pore_props[pore_id]["type"] == "CONE":
-                    return "Cone binning not implemented yet."
-                elif self._pore_props[pore_id]["type"] == "SLIT":
-                    return "Slit binning not implemented yet."
-                    # bins[pore_id] = np.linspace(0, self._pore_props["box"]["dimensions"][1], bin_num+1)
+        for pore_id in self._pore:
+            if pore_id[:5] == "shape":
+                ptype = self._pore_props[pore_id]["type"]
+                if ptype == "CYLINDER":
+                    bins[pore_id] = np.linspace(
+                        0, self._pore_props[pore_id]["diam"] / 2, bin_num + 1
+                    )
+                else:
+                    return f"{ptype} radial binning not implemented yet."
         return {"bins": bins}
-
 
     ###########
     # Density #
     ###########
-    def init_density(self, link_out, bin_num=150, remove_pore_from_res=False, bin_const_A=False, avg_slit=True, direction=2):
+    def init_density(
+        self,
+        link_out,
+        bin_num=150,
+        remove_pore_from_res=False,
+        bin_const_A=False,
+        avg_slit=True,
+        direction=2,
+    ):
         """Enable density sampling routine.
 
         Parameters
@@ -353,105 +257,86 @@ class Sample:
         bin_num : integer, optional
             Number of bins to be used
         remove_pore_from_res : bool, optional
-            True to remove an extended pore volume from the reservoirs to only
-            consider the reservoir space intersecting the crystal grid
-        bin_const_A : bool, optinal
-            If true, all radial bins will have the same surface area, otherwise the bin-width will be constant
+            True to remove an extended pore volume from the reservoirs
+        bin_const_A : bool, optional
+            If true, all radial bins will have the same surface area
         avg_slit : bool, optional
-            If False the density profile over the height of the slit pore will calculated.
-            For all other systems/shapes the bool has to be True.
+            If False the density profile over the slit pore height is calculated
         direction : int, optional
-            Direction to calculate density of a box system (x=0, y=1, z=2)
+            Direction for box-system density (x=0, y=1, z=2)
         """
-        # Initialize
         self._is_density = True
-        self._dens_inp = {"output": link_out, "bin_num": bin_num,
-                          "remove_pore_from_res": remove_pore_from_res, "bin_const_A": bin_const_A, "avg_slit": avg_slit, "direction": direction}                   
-    
+        self._dens_inp = {
+            "output": link_out,
+            "bin_num": bin_num,
+            "remove_pore_from_res": remove_pore_from_res,
+            "bin_const_A": bin_const_A,
+            "avg_slit": avg_slit,
+            "direction": direction,
+        }
+
     def _density_data(self):
-        """Create density data structure.
-
-        Returns
-        -------
-        data : dictionary
-            Density data structure
-        """
-        # Initialize
+        """Create density data structure."""
         bin_num = self._dens_inp["bin_num"]
-        data = {}
-
-        # Fill dictionary
-        data["ex_width"] = self._bin_ex(bin_num)["width"]
-        data["ex"] = self._bin_ex(bin_num)["bins"]
+        ex = self._bin_ex(bin_num)
+        data = {"ex_width": ex["width"], "ex": ex["bins"]}
 
         if self._pore:
-            for pore_id in self._pore.keys():
-                if pore_id[:5]=="shape":
-                    data[pore_id]={}
+            for pore_id in self._pore:
+                if pore_id[:5] == "shape":
+                    data[pore_id] = {}
                     if self._dens_inp["bin_const_A"]:
-                        data[pore_id]["in_width"] = self._bin_in_const_A(bin_num)["width"][pore_id]
-                        data[pore_id]["in"] = self._bin_in_const_A(bin_num)["bins"]
-                    elif self._dens_inp["avg_slit"]==False:
-                        data[pore_id]["in_width"] = self._bin_in_slit(bin_num)["width"][pore_id]
-                        data[pore_id]["in"] = self._bin_in_slit(bin_num)["bins"]
-                    elif self._dens_inp["avg_slit"]==True:
-                        data[pore_id]["in_width"] = self._bin_in(bin_num)["width"][pore_id]
-                        data[pore_id]["in"] = self._bin_in(bin_num)["bins"]
-
+                        inner = self._bin_in_const_A(bin_num)
+                        data[pore_id]["in_width"] = inner["width"][pore_id]
+                        data[pore_id]["in"] = inner["bins"]
+                    elif not self._dens_inp["avg_slit"]:
+                        inner = self._bin_in_slit(bin_num)
+                        data[pore_id]["in_width"] = inner["width"][pore_id]
+                        data[pore_id]["in"] = inner["bins"]
+                    else:
+                        inner = self._bin_in(bin_num)
+                        data[pore_id]["in_width"] = inner["width"][pore_id]
+                        data[pore_id]["in"] = inner["bins"]
         return data
 
     def _density(self, data, region, dist, com, pore_id):
-        """This function samples the density inside and outside of the pore.
-
-        All atoms are sampled each frame if they are inside or outside the
-        bounds of the pore minus an optional entry length on both sides.
-
-        Inside the pore the atom instances will be added to radial cylindric
-        slices :math:`r_i-r_{i-1}` and outside to rectangular slices
-        :math:`z_j-z_{j-1}` with pore radius :math:`r_i` of radial slice
-        :math:`i` and length :math:`z_j` of slice :math:`j`.
-
-        Parameters
-        ----------
-        data : dictionary
-            Data dictionary containing bins for the pore interior and exterior
-        region : string
-            Indicator wether molecule is inside or outside pore
-        dist : float
-            Distance of center of mass to pore surface area
-        com : list
-            Center of mass of current molecule
-        """
-        # Initialize
+        """Sample density inside and outside of the pore."""
         bin_num = self._dens_inp["bin_num"]
-        # Molecule is inside pore
-        if (region=="in" and pore_id!=0):
+
+        if region == "in" and pore_id != 0:
             if self._dens_inp["bin_const_A"]:
-                index = np.digitize(dist, data[pore_id]["in_width"][1:])
-            elif self._dens_inp["avg_slit"]==False:
-                index = np.digitize(com[1],data[pore_id]["in_width"][1:])
-            elif self._dens_inp["avg_slit"]==True:
-                index = int(dist/data[pore_id]["in_width"][1])
+                index = np.digitize(dist[pore_id], data[pore_id]["in_width"][1:])
+            elif not self._dens_inp["avg_slit"]:
+                index = np.digitize(com[1], data[pore_id]["in_width"][1:])
+            else:
+                index = int(dist[pore_id] / data[pore_id]["in_width"][1])
 
             if index <= bin_num:
                 data[pore_id]["in"][index] += 1
 
-        # Molecule is in the reservoir
-        elif region=="ex":
-            # Calculate distance to crystobalit and apply perodicity
-            length = abs(com[2]-self._pore_props["box"]["dimensions"][2]) if self._pore and com[2] > self._pore_props["box"]["dimensions"][2]/2 else com[self._dens_inp["direction"]]
-            index = int(length/data["ex_width"][1])
+        elif region == "ex":
+            length = (
+                abs(com[2] - self._pore_props["box"]["dimensions"][2])
+                if self._pore and com[2] > self._pore_props["box"]["dimensions"][2] / 2
+                else com[self._dens_inp["direction"]]
+            )
+            index = int(length / data["ex_width"][1])
 
-            # Only consider reservoir space in vicinity of crystobalit
-            # Remove an extended pore volume from the reservoir
-            if self._pore and self._dens_inp["remove_pore_from_res"] and pore_id=="shape_00":
-                is_add = index <= bin_num and dist > self._pore_props[pore_id]["diam"]/2 and com[2]<=self._pore_props["box"][2]
+            if (
+                self._pore
+                and self._dens_inp["remove_pore_from_res"]
+                and pore_id == "shape_00"
+            ):
+                is_add = (
+                    index <= bin_num
+                    and dist[pore_id] > self._pore_props[pore_id]["diam"] / 2
+                    and com[2] <= self._pore_props["box"]["dimensions"][2]
+                )
             else:
                 is_add = index <= bin_num
 
             if is_add:
                 data["ex"][index] += 1
-
 
     ############
     # Gyration #
@@ -466,96 +351,77 @@ class Sample:
         bin_num : integer, optional
             Number of bins to be used
         """
-        # Initialize
         self._is_gyration = True
         self._gyr_inp = {"output": link_out, "bin_num": bin_num}
 
     def _gyration_data(self):
-        """Create gyration data structure.
-
-        Returns
-        -------
-        data : dictionary
-            Gyration data structure
-        """
-        # Initialize
+        """Create gyration data structure."""
         bin_num = self._gyr_inp["bin_num"]
-        data = {}
-
-        # Fill dictionary
-        data["ex_width"] = self._bin_ex(bin_num)["width"]
-        data["ex"] = self._bin_ex(bin_num)["bins"]
+        ex = self._bin_ex(bin_num)
+        data = {"ex_width": ex["width"], "ex": ex["bins"]}
 
         if self._pore:
-            for pore_id in self._pore.keys():
-                if pore_id[:5]=="shape":
-                    data[pore_id] = {}
-                    data[pore_id]["in_width"] = self._bin_in(bin_num)["width"][pore_id]
-                    data[pore_id]["in"] = self._bin_in(bin_num)["bins"]
-
+            for pore_id in self._pore:
+                if pore_id[:5] == "shape":
+                    inner = self._bin_in(bin_num)
+                    data[pore_id] = {
+                        "in_width": inner["width"][pore_id],
+                        "in": inner["bins"],
+                    }
         return data
 
     def _gyration(self, data, region, dist, com, pos, pore_id):
-        """This function calculates the gyration radius of molecules inside the
-        pore.
-
-        All atoms are sampled each frame if they are inside the bounds of the
-        pore minus an optional entry length on both sides.
-
-        Inside the pore the atom instances will be added to radial cylindric
-        slices :math:`s_{r,j}-s_{r,j-1}` and outside to rectangular slices
-        :math:`s_{z,k}-s_{z,k-1}` with pore radius :math:`s_{r,j}` of radial
-        slice :math:`j` and length :math:`s_{z,k}` of slice :math:`k`.
-
-        The gyration radius is calculated using
+        r"""Sample the radius of gyration inside and outside of the pore.
 
         .. math::
 
-            R_g=\\left(\\frac{\\sum_i\\|\\boldsymbol{r}_i\\|^2m_i}{\\sum_im_i})\\right)^{\\frac{1}{2}}
-
-        with mass :math:`m_i` and position :math:`\\boldsymbol{r}_i` of atom
-        :math:`i` with respect to the center of mass of the molecule.
+            R_g=\left(\frac{\sum_i\|\boldsymbol{r}_i\|^2m_i}{\sum_im_i}\right)^{\frac{1}{2}}
 
         Parameters
         ----------
         data : dictionary
-            Data dictionary containing bins for the pore interior and exterior
+            Data dictionary with bins for pore interior and exterior
         region : string
-            Indicator wether molecule is inside or outside pore
-        dist : float
-            Distance of center of mass to pore surface area
-        com : list
-            Center of mass of current molecule
-        pos : list
-            List of atom positions of current molecule
+            'in' or 'ex'
+        dist : dict
+            Distance of CoM to pore axis per pore shape
+        com : array-like
+            Centre of mass of the current molecule
+        pos : ndarray
+            Atom positions of the current molecule, shape (n_atoms, 3)
+        pore_id : str or int
+            Active pore id, or 0 for exterior
         """
-        # Initialize
         bin_num = self._gyr_inp["bin_num"]
 
-        # Calculate gyration radius
-        r_g = (sum([geometry.length(geometry.vector(pos[atom_id], com))**2*self._masses[atom_id] for atom_id in range(self._num_atoms)])/self._sum_masses)**0.5
+        diffs = pos - np.asarray(com)
+        r_sq = np.einsum("ij,ij->i", diffs, diffs)
+        r_g = float(np.sqrt(np.dot(r_sq, self._masses_arr) / self._sum_masses))
 
-        # Add molecule to bin
-        if region=="in" and pore_id!=0:
-            index = int(dist/data[pore_id]["in_width"][1])
+        if region == "in" and pore_id != 0:
+            index = int(dist[pore_id] / data[pore_id]["in_width"][1])
             if index <= bin_num:
                 data[pore_id]["in"][index] += r_g
 
-        elif region=="ex":
-            # Calculate distance to crystobalit and apply perodicity
-            lentgh = abs(com[2]-self._pore_props["box"]["dimensions"][2]) if self._pore and com[2] > self._pore_props["box"]["dimensions"][2]/2 else com[2]
-            index = int(lentgh/data["ex_width"][1])
+        elif region == "ex":
+            length = (
+                abs(com[2] - self._pore_props["box"]["dimensions"][2])
+                if self._pore and com[2] > self._pore_props["box"]["dimensions"][2] / 2
+                else com[2]
+            )
+            index = int(length / data["ex_width"][1])
 
-            # Only consider reservoir space in vicinity of crystobalit
-            # Remove an extended pore volume from the reservoir
-            if self._pore and pore_id!=0:
-                is_add = index <= bin_num and dist > self._pore_props[pore_id]["diam"]/2 and com[2]<=self._pore_props["box"]["dimensions"][2]
+            if self._pore and pore_id != 0:
+                is_add = (
+                    index <= bin_num
+                    and dist[pore_id] > self._pore_props[pore_id]["diam"] / 2
+                    and com[2] <= self._pore_props["box"]["dimensions"][2]
+                )
             else:
                 is_add = index <= bin_num
 
             if is_add:
                 data["ex"][index] += r_g
-
 
     #########
     # Angle #
@@ -568,147 +434,156 @@ class Sample:
         link_out : string
             Link to output hdf5, obj or yml data file
         vector_atoms : list
-            List of two atom ids to define the molecule vector
+            List of two atom ids defining the molecule vector
         bin_num : integer, optional
             Number of bins to be used
         normals : dictionary, optional
-            Dictionary defining surface normal vector functions of the interior
-            *in* and exterior *ex* surcace - {"in": def normal_in(pos): return ..., ...}
+            Surface normal vector functions for interior *in* and exterior *ex*
         """
-        # Initialize
         self._is_angle = True
 
-        # Define normals
         if not normals:
             normals = {}
             if self._pore:
-                for pore_id in self._pore.keys():
-                    if pore_id[:5]=="shape":
+                for pore_id in self._pore:
+                    if pore_id[:5] == "shape":
                         normals[pore_id] = {}
-                        if self._pore_props[pore_id]["type"]=="CYLINDER":
-                            shape = pms.Cylinder({"centroid": self._pore_props[pore_id]["focal"], "central": [0, 0, 1], "length": self._pore_props["box"]["dimensions"][2], "diameter": self._pore_props[pore_id]["diam"]})
-                            def normal_in(pos): return shape.normal(pos)
-                            def normal_ex(pos): return [0, 0, -1] if pos[2] < (self._pore_props["box"]["dimensions"][2]-self._pore_props["box"]["res"]) else [0, 0, 1]
+                        if self._pore_props[pore_id]["type"] == "CYLINDER":
+                            shape = pms.Cylinder(
+                                {
+                                    "centroid": self._pore_props[pore_id]["focal"],
+                                    "central": [0, 0, 1],
+                                    "length": self._pore_props["box"]["dimensions"][2],
+                                    "diameter": self._pore_props[pore_id]["diam"],
+                                }
+                            )
+
+                            def normal_in(pos, _s=shape):
+                                return _s.normal(pos)
+
+                            def normal_ex(pos, _pp=self._pore_props):
+                                return (
+                                    [0, 0, -1]
+                                    if pos[2]
+                                    < (_pp["box"]["dimensions"][2] - _pp["box"]["res"])
+                                    else [0, 0, 1]
+                                )
+
                             normals[pore_id] = {"in": normal_in}
                             normals["ex"] = normal_ex
                         else:
-                            print("Angle: Shape normal not predefined yet. Please set the 'normals' variable...")
+                            print(
+                                "Angle: Shape normal not predefined yet. Please set the 'normals' variable..."
+                            )
                             return
             else:
-                def normal_in(pos): return [0, 0, 1]
-                def normal_ex(pos): return [0, 0, 1]
-                normals = {"in": normal_in, "ex": normal_ex}
+                normals = {
+                    "in": lambda pos: [0, 0, 1],
+                    "ex": lambda pos: [0, 0, 1],
+                }
         self._angle_normals = normals
-        print(self._angle_normals)
-        # Global input
-        self._angle_inp = {"output": link_out, "vector_atoms": vector_atoms, "bin_num": bin_num}
+        self._angle_inp = {
+            "output": link_out,
+            "vector_atoms": vector_atoms,
+            "bin_num": bin_num,
+        }
 
     def _angle_data(self):
-        """Create angle data structure.
-
-        Returns
-        -------
-        data : dictionary
-            Angle data structure
-        """
-        # Initialize
+        """Create angle data structure."""
         bin_num = self._angle_inp["bin_num"]
-        data = {}
-
-        # Fill dictionary
-        data["ex_width"] = self._bin_ex(bin_num)["width"]
-        data["ex"] = self._bin_ex(bin_num)["bins"]
+        ex = self._bin_ex(bin_num)
+        data = {"ex_width": ex["width"], "ex": ex["bins"]}
 
         if self._pore:
-            for pore_id in self._pore.keys():
-                if pore_id[:5]=="shape":
-                    data[pore_id] = {}
-                    data[pore_id]["in_width"] = self._bin_in(bin_num)["width"][pore_id]
-                    data[pore_id]["in"] = self._bin_in(bin_num)["bins"]
+            for pore_id in self._pore:
+                if pore_id[:5] == "shape":
+                    inner = self._bin_in(bin_num)
+                    data[pore_id] = {
+                        "in_width": inner["width"][pore_id],
+                        "in": inner["bins"],
+                    }
         return data
 
     def _angle(self, data, region, dist, com, pos, pore_id):
-        """This function calculates the angle between a molecule vector defined
-        between two atoms and the surface normal vector at the postition of the
-        molecules center of mass. Hereby all angles all summed up per bin.
-
-        If a box system is analyzed, the normal vector is the z-axis.
+        """Sample the molecule-surface angle inside and outside the pore.
 
         Parameters
         ----------
         data : dictionary
-            Data dictionary containing bins for the pore interior and exterior
+            Data dictionary with bins
         region : string
-            Indicator wether molecule is inside or outside pore
-        dist : float
-            Distance of center of mass to pore surface area
-        com : list
-            Center of mass of current molecule
-        pos : list
-            List of atom positions of current molecule
+            'in' or 'ex'
+        dist : dict
+            Distance of CoM to pore axis per shape
+        com : array-like
+            Centre of mass of the current molecule
+        pos : ndarray
+            Atom positions of the current molecule, shape (n_atoms, 3)
+        pore_id : str or int
+            Active pore id, or 0 for exterior
         """
-        # Initialize
         bin_num = self._angle_inp["bin_num"]
         vector_atoms = self._angle_inp["vector_atoms"]
         normals = self._angle_normals
 
-        # Calculate angle between molecule vector and surface normal
-        if region in ["in"] and pore_id !=0:
-            # Determine molecule vector
-            vec = geometry.vector(pos[vector_atoms[0]], pos[vector_atoms[1]])
-            # Calculate angle
-            angle = geometry.angle(vec, normals[pore_id]["in"](com))
-        elif region=="ex":
-            # Determine molecule vector
-            vec = geometry.vector(pos[vector_atoms[0]], pos[vector_atoms[1]])
-            # Calculate angle
-            angle = geometry.angle(vec, normals["ex"](com))
-
-        # Add molecule to bin
-        if region=="in" and pore_id !=0:
-            index = int(dist/data[pore_id]["in_width"][1])
+        if region == "in" and pore_id != 0:
+            vec = pos[vector_atoms[1]] - pos[vector_atoms[0]]
+            angle_val = geometry.angle(vec, normals[pore_id]["in"](com))
+            index = int(dist[pore_id] / data[pore_id]["in_width"][1])
             if index <= bin_num:
-                data[pore_id]["in"][index] += angle
+                data[pore_id]["in"][index] += angle_val
 
-        elif region=="ex":
-            # Calculate distance to crystobalit and apply perodicity
-            lentgh = abs(com[2]-self._pore_props["box"]["dimensions"][2]) if self._pore and com[2] > self._pore_props["box"]["dimensions"][2]/2 else com[2]
-            index = int(lentgh/data["ex_width"][1])
+        elif region == "ex":
+            vec = pos[vector_atoms[1]] - pos[vector_atoms[0]]
+            angle_val = geometry.angle(vec, normals["ex"](com))
+            length = (
+                abs(com[2] - self._pore_props["box"]["dimensions"][2])
+                if self._pore and com[2] > self._pore_props["box"]["dimensions"][2] / 2
+                else com[2]
+            )
+            index = int(length / data["ex_width"][1])
 
-            # Only consider reservoir space in vicinity of crystobalit
-            # Remove an extended pore volume from the reservoir
-            if self._pore and pore_id!=0:
-                print(self._pore_props, pore_id)
-                is_add = index <= bin_num and dist > self._pore_props[pore_id]["diam"]/2 and com[2]<=self._pore_props["box"]["dimensions"][2]
+            if self._pore and pore_id != 0:
+                is_add = (
+                    index <= bin_num
+                    and dist[pore_id] > self._pore_props[pore_id]["diam"] / 2
+                    and com[2] <= self._pore_props["box"]["dimensions"][2]
+                )
             else:
                 is_add = index <= bin_num
 
             if is_add:
-                data["ex"][index] += angle
-
+                data["ex"][index] += angle_val
 
     #############
     # Diffusion #
     #############
-    def init_diffusion_bin(self, link_out, bin_num=50, len_obs=16e-12, len_frame=2e-12, len_step=2, bin_step_size=1):
-        """Enable diffusion sampling routine.
+    def init_diffusion_bin(
+        self,
+        link_out,
+        bin_num=50,
+        len_obs=16e-12,
+        len_frame=2e-12,
+        len_step=2,
+        bin_step_size=1,
+    ):
+        """Enable bin-diffusion sampling routine.
 
         Parameters
         ----------
         link_out : string
-            Link to hdf5, obj or yml data file
+            Link to output obj or yml data file
         bin_num : integer, optional
-            Number of bins to be used
+            Number of radial bins
         len_obs : float, optional
-            Observation length of a window in seconds
+            Observation window length in seconds
         len_frame : float, optional
-            Length of a frame in seconds
+            Frame length in seconds
         len_step : integer, optional
-            Length of the step size between frames
+            Step size between frames
         bin_step_size : integer, optional
-            Number of allowed bins for the molecule to leave
+            Allowed radial bin displacement per window
         """
-        # Initialize
         if self._is_diffusion_mc:
             print("Binning and MC-approaches cannot be run in parallel.")
             return
@@ -718,258 +593,147 @@ class Sample:
         if self._is_numpy:
             print("Binning and numpy-approaches cannot be run in parallel.")
             return
-        if self._pore:
-            self._is_diffusion_bin = True
-        else:
+        if not self._pore:
             print("Bin diffusion currently only usable for pore system.")
             return
+        self._is_diffusion_bin = True
 
-        # Define window length
-        len_window = len_obs/len_step/len_frame+1
-        if not len_window == int(len_window):
-            obs_u = (math.ceil(len_window)-1)*len_step*len_frame
-            obs_d = (math.floor(len_window)-1)*len_step*len_frame
-            print("Observation length not possible with current inputs. Alternatively use len_obs="+"%.1e" % obs_u+" or len_obs="+"%.1e" % obs_d+".")
+        len_window = len_obs / len_step / len_frame + 1
+        if len_window != int(len_window):
+            obs_u = (math.ceil(len_window) - 1) * len_step * len_frame
+            obs_d = (math.floor(len_window) - 1) * len_step * len_frame
+            print(
+                f"Observation length not possible. Use len_obs={'%.1e' % obs_u} or {'%.1e' % obs_d}."
+            )
             return
-        else:
-            len_window = int(len_window)
+        len_window = int(len_window)
 
-        # Create input dictionalry
-        self._diff_bin_inp = {"output": link_out, "bin_step_size": bin_step_size,
-                              "bin_num": bin_num, "len_step": len_step,
-                              "len_frame": len_frame, "len_window": len_window}
+        self._diff_bin_inp = {
+            "output": link_out,
+            "bin_step_size": bin_step_size,
+            "bin_num": bin_num,
+            "len_step": len_step,
+            "len_frame": len_frame,
+            "len_window": len_window,
+        }
 
     def _diffusion_bin_data(self):
-        """Create bin diffusion data structure.
-
-        Returns
-        -------
-        data : dictionary
-            Bin diffusion data structure
-        """
-
-        # Initialize
+        """Create bin-diffusion data structure."""
         bin_num = self._diff_bin_inp["bin_num"]
         len_window = self._diff_bin_inp["len_window"]
-
-        # Create dictionary
         data = {}
-        for pore_id in self._pore.keys():
-            if pore_id[:5]=="shape":
-                data[pore_id] = {}
-                data[pore_id]["width"] = self._bin_window(bin_num, len_window)["width"][pore_id]
-                bins = ["z", "r", "n", "z_tot", "r_tot", "n_tot"]
-                for bin in bins:
-                    data[pore_id][bin] = self._bin_window(bin_num, len_window)["bins"]
-
+        for pore_id in self._pore:
+            if pore_id[:5] == "shape":
+                w = self._bin_window(bin_num, len_window)
+                data[pore_id] = {"width": w["width"][pore_id]}
+                for key in ("z", "r", "n", "z_tot", "r_tot", "n_tot"):
+                    data[pore_id][key] = [[0] * len_window for _ in range(bin_num + 1)]
         return data
 
     def _diffusion_bin_step(self, idx):
-        """Helper function to define allowed bin step list.
+        """List of bin indices within the allowed displacement of idx."""
+        s = self._diff_bin_inp["bin_step_size"]
+        return list(range(idx + s, idx - 1, -1)) + list(range(idx - 1, idx - s - 1, -1))
 
-        Parameters
-        ----------
-        idx : integer
-            Bin index
-        """
-        out_list = [idx+x for x in range(self._diff_bin_inp["bin_step_size"], 0, -1)]
-        out_list += [idx]
-        out_list += [idx-x for x in range(1, self._diff_bin_inp["bin_step_size"]+1)]
-        return out_list
-
-    def _diffusion_bin(self, data, region, pore_in, dist, com_list, idx_list, res_id, com):
-        """This function samples the mean square displacement of a molecule
-        group in a pore in both axial and radial direction separated in radial
-        bins.
-
-        First a centre of mass-list is filled with :math:`w\\cdot s` frames with
-        window length :math:`w` and stepsize :math:`s`. Each following frame
-        removes the first com of the list and a new added to the end of it. This
-        way only one loop over the frames is needed, since each frame is only
-        needed for :math:`w\\cdot s` frames in total.
-
-        All molecule com's are sampled each window if they are inside the bounds
-        of the pore minus an entry length on both sides. Once the com leaves the
-        boundary, it is no longer sampled for this specific window.
-        Additionally, the radial bin index is checked for each frame. If the
-        molecule com stays in the pore for the whole window length and in the
-        same starting bin plus an allowed offset, the msd is added to it is
-        added to a the corresponding window starting radial bin. The sub
-        volumes, or rather bins, of the radial distance are calculated by
-
-        .. math::
-
-            V_i^\\text{radial}=\\pi z_\\text{pore}(r_i^2-r_{i-1}^2)
-
-        with :math:`r` of bin :math:`i` and pore length :math:`z_\\text{pore}`.
-
-        Once the first com-list is filled, the mean square displacement (msd)
-        is sampled each frame. The axial diffusion only considers the
-        deviation in :math:`z` direction
-
-        .. math::
-
-            \\text{msd}_\\text{axial}=\\langle\\left[z(0)-z(t_i)\\right]^2\\rangle
-            =\\frac{\\left[z(0)-z(t_i)\\right]^2}{M_i}
-
-        with time :math:`t` and normalization :math:`M` at bin :math:`i`.
-        The radial diffusion only considers the radial components :math:`x` and
-        :math:`y`
-
-        .. math::
-
-            \\text{msd}_\\text{radial}=\\langle\\left[r(0)-r(t_i)\\right]^2\\rangle
-            =\\frac{\\left[\\sqrt{x^2(0)+y^2(0)}-\\sqrt{x^2(t_i)+y^2(t_i)}\\right]^2}{M_i}.
+    def _diffusion_bin(
+        self, data, region, pore_in, dist, com_list, idx_list, res_id, com
+    ):
+        r"""Sample mean-square displacement for bin-diffusion inside the pore.
 
         Parameters
         ----------
         data : dictionary
-            Data dictionary containing bins for axial and radial diffusion
+            Data dictionary with axial/radial msd bins
         region : string
-            Indicator wether molecule is inside or outside pore
-        dist : float
-            Distance of center of mass to pore surface area
-        com_list : list
-            List of dictionaries containing coms of all molecules for each frame
-        index_list : list
-            List of dictionaries containing bin id of all molecules for each frame
+            'in' or 'ex'
+        pore_in : str or int
+            Active pore id
+        dist : dict
+            Distance of CoM to pore axis per shape
+        com_list : dict
+            Sliding window of CoM per residue per pore
+        idx_list : dict
+            Sliding window of bin indices per residue per pore
         res_id : integer
             Current residue id
-        com : list
-            Center of mass of current molecule
+        com : array-like
+            Centre of mass of the current molecule
         """
-        # Initialize
         bin_num = self._diff_bin_inp["bin_num"]
         len_step = self._diff_bin_inp["len_step"]
         len_window = self._diff_bin_inp["len_window"]
 
-        # Only sample diffusion inside the pore
-        if region == "in":
-            # Calculate bin index
-            index = math.floor(dist/data[pore_in]["width"][1])
+        if region != "in":
+            return
 
-            # Add com and bin index to global lists
-            com_list[pore_in][-1][res_id] = com
-            idx_list[pore_in][-1][res_id] = index
+        index = math.floor(dist[pore_in] / data[pore_in]["width"][1])
+        com_list[pore_in][-1][res_id] = com
+        idx_list[pore_in][-1][res_id] = index
 
-            # Start sampling when initial window is filled
-            if len(com_list[pore_in]) == len_window*len_step and res_id in com_list[pore_in][0]:
-                # Set reference position
-                pos_ref = com_list[pore_in][0][res_id]
-                idx_ref = idx_list[pore_in][0][res_id]
+        if (
+            len(com_list[pore_in]) == len_window * len_step
+            and res_id in com_list[pore_in][0]
+        ):
+            pos_ref = com_list[pore_in][0][res_id]
+            idx_ref = idx_list[pore_in][0][res_id]
 
-                # Create temporary msd lists
-                msd_z = [0 for x in range(len_window)]
-                msd_r = [0 for x in range(len_window)]
-                norm = [0 for x in range(len_window)]
-                len_msd = 0
+            msd_z = [0] * len_window
+            msd_r = [0] * len_window
+            norm = [0] * len_window
+            len_msd = 0
 
-                # Run through position list to sample msd
-                for step in range(0, len_window*len_step, len_step):
-                    # Check if com is inside pore
-                    if res_id in com_list[pore_in][step]:
-                        # Initialize step information
-                        pos_step = com_list[pore_in][step][res_id]
-                        idx_step = idx_list[pore_in][step][res_id]
+            for step in range(0, len_window * len_step, len_step):
+                if res_id not in com_list[pore_in][step]:
+                    break
+                pos_step = com_list[pore_in][step][res_id]
+                idx_step = idx_list[pore_in][step][res_id]
+                win_idx = step // len_step
 
-                        # Get window index
-                        win_idx = int(step/len_step)
+                msd_z[win_idx] += (pos_ref[2] - pos_step[2]) ** 2
+                msd_r[win_idx] += (
+                    geometry.length(
+                        geometry.vector(pos_ref, [pos_step[0], pos_step[1], pos_ref[2]])
+                    )
+                    ** 2
+                )
+                norm[win_idx] += 1
 
-                        # Add to msd
-                        msd_z[win_idx] += (pos_ref[2]-pos_step[2])**2
-                        msd_r[win_idx] += geometry.length(geometry.vector(pos_ref, [pos_step[0], pos_step[1], pos_ref[2]]))**2
+                if idx_step in self._diffusion_bin_step(idx_ref):
+                    len_msd += 1
+                else:
+                    break
 
-                        # Add to normalize
-                        norm[win_idx] += 1
-
-                        # Check if com is within range of reference bin
-                        if idx_step in self._diffusion_bin_step(idx_ref):
-                            len_msd += 1
-
-                        # COM left radial bin
-                        else: break
-                    # COM left the boundary
-                    else: break
-
-                # Save msd
-                if idx_ref <= bin_num:
-                    for i in range(len_window):
-                        # Add to total list
-                        data[pore_in]["z_tot"][idx_ref][i] += msd_z[i]
-                        data[pore_in]["r_tot"][idx_ref][i] += msd_r[i]
-                        data[pore_in]["n_tot"][idx_ref][i] += norm[i]
-
-                        # Add to bin calculation list if msd is permissible
-                        if len_msd == len_window:
-                            data[pore_in]["z"][idx_ref][i] += msd_z[i]
-                            data[pore_in]["r"][idx_ref][i] += msd_r[i]
-                            data[pore_in]["n"][idx_ref][i] += norm[i]
-
+            if idx_ref <= bin_num:
+                for i in range(len_window):
+                    data[pore_in]["z_tot"][idx_ref][i] += msd_z[i]
+                    data[pore_in]["r_tot"][idx_ref][i] += msd_r[i]
+                    data[pore_in]["n_tot"][idx_ref][i] += norm[i]
+                    if len_msd == len_window:
+                        data[pore_in]["z"][idx_ref][i] += msd_z[i]
+                        data[pore_in]["r"][idx_ref][i] += msd_r[i]
+                        data[pore_in]["n"][idx_ref][i] += norm[i]
 
     ################
     # MC Diffusion #
     ################
-    def init_diffusion_mc(self, link_out, len_step, bin_num=100, len_frame=2e-12, direction = 2):
-        """Enable diffusion sampling routine with the MC Alogrithm.
-
-        This function sample the transition matrix for the diffusion
-        calculation with the Monte Carlo diffusion methode for a cubic
-        simulation box. The sample of the transition matrix is to be run on
-        the cluster due to a high time and resource consumption. The output,
-        a data object, is then used to calculate the self-diffusion using
-        further calculation functions for the MC Diffusion methode.
-
-        It is necessary to caculate the transition matrix for different step
-        length and so for different lag times. A lagtime
-        :math:`\\Delta t_{\\alpha}` is defined by
-
-        .. math::
-
-            \\Delta t_{\\alpha} = t_{i,\\alpha} - t_{j,\\alpha}
-
-        with :math:`i` and :math:`j` as the current state of the system at two
-        different times and :math:`\\alpha` as past time between the two states.
-        To sample the transition matrix the frame length :math:`t` has to
-        be specifiy and this frame length is for all lag times the same.
-        The variation of the lag time is happend by adapting the step length
-        :math:`s` which indicates the interval between the frames. The lag time
-        is than calculated by
-
-        .. math::
-
-            \\Delta t_{\\alpha} = t \\cdot s
-
-        After the sampling a model class has to set and then the MC calculation
-        can run. Subsequently the final mean diffusion coefficient can be
-        determined with a extrapolation to
-        :math:`\\Delta t_{\\alpha} \\rightarrow \\infty`.
-        For the etxrapolation we need the mean diffusion over the bins for
-        different chosen lag times. That's why we have to calculate the results
-        and the transition matrix for several lag times. More information about
-        post processing and the extrapolation that you can find in
-        :func:`poreana.diffusion.mc_fit`.
-
-        The direction of descretization can be also choosen using the input variable
-        :math:`\\mathrm{direction}`. The simulation box
-        can be divided in every spatial direction and so the transition matrix
-        is sampled in the chosen direction and the diffusion is calculated in
-        this direction.
+    def init_diffusion_mc(
+        self, link_out, len_step, bin_num=100, len_frame=2e-12, direction=2
+    ):
+        r"""Enable MC-diffusion transition-matrix sampling.
 
         Parameters
         ----------
         link_out : string
-            Link to hdf5, obj or yml data file
+            Link to output obj or yml data file
         len_step : list
-            Length of the step size between frames
+            Step lengths (lag times) to sample
         bin_num : integer, optional
-            Number of bins to be used
+            Number of spatial bins
         len_frame : float, optional
-            Length of a frame in seconds
+            Frame length in seconds
         direction : integer, optional
-            Direction of descretization of the simulation box (**0** (x-axis);
-            **1** (y-axis); **2** (z-axis))
+            Spatial direction (0=x, 1=y, 2=z)
         """
-        # Initialize
         if self._is_diffusion_bin:
             print("Binning and MC-approaches cannot be run in parallel.")
             return
@@ -979,192 +743,124 @@ class Sample:
         if self._is_numpy:
             print("Numpy and MC-approaches cannot be run in parallel.")
             return
-
-        if direction not in [0,1,2]:
-            print("Wrong directional input. Possible inputs are 0 (x-axis), 1 (y-axis), and 2 (z-axis)...")
+        if direction not in [0, 1, 2]:
+            print(
+                "Wrong directional input. Possible inputs are 0 (x-axis), 1 (y-axis), and 2 (z-axis)..."
+            )
             return
 
-        # Enable routine
         self._is_diffusion_mc = True
+        bins = self._bin_mc(bin_num, direction)["bins"]
+        len_step = sorted(len_step)
 
-        # Calculate bins
-        bins = self._bin_box(bin_num, direction)["bins"]
-
-        # Sort len_step list
-        len_step.sort()
-
-        # Create input dictionalry
-        self._diff_mc_inp = {"output": link_out, "bins": bins,
-                              "bin_num": bin_num, "len_step": len_step,
-                              "len_frame": len_frame, "is_pbc": True, "direction" : int(direction)}
+        self._diff_mc_inp = {
+            "output": link_out,
+            "bins": bins,
+            "bin_num": bin_num,
+            "len_step": len_step,
+            "len_frame": len_frame,
+            "is_pbc": True,
+            "direction": int(direction),
+        }
 
     def _diffusion_mc_data(self):
-        """Create mc diffusion data structure.
-
-        Returns
-        -------
-        data : dictionary
-            Bin diffusion data structure
-        """
-        # Initialize
+        """Create MC-diffusion data structure."""
         bin_num = self._diff_mc_inp["bin_num"]
-        len_step = self._diff_mc_inp["len_step"]
-
-        # Create dictionary
-        data = {}
-
-        # Initialize transition matrix
-        for step in len_step:
-            data[step] = np.zeros((bin_num+2, bin_num+2), int)
-
-        return data
+        return {
+            step: np.zeros((bin_num + 2, bin_num + 2), int)
+            for step in self._diff_mc_inp["len_step"]
+        }
 
     def _diffusion_mc(self, data, idx_list, com, res_id, frame_list, frame_id):
-        """This function sample the transition matrix for the diffusion
-        calculation with the Monte Carlo diffusion methode for a cubic
-        simulation box. The sample of the transition matrix is to be run on
-        the cluster due to a high time and resource consumption. The output,
-        a h5 data file, is then used to calculate the self-diffusion using
-        further calculation functions for the MC Diffusion methode.
-
-        It is necessary to caculate the transition matrix for different step
-        length and so for different lag times. A lagtime
-        :math:`\\Delta t_{\\alpha}` is defined by
-
-        .. math::
-
-            \\Delta t_{\\alpha} = t_{i,\\alpha} - t_{j,\\alpha}
-
-        with :math:`i` and :math:`j` as the current state of the system at two
-        different times and :math:`\\alpha` as past time between the two states.
-        To sample the transition matrix the frame length :math:`t` has to
-        be specifiy and this frame length is for all lag times the same.
-        The variation of the lag time is happend by adapting the step length
-        :math:`s` which indicates the interval between the frames. The lag time
-        is than calculated by
-
-        .. math::
-
-            \\Delta t_{\\alpha} = t \\cdot s
-
-        After the sampling a model class has to set and then the MC calculation
-        can run. Subsequently the final mean diffusion coefficient can be
-        determined with a extrapolation to
-        :math:`\\Delta t_{\\alpha} \\rightarrow \\infty`.
-        For the etxrapolation we need the mean diffusion over the bins for
-        different chosen lag times. That's why we have to calculate the results
-        and the transition matrix for several lag times. More information about
-        post processing and the extrapolation that you can find in
-        :func:`diffusion.diffusion_fit`
+        """Sample the MC-diffusion transition matrix.
 
         Parameters
         ----------
         data : dictionary
-            Data dictionary containing bins for axial and radial diffusion
-        index_list : list
-            List of dictionaries containing bin id of all molecules for each frame
-        com : list
-            Center of mass of current molecule
+            Transition matrices keyed by step length
+        idx_list : list
+            Sliding list of bin-index dicts per frame
+        com : array-like
+            CoM of the current molecule
         res_id : integer
             Current residue id
         frame_list : list
-            List of frame ids to process
+            Frame ids assigned to this worker
         frame_id : integer
-            Current frame_id
+            Current frame id
         """
-        # Initialize
         len_step = self._diff_mc_inp["len_step"]
         bins = self._diff_mc_inp["bins"]
         direction = self._diff_mc_inp["direction"]
 
-        # Calculate bin index
         idx_list[-1][res_id] = np.digitize(com[direction], bins)
 
-        # Sample the transition matrix for the len_step
-        if frame_list[0]==0:
+        if frame_list[0] == 0:
             for step in len_step:
-                if len(idx_list) >= (step+1):
-                    # Calculate transition matrix in z direction
-                    start = idx_list[-(step+1)][res_id]
-                    end = idx_list[-1][res_id]
-                    data[step][end, start] += 1
+                if len(idx_list) >= step + 1:
+                    data[step][idx_list[-1][res_id], idx_list[-(step + 1)][res_id]] += 1
 
-        # For parallel calculation
-        if frame_list[0]!=0 and frame_id>=(frame_list[0] + self._diff_mc_inp["len_step"][-1]):
+        elif frame_id >= frame_list[0] + self._diff_mc_inp["len_step"][-1]:
             for step in len_step:
-                if len(idx_list) >= (step+1):
-                    # Calculate transition matrix in z direction
-                    start = idx_list[-(step+1)][res_id]
-                    end = idx_list[-1][res_id]
-                    data[step][end, start] += 1
+                if len(idx_list) >= step + 1:
+                    data[step][idx_list[-1][res_id], idx_list[-(step + 1)][res_id]] += 1
 
+    ######################
+    # VACF Diffusion     #
+    ######################
+    def init_diffusion_vacf(
+        self,
+        link_out: str,
+        len_correration=2e-11,
+        new_time_origin=2e-13,
+        sample_step=20,
+        len_frame=1e-15,
+        bin_num=32,
+        direction=2,
+        sample_each_residue=False,
+    ):
+        """Enable VACF diffusion sampling for local diffusion coefficients.
 
-    ##################
-    # VACF Diffusion #
-    ##################
-    def init_diffusion_vacf(self, link_out: str, len_correration=2e-11, new_time_origin=2e-13, sample_step=20, len_frame=1e-15, bin_num=32, direction=2, sample_each_residue=False):
-        """Enable diffusion sampling routine with the local VACF Alogrithm.
-        
-        This function samples the local velocity autocorrelation function for
-        the diffusion calculation in all three directions. The local diffusion 
-        coefficient in a direction :math:`\\alpha` is calculated by
+        Samples the local velocity autocorrelation function (VACF) to compute
+        direction-resolved diffusion coefficients per spatial bin. For cylindrical
+        pores, ``direction='radial'`` bins in the radial coordinate and computes
+        diffusion in cylindrical coordinates (radial, tangential, axial).
 
-        .. math::
-            D_{\\alpha,l} = \\frac{1}{N_l}\\sum_{i=1}^{N}\\int_0^{\\infty} \\langle v_{\\alpha,i,l}(0)v_{\\alpha,i}(t)\\rangle dt
-
-        with :math:`N_l` as the average number of molecules in the local region, 
-        :math:`v_{\\alpha,i}` as the velocity of molecule :math:`i` in direction 
-        :math:`\\alpha` and :math:`v_{\\alpha,i,l}(t)` as :math:`v_{\\alpha,i}(t)S_{q,i}(t)`
-        with :math:`S_{q,i}` as a swich function that is 1 if the molecule
-        :math:`i` is in the local region and 0 otherwise. 
-        
-        The local region is defined by a binning of the simulation box in the 
-        chosen direction, if the direction is **0** (x-axis), **1** (y-axis), or
-        **2** (z-axis). If the system is a pore system, consisting of pores all
-        the same shape, sharing the same axis, the direction can be chosen as 
-        "radial" to bin the system in bins according to the distance to the 
-        center of the pore. The diffusion is then calculated in coordinates
-        corresponding to the pore shape. For cylindrical pores, the diffusion is
-        calculated in cylindrical coordinates (radial, tangential, axial), for
-        slit pores in Cartesian coordinates (x, y, z).
-
-        The VACF is sampled for a correlation time and choosing a new time origin
-        after a certain time. 
-
-        The method was described by Hunter et al. in the Journal of Chemical Physics. Theory Comput. , 18(12), pp.3357–3363.
-        
         Parameters
         ----------
         link_out : string
-            Link to obj data file
+            Output file path
         len_correration : float, optional
-            Length of the correlation time in seconds
+            Correlation time in seconds
         new_time_origin : float, optional
-            Time between new time origins in seconds
+            Time between successive time origins in seconds
         sample_step : integer, optional
-            Step size of the sampling in your simulation in frames
+            Frames between velocity samples
         len_frame : float, optional
-            Length of a frame in your simulation in seconds
+            Frame length in seconds
         bin_num : integer, optional
-            Number of bins to be used
-        direction : integer or string, optional
-            Direction of descretization of the simulation box (**0** (x-axis);
-            **1** (y-axis); **2** (z-axis)) If the system is a pore system,
-            the direction can also be "radial" to bin the system in radial bins
+            Number of spatial bins
+        direction : integer or ``'radial'``, optional
+            Binning direction: 0 (x), 1 (y), 2 (z), or ``'radial'`` for
+            cylindrical pore systems
         sample_each_residue : bool, optional
-            If True, the VACF is sampled for each residue separately, default is False
+            Sample VACF per residue instead of per bin average
         """
-        # Calculate correlation steps and new time origin steps
-        corr_steps = int(round(len_correration/len_frame/sample_step))
-        new_time_origin_steps = int(round(new_time_origin/len_frame/sample_step))
+        corr_steps = int(round(len_correration / len_frame / sample_step))
+        new_time_origin_steps = int(round(new_time_origin / len_frame / sample_step))
         if corr_steps < 1 or new_time_origin_steps < 1:
-            print("VACF needs a correlation time longer than one frame. Please adjust len_correration and/or new_time_origin.")
+            print(
+                "VACF needs a correlation time longer than one frame. "
+                "Please adjust len_correration and/or new_time_origin."
+            )
             return
-        if 2*corr_steps-1 >= self._num_frame:
-            print("VACF correlation time is too long for the number of frames in the trajectory. Please reduce len_correration or use a longer trajectory.")
+        if 2 * corr_steps - 1 >= self._num_frame:
+            print(
+                "VACF correlation time is too long for the number of frames. "
+                "Please reduce len_correration or use a longer trajectory."
+            )
             return
 
-        # Initialize
         if self._is_diffusion_bin:
             print("Binning and VACF-approaches cannot be run in parallel.")
             return
@@ -1172,531 +868,559 @@ class Sample:
             print("MC and VACF-approaches cannot be run in parallel.")
             return
         if self._is_numpy:
-            print("VACF-approaches cannot be run in parallel with numpy approaches.")
+            print("VACF and numpy-approaches cannot be run in parallel.")
             return
-        if direction not in [0,1,2] and (direction=="radial" and not self._pore):
-            print("Wrong directional input. Possible inputs are 0 (x-axis), 1 (y-axis), 2 (z-axis), and 'radial' (only for pore systems).")
+        if direction not in [0, 1, 2] and not (direction == "radial" and self._pore):
+            print(
+                "Wrong directional input. Options: 0 (x), 1 (y), 2 (z), "
+                "or 'radial' (pore systems only)."
+            )
             return
-        if self._traj.split(".")[-1]!="trr":
-            print("VACF needs a trajectory file with velocities. Please use a .trr file.")
+        if self._traj.split(".")[-1] != "trr":
+            print("VACF requires a .trr trajectory file with velocities.")
             return
-        if direction=="radial":
-            # Check if all pores share the same cylindrical axis
-            axes = []
-            shape = []
-            for pore_id in self._pore.keys():
-                if pore_id[:5]=="shape":
-                    if self._pore_props[pore_id]["type"]=="CYLINDER":
-                        axes.append(tuple(self._pore_props[pore_id]["focal"][0:2]))
-                        shape.append(self._pore_props[pore_id]["type"])
+
+        if direction == "radial":
+            axes, shapes = [], []
+            for pore_id in self._pore:
+                if pore_id[:5] == "shape":
+                    if self._pore_props[pore_id]["type"] == "CYLINDER":
+                        axes.append(tuple(self._pore_props[pore_id]["focal"][:2]))
+                        shapes.append(self._pore_props[pore_id]["type"])
                     else:
-                        print("Full radial diffusion only available for pore systems consisting of cylindrical pores.")
+                        print(
+                            "Radial VACF only available for cylindrical pore systems."
+                        )
                         return
-            if not all(axis == axes[0] for axis in axes):
-                print("Radial diffusion only available for pore systems consisting of pores, all sharing the same cylindrical axis.")
+            if not all(a == axes[0] for a in axes):
+                print(
+                    "Radial VACF requires all pores to share the same cylindrical axis."
+                )
                 return
-            if all(s == shape[0] for s in shape):
-                if shape[0]=="CYLINDER":
-                    direction = "radial_cylindrical"
+            if all(s == shapes[0] for s in shapes) and shapes[0] == "CYLINDER":
+                direction = "radial_cylindrical"
             else:
-                print("Radial diffusion only available for pore systems consisting of pores of the same shape.")
+                print("Radial VACF requires all pores to be the same shape.")
                 return
 
-        # Enable routine
         self._is_diffusion_vacf = True
 
-        # Calculate bins
-        if direction=="radial_cylindrical":
+        if direction == "radial_cylindrical":
             bins = self._bin_pore(bin_num)["bins"]
         else:
-            bins = self._bin_box(bin_num, direction)["bins"]
+            bins = self._bin_mc(bin_num, direction)["bins"]
 
-        # Create input dictionary
-        self._diff_vacf_inp = {"output": link_out,"bins": bins, "len_correration": len_correration,  
-                               "new_time_origin": new_time_origin, "sample_step": sample_step, 
-                               "len_frame": len_frame, "bin_num": bin_num, "direction": direction, 
-                               "corr_steps": corr_steps, "new_time_origin_steps": new_time_origin_steps,
-                               "num_res": self.num_res, "sample_each_residue": sample_each_residue}
+        self._diff_vacf_inp = {
+            "output": link_out,
+            "bins": bins,
+            "len_correration": len_correration,
+            "new_time_origin": new_time_origin,
+            "sample_step": sample_step,
+            "len_frame": len_frame,
+            "bin_num": bin_num,
+            "direction": direction,
+            "corr_steps": corr_steps,
+            "new_time_origin_steps": new_time_origin_steps,
+            "num_res": self.num_res,
+            "sample_each_residue": sample_each_residue,
+        }
 
     def _diffusion_vacf_data(self) -> dict:
-        """Create VACF diffusion data structure.
-
-        Returns
-        -------
-        data : dictionary
-            VACF diffusion data structure, containing vacf_data 
-            (bin_num, corr_steps, num_residues, 3) and 
-            density (bin_num, num_residues)
-        """
-        # Initialize
+        """Create the VACF diffusion data structure."""
         bin_num = self._diff_vacf_inp["bin_num"]
         corr_steps = self._diff_vacf_inp["corr_steps"]
-        sample_each_residue = self._diff_vacf_inp["sample_each_residue"]
+        per_res = self._diff_vacf_inp["sample_each_residue"]
+        n_res = self.num_res if per_res else 1
 
-        # Create dictionary
         data = {}
-
-        # For pore systems
         if self._pore:
-            for pore_id in self._pore.keys():
-                if pore_id[:5]=="shape":
-                    data[pore_id] = {}
-                    if sample_each_residue:
-                        data[pore_id]["vacf_data"] = np.zeros((bin_num, corr_steps, self.num_res, 3), float)
-                        data[pore_id]["density"] = np.zeros((bin_num, self.num_res), int)
-                    else:
-                        data[pore_id]["vacf_data"] = np.zeros((bin_num, corr_steps, 1, 3), float)
-                        data[pore_id]["density"] = np.zeros((bin_num, 1), int)
-        # For box systems
+            for pore_id in self._pore:
+                if pore_id[:5] == "shape":
+                    data[pore_id] = {
+                        "vacf_data": np.zeros((bin_num, corr_steps, n_res, 3), float),
+                        "density": np.zeros((bin_num, n_res), int),
+                    }
         else:
-            # Initialize vacf and density data
-            if sample_each_residue:
-                data["vacf_data"] = np.zeros((bin_num, corr_steps, self.num_res, 3), float)
-                data["density"] = np.zeros((bin_num, self.num_res), int)
-            else:
-                data["vacf_data"] = np.zeros((bin_num, corr_steps, 1, 3), float)
-                data["density"] = np.zeros((bin_num, 1), int)
-
+            data = {
+                "vacf_data": np.zeros((bin_num, corr_steps, n_res, 3), float),
+                "density": np.zeros((bin_num, n_res), int),
+            }
         return data
 
-    def _diffusion_vacf(self, data: dict, frame_id: int, pos_list: np.ndarray, pos_pointer: int, vel_list: np.ndarray, vel_pointer: int):
-        """
-        This function samples the local velocity autocorrelation function (VACF) for
-        the diffusion calculation.
+    def _diffusion_vacf(
+        self,
+        data: dict,
+        frame_id: int,
+        pos_list: np.ndarray,
+        pos_pointer: int,
+        vel_list: np.ndarray,
+        vel_pointer: int,
+    ):
+        """Sample the local VACF for all bins at one time origin.
 
-        It uses a given buffer of velocities for a correlation time to sample the VACF
-        if the current frame is a new time origin. The VACF is sampled for each bin
-        forward and backward in time.
-        
         Parameters
         ----------
         data : dictionary
-            Data dictionary containing bins for VACF diffusion
+            VACF data structure
         frame_id : integer
-            Current frame id
+            Current frame index
         pos_list : numpy.ndarray
-            List of molecule positions of all buffered frames
-            shape: (corr_steps, num_molecules, 3)
+            Circular buffer of CoM positions, shape (corr_steps, n_res, 3)
         pos_pointer : integer
-            Pointer to the current frame in the position list
+            Current write position in pos_list
         vel_list : numpy.ndarray
-            List of molecule velocities of all buffered frames
-            shape: (2*corr_steps-1, num_molecules, 3)
+            Circular buffer of CoM velocities, shape (2*corr_steps-1, n_res, 3)
         vel_pointer : integer
-            Pointer to the current frame in the velocity list
+            Current write position in vel_list
         """
         bins = self._diff_vacf_inp["bins"]
         direction = self._diff_vacf_inp["direction"]
         corr_steps = self._diff_vacf_inp["corr_steps"]
         new_time_origin_steps = self._diff_vacf_inp["new_time_origin_steps"]
-        sample_each_residue = self._diff_vacf_inp["sample_each_residue"]
+        per_res = self._diff_vacf_inp["sample_each_residue"]
 
-        if direction=="radial_cylindrical":
-            direction = 0  # radial direction in cylindrical coordinates
+        if direction == "radial_cylindrical":
+            direction = 0
 
-        if (frame_id-corr_steps)%new_time_origin_steps==0:
-            pos = pos_list[pos_pointer, :, direction] # positions of v(0), shape: (num_molecules); Pos pointer is at t=0
+        if (frame_id - corr_steps) % new_time_origin_steps != 0:
+            return
 
-            # Vel pointer is at frame_id-(2*corr_steps-1) -> shift by +corr_steps-1 is middle of buffer which is t=0; mask is for t=0
-            vel_pointer = (vel_pointer + corr_steps - 1) % vel_list.shape[0]  # Adjust pointer to t=0
-            
-            # Create forward and backward indices for correlation steps
-            forward_index = (np.arange(corr_steps) + vel_pointer) % vel_list.shape[0]  # Indices for backward velocities
-            backward_index = (np.arange(corr_steps)[::-1] + vel_pointer + corr_steps) % vel_list.shape[0]  # Indices for forward velocities
+        pos = pos_list[pos_pointer, :, direction]
+        vel_pointer = (vel_pointer + corr_steps - 1) % vel_list.shape[0]
+        forward_idx = (np.arange(corr_steps) + vel_pointer) % vel_list.shape[0]
+        backward_idx = (
+            np.arange(corr_steps)[::-1] + vel_pointer + corr_steps
+        ) % vel_list.shape[0]
 
-            # Loop over all pores or just the box
-            for pore_id in self._pore.keys() if self._pore else [None]:
-                # For pore systems
-                if pore_id:
-                    if pore_id[:5]!="shape":
-                        continue
-                    data_pore = data[pore_id]
-                    bin_pore = bins[pore_id]
-                    res = self._pore_props["box"]["res"]
-                    z_min = res + self._pore_props[pore_id]["focal"][2]-self._pore_props[pore_id]["length"]/2+self._entry
-                    z_max = res + self._pore_props[pore_id]["focal"][2]+self._pore_props[pore_id]["length"]/2-self._entry
-                    # Filter all molecules that are inside the pore in z-direction
-                    pore_mask = (z_min < pos_list[pos_pointer, :, 2]) & (pos_list[pos_pointer, :, 2] < z_max)
-                    in_wall_mask = (pos > (self._pore_props[pore_id]["diam"]*1.01)/2)
-                # For box systems (all molecules are in the "pore" and not in the wall)
+        for pore_id in self._pore.keys() if self._pore else [None]:
+            if pore_id is not None:
+                if pore_id[:5] != "shape":
+                    continue
+                data_p = data[pore_id]
+                bin_p = bins[pore_id]
+                res = self._pore_props["box"]["res"]
+                z_min = (
+                    res
+                    + self._pore_props[pore_id]["focal"][2]
+                    - self._pore_props[pore_id]["length"] / 2
+                    + self._entry
+                )
+                z_max = (
+                    res
+                    + self._pore_props[pore_id]["focal"][2]
+                    + self._pore_props[pore_id]["length"] / 2
+                    - self._entry
+                )
+                pore_mask = (z_min < pos_list[pos_pointer, :, 2]) & (
+                    pos_list[pos_pointer, :, 2] < z_max
+                )
+                if self._diff_vacf_inp["direction"] == "radial_cylindrical":
+                    r_from_axis = pos
                 else:
-                    data_pore = data
-                    bin_pore = bins
-                    pore_mask = np.ones(pos.shape, dtype=bool)
-                    in_wall_mask = np.zeros(pos.shape, dtype=bool)
+                    focal = self._pore_props[pore_id]["focal"]
+                    r_from_axis = np.sqrt(
+                        (pos_list[pos_pointer, :, 0] - focal[0]) ** 2
+                        + (pos_list[pos_pointer, :, 1] - focal[1]) ** 2
+                    )
+                in_wall_mask = (
+                    r_from_axis > self._pore_props[pore_id]["diam"] * 1.01 / 2
+                )
+            else:
+                data_p = data
+                bin_p = bins
+                pore_mask = np.ones(pos.shape, dtype=bool)
+                in_wall_mask = np.zeros(pos.shape, dtype=bool)
 
-                com_bins = np.digitize(pos, bin_pore) - 1  # bin indices for each molecule
-                # If there are molecules that should be in a bin, print a warning
-                if np.any(com_bins[pore_mask] >= len(bin_pore) - 1) or np.any(com_bins[pore_mask] < 0):
-                    print("WARNING: Some molecules are outside the defined bins at frame", frame_id, "Number of molecules outside bins:", np.sum((com_bins[pore_mask] >= len(bin_pore) - 1) | (com_bins[pore_mask] < 0)))
-                    print("WARNING: Position min/max:", np.min(pos[pore_mask]), np.max(pos[pore_mask]))
+            com_bins = np.digitize(pos, bin_p) - 1
+            n_bins = len(bin_p) - 1
+            for bin_id in range(n_bins):
+                mask = (com_bins == bin_id) & pore_mask & ~in_wall_mask
+                if not np.any(mask):
+                    continue
+                vel0 = vel_list[vel_pointer, mask, :]
+                fwd = vel_list[forward_idx][:, mask, :]
+                bwd = vel_list[backward_idx][:, mask, :]
+                vacf = (vel0[np.newaxis] * fwd + vel0[np.newaxis] * bwd) / 2
 
-                for bin_id in range(len(bin_pore) - 1):
-                    bin_mask = (com_bins == bin_id)
-
-                    # All molecules to consider are in a bin, inside the pore, and not in the wall
-                    mask = bin_mask & pore_mask & ~in_wall_mask
-                    if not np.any(mask):
-                        print("WARNING: No molecules found in bin", bin_id, "at frame", frame_id)
-                        continue
-                    # Get filtered velocities for molecules in this bin (v_l(0) part in the equation)
-                    vel0 = vel_list[vel_pointer, mask, :]  # shape: (num_mol_in_bin, 3)
-                    # Build the velocity forward time series for these molecules (v(t) part in the equation)
-                    forward_velos = vel_list[forward_index][:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3); It is not the same as vel_list[forward_index, :, mask]
-                    # Build the velocity backward time series for these molecules (v(t) part in the equation)
-                    backward_velos = vel_list[backward_index][:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3)
-                    # Concatenate forward and backward
-                    vacf = (vel0[np.newaxis, :, :] * forward_velos + vel0[np.newaxis, :, :] * backward_velos) / 2 # shape: (corr_steps, num_mol_in_bin, 3)
-
-                    if sample_each_residue:
-                        res_indices = np.where(mask)[0]
-                        data_pore["vacf_data"][bin_id, :, :, :][:, res_indices, :] += vacf # It is not the same as [bin_id, :, res_indices, :]
-                        data_pore["density"][bin_id, res_indices] += 1
-                    else:
-                        data_pore["vacf_data"][bin_id, :, 0, :] += np.sum(vacf, axis=1)
-                        data_pore["density"][bin_id, 0] += np.sum(mask)
+                if per_res:
+                    idx = np.where(mask)[0]
+                    data_p["vacf_data"][bin_id, :, idx, :] += vacf.transpose(0, 1, 2)[
+                        :, :, :
+                    ]
+                    data_p["density"][bin_id, idx] += 1
+                else:
+                    data_p["vacf_data"][bin_id, :, 0, :] += np.sum(vacf, axis=1)
+                    data_p["density"][bin_id, 0] += np.sum(mask)
 
     ##################
     # Numpy Sampling #
     ##################
     def init_numpy_file(self, link_out, positions=True, velocities=True):
-        """Enable numpy sampling routine.
-
-        This function enables the numpy sampling routine. It is used to
-        sample the positions and/or velocities of the molecules in the system. The
-        output is stored in a .npz data file. The shape of the data is 
-        (num_frames, num_molecules, 3) for positions and velocities.
+        """Enable numpy position/velocity sampling.
 
         Parameters
         ----------
         link_out : string
-            Name to numpy data file
+            Output ``.npz`` file path
         positions : bool, optional
-            True to sample positions of the molecules, default is True
+            Sample CoM positions (default True)
         velocities : bool, optional
-            True to sample velocities of the molecules, default is True
+            Sample CoM velocities (default True); requires a ``.trr`` trajectory
         """
         if self._is_diffusion_bin or self._is_diffusion_mc or self._is_diffusion_vacf:
-            print("Numpy sampling cannot be run in parallel with diffusion sampling.")
+            print("Numpy sampling cannot run in parallel with diffusion sampling.")
             return
-        if velocities and self._traj.split(".")[-1]!="trr":
-            print("You need a trajectory file with velocities. Please use a .trr file.")
+        if velocities and self._traj.split(".")[-1] != "trr":
+            print("Velocity sampling requires a .trr trajectory file.")
             return
-        # Enable routine
         self._is_numpy = True
-
-        # Create input dictionary
-        self._numpy_inp = {"output": link_out, "positions": positions, "velocities": velocities}
+        self._numpy_inp = {
+            "output": link_out,
+            "positions": positions,
+            "velocities": velocities,
+        }
 
     def _numpy_data(self):
-        """Create numpy data structure.
-
-        Returns
-        -------
-        data : dictionary
-            Numpy data structure, containing positions and/or velocities
-        """
-        # Initialize
+        """Create numpy sampling data structure."""
         data = {}
-
-        # Add positions and velocities
         if self._numpy_inp["positions"]:
             data["positions"] = np.zeros((self._num_frame, self.num_res, 3), float)
         if self._numpy_inp["velocities"]:
             data["velocities"] = np.zeros((self._num_frame, self.num_res, 3), float)
-
         return data
-    
+
     def _numpy(self, data, positions, velocities, frame_id):
-        """This function samples the positions and velocities of the molecules
-        in the system. The output is stored in a numpy data file.
+        """Record CoM positions and velocities for one frame.
 
         Parameters
         ----------
         data : dictionary
-            Data dictionary containing positions and velocities
-        positions : numpy.ndarray
-            List of atom positions of current frame
-        velocities : numpy.ndarray
-            List of atom velocities of current frame
+            Numpy data structure
+        positions : array-like
+            Raw atom positions for this frame
+        velocities : array-like
+            Raw atom velocities for this frame
         frame_id : integer
-            Current frame id
+            Current frame index
         """
-        # Add positions and velocities to data dictionary
         if self._numpy_inp["positions"]:
-            pos = np.array(positions).reshape((self.num_res, self._num_atoms, 3)) / 10 # Convert to nm
-            pos_com = np.sum(pos * self._masses[np.newaxis,: , np.newaxis], axis=1) / self._sum_masses
-            data["positions"][frame_id] = pos_com
-
+            pos = (
+                np.asarray(positions).reshape((self.num_res, self._atoms_per_mol, 3))[
+                    :, self._atoms, :
+                ]
+                / 10
+            )
+            data["positions"][frame_id] = (
+                np.sum(pos * self._masses_arr[np.newaxis, :, np.newaxis], axis=1)
+                / self._sum_masses
+            )
         if self._numpy_inp["velocities"]:
-            vel = np.array(velocities).reshape((self.num_res, self._num_atoms, 3)) * 100 # Convert to m/s
-            vel_com = np.sum(vel * self._masses[np.newaxis,: , np.newaxis], axis=1) / self._sum_masses
-            data["velocities"][frame_id] = vel_com
+            vel = (
+                np.asarray(velocities).reshape((self.num_res, self._atoms_per_mol, 3))[
+                    :, self._atoms, :
+                ]
+                * 100
+            )
+            data["velocities"][frame_id] = (
+                np.sum(vel * self._masses_arr[np.newaxis, :, np.newaxis], axis=1)
+                / self._sum_masses
+            )
 
     ############
     # Sampling #
     ############
-    def sample(self, shift=[0, 0, 0], num_cores=0, is_pbc=True, is_broken=False, is_parallel=True):
-        """This function runs all enabled sampling routines. The output is
-        stored in form of pickle files for later calculation using methods
-        provided in the package.
-
-        Note that the sampling should be run on a cluster due to a high time and
-        resource consumption.
+    def sample(
+        self, shift=[0, 0, 0], n_proc=0, is_pbc=True, is_broken=False, is_parallel=True
+    ):
+        """Run all enabled sampling routines.
 
         Parameters
         ----------
         shift : list, optional
-            Vector for translating atoms in nm
-        num_cores : integer, optional
-            Number of cores to use
+            Translation vector in nm
+        n_proc : integer, optional
+            Number of CPU cores (0 = all available)
         is_pbc : bool, optional
             True to apply periodic boundary conditions
         is_broken : bool, optional
-            True to check for broken molecules during sampling
+            True to flag broken molecules
         is_parallel : bool, optional
-            True to run parallelized sampling
+            True to use multiprocessing
         """
-        # Process input
-        if not len(shift)==3:
+        if len(shift) != 3:
             print("Sample - Wrong shift dimension.")
             return
 
-        # Get number of available cores
-        avail_cores = mp.cpu_count()
-        # for cluster compatibility
-        cluster_tasks = (
-            os.getenv("SLURM_NTASKS")
-            or os.getenv("PBS_NP")
-            or os.getenv("LSB_DJOB_NUMPROC")
-            or os.getenv("NSLOTS")
-        )
-        cluster_tasks = int(cluster_tasks) if cluster_tasks else None
-        max_cores = min(avail_cores, cluster_tasks) if cluster_tasks else avail_cores-1
-        num_cores = num_cores if num_cores and num_cores<=max_cores else max_cores
+        n_proc = n_proc if n_proc and n_proc <= mp.cpu_count() else mp.cpu_count()
 
-        # Error message
         if is_parallel and self._is_angle:
             print("Currently the angle routine cannot be parallelized...")
             return
 
-        # Run sampling helper
         if is_parallel:
-            # Divide number of frames on processors
-            frame_num = math.floor(self._num_frame/num_cores)
+            frame_num = math.floor(self._num_frame / n_proc)
+            frame_start = [frame_num * i for i in range(n_proc)]
+            frame_end = [
+                frame_num * (i + 1) if i < n_proc - 1 else self._num_frame
+                for i in range(n_proc)
+            ]
 
-            # Define bounds
-            frame_start = [frame_num*i for i in range(num_cores)]
-            frame_end = [frame_num*(i+1) if i<num_cores-1 else self._num_frame for i in range(num_cores)]
-
-            # Substract window filling for bin diffusion
             if self._is_diffusion_bin:
-                frame_start = [x-self._diff_bin_inp["len_window"]*self._diff_bin_inp["len_step"]+1 if i>0 else x for i, x in enumerate(frame_start)]
+                win = self._diff_bin_inp["len_window"] * self._diff_bin_inp["len_step"]
+                frame_start = [
+                    x - win + 1 if i > 0 else x for i, x in enumerate(frame_start)
+                ]
 
             if self._is_diffusion_mc:
-                frame_end = [x+max(self._diff_mc_inp["len_step"]) for i, x in enumerate(frame_end)]
+                max_step = max(self._diff_mc_inp["len_step"])
+                frame_end = [x + max_step for x in frame_end]
                 for i in range(len(frame_end)):
                     if frame_end[i] >= self._num_frame:
-                        frame_end[i] = frame_end[-1]-max(self._diff_mc_inp["len_step"])
+                        frame_end[i] = frame_end[-1] - max_step
 
-            # Shift window to last new time origin and extend it by correlation time
             if self._is_diffusion_vacf:
-                shift_start = [start%self._diff_vacf_inp["new_time_origin_steps"] for start in frame_start]
-                shift_end = [end%self._diff_vacf_inp["new_time_origin_steps"] for end in frame_end]
-                frame_start = [max(0, start-shift_start[i]-self._diff_vacf_inp["corr_steps"]+1) for i, start in enumerate(frame_start)]
-                frame_end = [min(self._num_frame, end-shift_end[i]+self._diff_vacf_inp["corr_steps"]) for i, end in enumerate(frame_end)]
+                cs = self._diff_vacf_inp["corr_steps"]
+                nto = self._diff_vacf_inp["new_time_origin_steps"]
+                frame_start = [max(0, s - s % nto - cs + 1) for s in frame_start]
+                frame_end = [min(self._num_frame, e - e % nto + cs) for e in frame_end]
 
-            # Create working lists for processors
-            frame_np = [list(range(frame_start[i], frame_end[i])) for i in range(num_cores)]
-
-            # Run parallel search
-            pool = mp.Pool(processes=num_cores)
-            results = [pool.apply_async(self._sample_helper, args=(frame_list, np.array(shift), is_pbc, is_broken,)) for frame_list in frame_np]
+            frame_np = [
+                list(range(frame_start[i], frame_end[i])) for i in range(n_proc)
+            ]
+            _ctx = mp.get_context("fork") if sys.platform != "win32" else mp
+            pool = _ctx.Pool(processes=n_proc)
+            results = [
+                pool.apply_async(
+                    self._sample_helper, args=(fl, shift, is_pbc, is_broken)
+                )
+                for fl in frame_np
+            ]
             pool.close()
             pool.join()
             output = [x.get() for x in results]
-
-            # Destroy object
             del results
         else:
-            # Run sampling
-            output = [self._sample_helper(list(range(self._num_frame)), np.array(shift), is_pbc, is_broken)]
+            output = [
+                self._sample_helper(
+                    list(range(self._num_frame)), shift, is_pbc, is_broken
+                )
+            ]
 
-        # Concatenate output and create pickle object files
-        system = {"sys": "pore", "props": self._pore_props} if self._pore else {"sys": "box", "props": {"length" :self._box}}
-        inp = {"num_frame": self._num_frame, "mass": self._sum_masses, "entry": self._entry}
+        system = (
+            {"sys": "pore", "props": self._pore_props}
+            if self._pore
+            else {"sys": "box", "props": {"length": self._box}}
+        )
+        inp = {
+            "num_frame": self._num_frame,
+            "mass": self._mol.get_mass(),
+            "entry": self._entry,
+        }
 
         if self._is_density:
-            inp_dens = inp.copy()
-            inp_dens.update(self._dens_inp)
-            inp_dens.pop("output")
+            inp_dens = {
+                **inp,
+                **{k: v for k, v in self._dens_inp.items() if k != "output"},
+            }
             data_dens = output[0]["density"]
             for out in output[1:]:
                 if self._pore:
-                    for pore_id in output[0]["density"].keys():
-                        if pore_id[:5]=="shape":
-                            data_dens[pore_id]["in"] = [x+y for x, y in zip(data_dens[pore_id]["in"], out["density"][pore_id]["in"])]
-                data_dens["ex"] = [x+y for x, y in zip(data_dens["ex"], out["density"]["ex"])]
-
-            # Pickle
-            results = {system["sys"]: system["props"], "inp": inp_dens, "data": data_dens, "type": "dens_bin"}
-            utils.save(results, self._dens_inp["output"])
+                    for pore_id in data_dens:
+                        if pore_id[:5] == "shape":
+                            data_dens[pore_id]["in"] = [
+                                x + y
+                                for x, y in zip(
+                                    data_dens[pore_id]["in"],
+                                    out["density"][pore_id]["in"],
+                                )
+                            ]
+                data_dens["ex"] = [
+                    x + y for x, y in zip(data_dens["ex"], out["density"]["ex"])
+                ]
+            utils.save(
+                {
+                    system["sys"]: system["props"],
+                    "inp": inp_dens,
+                    "data": data_dens,
+                    "type": "dens_bin",
+                },
+                self._dens_inp["output"],
+            )
 
         if self._is_gyration:
-            inp_gyr = inp.copy()
-            inp_gyr.update(self._gyr_inp)
-            inp_gyr.pop("output")
+            inp_gyr = {
+                **inp,
+                **{k: v for k, v in self._gyr_inp.items() if k != "output"},
+            }
             data_gyr = output[0]["gyration"]
             for out in output[1:]:
                 if self._pore:
-                    for pore_id in output[0]["gyration"].keys():
-                        if pore_id[:5]=="shape":
-                            data_gyr[pore_id]["in"] = [x+y for x, y in zip(data_gyr[pore_id]["in"], out["gyration"][pore_id]["in"])]
-                data_gyr["ex"] = [x+y for x, y in zip(data_gyr["ex"], out["gyration"]["ex"])]
-
-            # Pickle
-            results = {system["sys"]: system["props"], "inp": inp_gyr, "data": data_gyr, "type": "gyr_bin"}
-            utils.save(results, self._gyr_inp["output"])
+                    for pore_id in data_gyr:
+                        if pore_id[:5] == "shape":
+                            data_gyr[pore_id]["in"] = [
+                                x + y
+                                for x, y in zip(
+                                    data_gyr[pore_id]["in"],
+                                    out["gyration"][pore_id]["in"],
+                                )
+                            ]
+                data_gyr["ex"] = [
+                    x + y for x, y in zip(data_gyr["ex"], out["gyration"]["ex"])
+                ]
+            utils.save(
+                {
+                    system["sys"]: system["props"],
+                    "inp": inp_gyr,
+                    "data": data_gyr,
+                    "type": "gyr_bin",
+                },
+                self._gyr_inp["output"],
+            )
 
         if self._is_angle:
-            inp_angle = inp.copy()
-            inp_angle.update(self._angle_inp)
-            inp_angle.pop("output")
+            inp_angle = {
+                **inp,
+                **{k: v for k, v in self._angle_inp.items() if k != "output"},
+            }
             data_angle = output[0]["angle"]
-            # for out in output[1:]:
-            #     if self._pore:
-            #         data_angle["in"] = [x+y for x, y in zip(data_angle["in"], out["angle"]["in"])]
-            #     data_angle["ex"] = [x+y for x, y in zip(data_angle["ex"], out["angle"]["ex"])]
-
-            # Pickle
-            results = {system["sys"]: system["props"], "inp": inp_angle, "data": data_angle, "type": "angle_bin"}
-            utils.save(results, self._angle_inp["output"])
+            utils.save(
+                {
+                    system["sys"]: system["props"],
+                    "inp": inp_angle,
+                    "data": data_angle,
+                    "type": "angle_bin",
+                },
+                self._angle_inp["output"],
+            )
 
         if self._is_diffusion_bin:
-            inp_diff = inp.copy()
-            inp_diff.update(self._diff_bin_inp)
-            inp_diff.pop("output")
+            inp_diff = {
+                **inp,
+                **{k: v for k, v in self._diff_bin_inp.items() if k != "output"},
+            }
             data_diff = output[0]["diffusion_bin"]
             for out in output[1:]:
-                if self._pore:
-                    for pore_id in output[0]["diffusion_bin"].keys():
-                        if pore_id[:5]=="shape":
-                            for i in range(self._diff_bin_inp["bin_num"]):
-                                for j in range(self._diff_bin_inp["len_window"]):
-                                    data_diff[pore_id]["z"][i][j] += out["diffusion_bin"][pore_id]["z"][i][j]
-                                    data_diff[pore_id]["r"][i][j] += out["diffusion_bin"][pore_id]["r"][i][j]
-                                    data_diff[pore_id]["n"][i][j] += out["diffusion_bin"][pore_id]["n"][i][j]
-                                    data_diff[pore_id]["z_tot"][i][j] += out["diffusion_bin"][pore_id]["z_tot"][i][j]
-                                    data_diff[pore_id]["r_tot"][i][j] += out["diffusion_bin"][pore_id]["r_tot"][i][j]
-                                    data_diff[pore_id]["n_tot"][i][j] += out["diffusion_bin"][pore_id]["n_tot"][i][j]
-
-            # Pickle
-            results = {system["sys"]: system["props"], "inp": inp_diff, "data": data_diff, "type": "diff_bin"}
-            utils.save(results, self._diff_bin_inp["output"])
+                for pore_id in data_diff:
+                    if pore_id[:5] == "shape":
+                        for key in ("z", "r", "n", "z_tot", "r_tot", "n_tot"):
+                            a = np.array(data_diff[pore_id][key])
+                            b = np.array(out["diffusion_bin"][pore_id][key])
+                            data_diff[pore_id][key] = (a + b).tolist()
+            utils.save(
+                {
+                    system["sys"]: system["props"],
+                    "inp": inp_diff,
+                    "data": data_diff,
+                    "type": "diff_bin",
+                },
+                self._diff_bin_inp["output"],
+            )
 
         if self._is_diffusion_mc:
-            inp_diff = inp.copy()
-            inp_diff.update(self._diff_mc_inp)
-            inp_diff.pop("output")
+            inp_diff = {
+                **inp,
+                **{k: v for k, v in self._diff_mc_inp.items() if k != "output"},
+            }
             data_diff = output[0]["diffusion_mc"]
             for step in self._diff_mc_inp["len_step"]:
-                data_diff[step] = data_diff[step]
                 for out in output[1:]:
                     data_diff[step] += out["diffusion_mc"][step]
-
             for step in self._diff_mc_inp["len_step"]:
-                data_diff[step] = data_diff[step][1:-1,1:-1]
-
-            # Save results in dictionary
-            results = {system["sys"]: system["props"], "inp": inp_diff, "data": data_diff, "type": "diff_mc"}
-
-            # Save dictionary to h5-file
-            utils.save(results, self._diff_mc_inp["output"])
+                data_diff[step] = data_diff[step][1:-1, 1:-1]
+            utils.save(
+                {
+                    system["sys"]: system["props"],
+                    "inp": inp_diff,
+                    "data": data_diff,
+                    "type": "diff_mc",
+                },
+                self._diff_mc_inp["output"],
+            )
 
         if self._is_diffusion_vacf:
-            inp_diff = inp.copy()
-            inp_diff.update(self._diff_vacf_inp)
-            inp_diff.pop("output")
+            inp_diff = {
+                **inp,
+                **{k: v for k, v in self._diff_vacf_inp.items() if k != "output"},
+            }
             data_diff = output[0]["diffusion_vacf"]
             for out in output[1:]:
-                for pore_id in output[0]["diffusion_vacf"].keys() if self._pore else [None]:
-                    if pore_id:
-                        if pore_id[:5]!="shape":
+                for pore_id in self._pore.keys() if self._pore else [None]:
+                    if pore_id is not None:
+                        if pore_id[:5] != "shape":
                             continue
-                        data_diff[pore_id]["density"] += out["diffusion_vacf"][pore_id]["density"]
-                        data_diff[pore_id]["vacf_data"] += out["diffusion_vacf"][pore_id]["vacf_data"]
+                        data_diff[pore_id]["density"] += out["diffusion_vacf"][pore_id][
+                            "density"
+                        ]
+                        data_diff[pore_id]["vacf_data"] += out["diffusion_vacf"][
+                            pore_id
+                        ]["vacf_data"]
                     else:
                         data_diff["density"] += out["diffusion_vacf"]["density"]
                         data_diff["vacf_data"] += out["diffusion_vacf"]["vacf_data"]
-
-            # Save results in dictionary
-            results = {system["sys"]: system["props"], "inp": inp_diff, "data": data_diff, "type": "diff_vacf"}
-
-            # Save dictionary
-            utils.save(results, self._diff_vacf_inp["output"])
+            utils.save(
+                {
+                    system["sys"]: system["props"],
+                    "inp": inp_diff,
+                    "data": data_diff,
+                    "type": "diff_vacf",
+                },
+                self._diff_vacf_inp["output"],
+            )
 
         if self._is_numpy:
-            data_numpy = output[0]["numpy"].copy()
+            data_np = output[0]["numpy"].copy()
             for out in output[1:]:
                 if self._numpy_inp["positions"]:
-                    data_numpy["positions"] += out["numpy"]["positions"]
+                    data_np["positions"] += out["numpy"]["positions"]
                 if self._numpy_inp["velocities"]:
-                    data_numpy["velocities"] += out["numpy"]["velocities"]
-
-            # Save results as numpy file
-            np.savez(self._numpy_inp["output"], **data_numpy)
+                    data_np["velocities"] += out["numpy"]["velocities"]
+            np.savez(self._numpy_inp["output"], **data_np)
 
     def _sample_helper(self, frame_list, shift, is_pbc, is_broken):
-        """Helper function for sampling run.
+        """Worker function: sample all enabled routines for a list of frames.
 
         Parameters
         ----------
-        frame_list :
-            List of frame ids to process
-        shift : np.ndarray
-            Vector for translating atoms in nm
+        frame_list : list
+            Frame ids to process
+        shift : list
+            Translation vector in nm
         is_pbc : bool
-            True to apply periodic boundary conditions
+            Apply periodic boundary conditions
         is_broken : bool
-            True to check for broken molecules during sampling
+            Check for broken molecules
 
         Returns
         -------
         output : dictionary
-            Dictionary containing all sampled data
+            Accumulated sampling data
         """
-        # Initialize
-        box = self._pore_props["box"]["dimensions"] if self._pore else self._box
+        box = (
+            np.array(self._pore_props["box"]["dimensions"])
+            if self._pore
+            else np.array(self._box)
+        )
         res = self._pore_props["box"]["res"] if self._pore else 0
+        shift_arr = np.array(shift, dtype=float)
 
-        # Calculate length index and com lists
+        # Initialize sliding windows for diffusion
         if self._is_diffusion_bin:
-            len_fill = self._diff_bin_inp["len_window"]*self._diff_bin_inp["len_step"]
-
-            com_list = {}
-            idx_list = {}
-            for pore_id in self._pore.keys():
-                if pore_id[:5]=="shape":
-                    com_list[pore_id] = []
-                    idx_list[pore_id] = []
+            com_list = {pid: [] for pid in self._pore if pid[:5] == "shape"}
+            idx_list = {pid: [] for pid in self._pore if pid[:5] == "shape"}
         elif self._is_diffusion_mc:
-            len_fill = self._diff_mc_inp["len_step"][-1]+1
-
             com_list = []
             idx_list = []
-        elif self._is_diffusion_vacf:
-            len_fill_vel = 2 * self._diff_vacf_inp["corr_steps"] - 1
-            len_fill_pos = self._diff_vacf_inp["corr_steps"]
 
-            pos_list = np.zeros((len_fill_pos, self.num_res, 3), float)
-            pos_pointer = 0
-            vel_list = np.zeros((len_fill_vel, self.num_res, 3), float)
-            vel_pointer = 0
-            filled_up = False
-        else:
-            len_fill = 1
+        # VACF circular buffers
+        if self._is_diffusion_vacf:
+            cs = self._diff_vacf_inp["corr_steps"]
+            _pos_list = np.zeros((cs, self.num_res, 3), float)
+            _pos_ptr = 0
+            _vel_list = np.zeros((2 * cs - 1, self.num_res, 3), float)
+            _vel_ptr = 0
+            _vacf_filled = False
 
-        # Create local data structures
+        # Initialize per-worker output structures
         output = {}
         if self._is_density:
             output["density"] = self._density_data()
@@ -1706,179 +1430,218 @@ class Sample:
             output["angle"] = self._angle_data()
         if self._is_diffusion_bin:
             output["diffusion_bin"] = self._diffusion_bin_data()
-        elif self._is_diffusion_mc:
+        if self._is_diffusion_mc:
             output["diffusion_mc"] = self._diffusion_mc_data()
-        elif self._is_diffusion_vacf:
+        if self._is_diffusion_vacf:
             output["diffusion_vacf"] = self._diffusion_vacf_data()
         if self._is_numpy:
             output["numpy"] = self._numpy_data()
 
-        # Load trajectory
+        # Sliding window fill length
+        if self._is_diffusion_bin:
+            len_fill = self._diff_bin_inp["len_window"] * self._diff_bin_inp["len_step"]
+        elif self._is_diffusion_mc:
+            len_fill = self._diff_mc_inp["len_step"][-1] + 1
+        else:
+            len_fill = 1
+
         traj = cf.Trajectory(self._traj)
-        frame_form = "%"+str(len(str(self._num_frame)))+"i"
-        # Run through frames
+        frame_fmt = "%{}i".format(len(str(self._num_frame)))
+
         for frame_id in frame_list:
-            # Read frame
             frame = traj.read_step(frame_id)
-            positions = frame.positions
+            positions = frame.positions  # shape (N, 3) in Angstroms
+
+            # --- VACF / numpy batch processing (all residues at once) ---
             if self._is_diffusion_vacf or self._is_numpy:
-                velocities = frame.velocities
+                all_pos = (
+                    np.asarray(positions).reshape(self.num_res, self._atoms_per_mol, 3)[
+                        :, self._atoms, :
+                    ]
+                    / 10
+                    + shift_arr
+                )  # (n_res, n_sel, 3) in nm
+                all_com = (
+                    np.sum(
+                        all_pos * self._masses_arr[np.newaxis, :, np.newaxis], axis=1
+                    )
+                    / self._sum_masses
+                )  # (n_res, 3)
+                if is_pbc:
+                    all_com = all_com - np.floor(all_com / box) * box
 
-            pos = np.array(positions).reshape((self.num_res, self._num_atoms, 3)) / 10 + shift # Convert to nm
-            com_no_pbc = np.sum(pos * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
-            if is_broken:
-                distances = pos - com_no_pbc[:, np.newaxis, :]
-                max_dist = min(box)/3
-                broken = np.any(np.linalg.norm(distances, axis=2) > max_dist, axis=1)
-                if np.any(broken):
-                    res_ids = np.where(broken)[0]
-                    for res_id in res_ids:
-                        print("Sample - Broken molecule found - ResID: "+"%5i"%res_id)
-            if is_pbc:
-                com = com_no_pbc - np.floor(com_no_pbc / box) * box
-            else:
-                com = com_no_pbc
+                if self._is_diffusion_vacf:
+                    all_vel = (
+                        np.asarray(frame.velocities).reshape(
+                            self.num_res, self._atoms_per_mol, 3
+                        )[:, self._atoms, :]
+                        * 100
+                    )  # Ang/ps -> m/s
+                    all_vel_com = (
+                        np.sum(
+                            all_vel * self._masses_arr[np.newaxis, :, np.newaxis],
+                            axis=1,
+                        )
+                        / self._sum_masses
+                    )
 
-            if self._is_diffusion_vacf or self._is_numpy:
-                vel = np.array(velocities).reshape((self.num_res, self._num_atoms, 3)) * 100 # Convert A/ps to m/s
-                vel_com = np.sum(vel * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
+                    _com_vacf = all_com.copy()
+                    _vel_vacf = all_vel_com.copy()
+                    if self._diff_vacf_inp["direction"] == "radial_cylindrical":
+                        focal = np.array(self._pore_props["shape_00"]["focal"][:2])
+                        dx = all_com[:, 0] - focal[0]
+                        dy = all_com[:, 1] - focal[1]
+                        r = np.sqrt(dx**2 + dy**2)
+                        r_safe = np.where(r == 0, 1e-8, r)
+                        _com_vacf[:, 0] = r
+                        _com_vacf[:, 1] = np.arctan2(dy, dx)
+                        vr = (all_vel_com[:, 0] * dx + all_vel_com[:, 1] * dy) / r_safe
+                        vt = (all_vel_com[:, 1] * dx - all_vel_com[:, 0] * dy) / r_safe
+                        _vel_vacf[:, 0] = vr
+                        _vel_vacf[:, 1] = vt
 
-            # Create region and distance lists
-            dist = np.zeros(self.num_res, float)
-            region = [""]*self.num_res
-            pore_in = [1]*self.num_res
-            # Determine region and distance
-            if self._pore:
-                for pore_id in self._pore.keys():
-                    if pore_id[:5]=="shape":
-                        # Determine pore properties
-                        pore_center = np.array(self._pore_props[pore_id]["focal"][0:2])
-                        z_min = res + self._pore_props[pore_id]["focal"][2]-self._pore_props[pore_id]["length"]/2+self._entry
-                        z_max = res + self._pore_props[pore_id]["focal"][2]+self._pore_props[pore_id]["length"]/2-self._entry
+                    _pos_list[_pos_ptr] = _com_vacf
+                    _pos_ptr = (_pos_ptr + 1) % cs
+                    _vel_list[_vel_ptr] = _vel_vacf
+                    _vel_ptr += 1
+                    if _vel_ptr >= 2 * cs - 1:
+                        _vel_ptr = 0
+                        _vacf_filled = True
 
-                        # Filter all residues not in reservoir and entry region
-                        pore_mask = (z_min < com[:,2]) & (com[:,2] < z_max)
-                        if self._pore_props[pore_id]["type"] in ["CYLINDER","CONE"]:
-                            dist[pore_mask] = np.linalg.norm(pore_center - com[pore_mask,:2], axis=1)
-                        elif self._pore_props[pore_id]["type"]=="SLIT":
-                            dist[pore_mask] = abs(self._pore_props[pore_id]["focal"][1]-com[pore_mask,1])
-                        
-                        # Filter all residues in pore wall
-                        in_wall_mask = (dist > (self._pore_props[pore_id]["diam"]*1.01)/2)
-                        if np.any(in_wall_mask):
-                            dist[in_wall_mask] = 0
-                        
-                        # Not in wall and not in reservoir -> in pore
-                        in_pore_mask = pore_mask & (~in_wall_mask)
-                        for res_id in np.where(in_pore_mask)[0]:
-                            region[res_id] = "in"
-                            pore_in[res_id] = pore_id
-                # FIlter all residues in reservoir region
-                mask_ex = (com[:,2] < res) | (com[:,2] > box[2]-res)
-                for res_id in np.where(mask_ex)[0]:
-                    region[res_id] = "ex"
-                    pore_in[res_id] = 0
-            # For box systems
-            elif not self._pore:
-                region = ["ex"]*self.num_res
-                pore_in = [0]*self.num_res
+                    if _vacf_filled:
+                        self._diffusion_vacf(
+                            output["diffusion_vacf"],
+                            frame_id,
+                            _pos_list,
+                            _pos_ptr,
+                            _vel_list,
+                            _vel_ptr,
+                        )
 
-            # Add new dictionaries and remove unneeded references
+                if self._is_numpy:
+                    self._numpy(output["numpy"], positions, frame.velocities, frame_id)
+
+            # Manage sliding window lists
             if self._is_diffusion_bin:
-                for pore_id in self._pore.keys():
-                    if pore_id[:5]=="shape":
-                        if len(com_list[pore_id]) >= len_fill:
-                            idx_list[pore_id].pop(0)
-                            com_list[pore_id].pop(0)
-                        idx_list[pore_id].append({})
-                        com_list[pore_id].append({})
+                for pid in com_list:
+                    if len(com_list[pid]) >= len_fill:
+                        idx_list[pid].pop(0)
+                        com_list[pid].pop(0)
+                    idx_list[pid].append({})
+                    com_list[pid].append({})
             elif self._is_diffusion_mc:
                 if len(com_list) >= len_fill:
                     idx_list.pop(0)
                     com_list.pop(0)
                 idx_list.append({})
                 com_list.append({})
-            elif self._is_diffusion_vacf:
-                if self._diff_vacf_inp["direction"] == "radial_cylindrical":
-                    # Convert to cylindrical coordinates for radial direction
-                    pore_center = np.array(self._pore_props["shape_00"]["focal"][0:2])
-                    dx = com[:,0] - pore_center[0]
-                    dy = com[:,1] - pore_center[1]
-                    r = np.sqrt(dx**2 + dy**2)
-                    theta = np.arctan2(dy, dx)
-                    z = com[:,2]
-                    com_cylindrical = np.zeros_like(com)
-                    com_cylindrical[:,0] = r
-                    com_cylindrical[:,1] = theta
-                    com_cylindrical[:,2] = z
-                    com = com_cylindrical
-                    # Convert velocities to cylindrical coordinates
-                    r_save = np.where(r==0, 1e-8, r)  # Avoid division by zero
-                    vr = (vel_com[:,0]*dx + vel_com[:,1]*dy) / r_save
-                    vtheta = (vel_com[:,1]*dx - vel_com[:,0]*dy) / r_save
-                    vtheta[r==1e-8] = 0  # If r was zero, set vtheta to zero
-                    vz = vel_com[:,2]
-                    vel_com_cylindrical = np.zeros_like(vel_com)
-                    vel_com_cylindrical[:,0] = vr
-                    vel_com_cylindrical[:,1] = vtheta
-                    vel_com_cylindrical[:,2] = vz
-                    vel_com = vel_com_cylindrical
 
-                # Update center of mass list
-                pos_list[pos_pointer] = com
-                pos_pointer += 1
-                if pos_pointer >= len_fill_pos:
-                    pos_pointer = 0
+            for res_id, atom_indices in self._res_list.items():
+                # Extract and convert positions: Ang -> nm, apply shift
+                pos = positions[atom_indices] / 10.0 + shift_arr  # (n_atoms, 3)
 
-                # Update velocity list
-                vel_list[vel_pointer] = vel_com
-                vel_pointer += 1
-                if vel_pointer >= len_fill_vel:
-                    vel_pointer = 0
-                    if not filled_up:
-                        filled_up = True
+                # Centre of mass without PBC
+                com_no_pbc = (self._masses_arr @ pos) / self._sum_masses  # (3,)
 
-            if self._is_angle or self._is_density or self._is_gyration or self._is_diffusion_bin or self._is_diffusion_mc:
-                # Run through residues
-                for res_id in self._res_list:
-                    pos_i = pos[res_id]
-                    com_i = com[res_id]
-                    com_no_pbc_i = com_no_pbc[res_id]
+                if is_broken and np.any(np.abs(com_no_pbc - pos[0]) > box / 3):
+                    print(f"Sample - Broken molecule found - ResID: {res_id:5d}")
 
-                    pore_id = pore_in[res_id]
-                    region_i = region[res_id]
-                    dist_i = dist[res_id]
+                com = com_no_pbc % box if is_pbc else com_no_pbc
 
-                    # Remove window filling instances except from first processor
-                    if self._is_diffusion_bin:
-                        for pore_id_ in self._pore.keys():
-                            if pore_id_[:5]=="shape":
-                                is_sample = len(com_list[pore_id_])==len_fill or frame_id<=len_fill
-                    else:
-                        is_sample = True
+                # Distance from pore axis
+                if self._pore:
+                    dist = {}
+                    for pore_id, pp in self._pore_props.items():
+                        if pore_id[:5] == "shape":
+                            focal = pp["focal"]
+                            if pp["type"] in ("CYLINDER", "CONE"):
+                                dist[pore_id] = float(
+                                    np.linalg.norm(
+                                        com[:2] - np.array([focal[0], focal[1]])
+                                    )
+                                )
+                            elif pp["type"] == "SLIT":
+                                dist[pore_id] = abs(focal[1] - float(com[1]))
+                else:
+                    dist = 0
 
-                    # Sampling routines
-                    if is_sample:
-                        if (self._is_density) and (pore_id != ""):
-                            self._density(output["density"], region_i, dist_i, com_i, pore_id)
-                        if self._is_gyration and (pore_id != ""):
-                            self._gyration(output["gyration"], region_i, dist_i, com_no_pbc_i, pos_i, pore_id)
-                        if self._is_angle and (pore_id != ""):
-                            self._angle(output["angle"], region_i, dist_i, com_i, pos_i, pore_id)
-                    if self._is_diffusion_bin and (pore_id != ""):
-                        self._diffusion_bin(output["diffusion_bin"], region_i, pore_id, dist_i, com_list, idx_list, res_id, com_i)
-                    if self._is_diffusion_mc:
-                        self._diffusion_mc(output["diffusion_mc"], idx_list, com_i, res_id, frame_list, frame_id)
-            elif self._is_diffusion_vacf:
-                if filled_up:
-                    self._diffusion_vacf(output["diffusion_vacf"], frame_id, pos_list, pos_pointer, vel_list, vel_pointer)
-            elif self._is_numpy:
-                self._numpy(output["numpy"], positions, velocities, frame_id)
+                # Region classification
+                region = ""
+                pore_in = 1
+                if (
+                    self._pore
+                    and res + self._entry < com[2] < box[2] - res - self._entry
+                ):
+                    region = "in"
+                    for pore_id, pp in self._pore_props.items():
+                        if pore_id[:5] == "shape":
+                            z_min = (
+                                res + pp["focal"][2] - pp["length"] / 2 + self._entry
+                            )
+                            z_max = (
+                                res + pp["focal"][2] + pp["length"] / 2 - self._entry
+                            )
+                            if (
+                                z_min < com[2] < z_max
+                                and dist[pore_id] < pp["diam"] * 1.01 / 2
+                            ):
+                                pore_in = pore_id
+                elif not self._pore or com[2] < res or com[2] > box[2] - res:
+                    region = "ex"
+                    pore_in = 0
 
-            # Progress
-            if frame_list[0] == 0 and (frame_id)%100==0 or frame_id==0:
-                sys.stdout.write("Finished frame "+frame_form%(frame_id)+"/"+frame_form%frame_list[-1]+" on one Core ...\r")
+                # Determine whether to sample (skip window-filling frames for non-first workers)
+                if self._is_diffusion_bin:
+                    is_sample = any(
+                        len(com_list[pid]) == len_fill or frame_id <= len_fill
+                        for pid in com_list
+                    )
+                else:
+                    is_sample = True
+
+                if is_sample:
+                    if self._is_density and pore_in != 1:
+                        self._density(output["density"], region, dist, com, pore_in)
+                    if self._is_gyration and pore_in != 1:
+                        self._gyration(
+                            output["gyration"], region, dist, com_no_pbc, pos, pore_in
+                        )
+                    if self._is_angle and pore_in != 1:
+                        self._angle(output["angle"], region, dist, com, pos, pore_in)
+
+                if self._is_diffusion_bin and pore_in != 1:
+                    self._diffusion_bin(
+                        output["diffusion_bin"],
+                        region,
+                        pore_in,
+                        dist,
+                        com_list,
+                        idx_list,
+                        res_id,
+                        com,
+                    )
+                if self._is_diffusion_mc:
+                    self._diffusion_mc(
+                        output["diffusion_mc"],
+                        idx_list,
+                        com,
+                        res_id,
+                        frame_list,
+                        frame_id,
+                    )
+
+            if (
+                (frame_id + 1) % 10 == 0
+                or frame_id == 0
+                or frame_id == self._num_frame - 1
+            ):
+                sys.stdout.write(
+                    "Finished frame "
+                    + frame_fmt % (frame_id + 1)
+                    + "/"
+                    + frame_fmt % self._num_frame
+                    + "...\r"
+                )
                 sys.stdout.flush()
-
-        print("Finished on one Core for frames "+frame_form%(frame_list[0])+"-"+frame_form%frame_list[-1])
+        print()
         return output

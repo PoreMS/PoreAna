@@ -1,8 +1,8 @@
-<img src="https://github.com/PoreMS/PoreAna/blob/main/docsrc/pics/logo_text_sub.svg" width="60%">
+<img src="https://github.com/PoreMS/PoreAna/blob/main/docs/pics/logo_text_sub.svg" width="60%">
 
 --------------------------------------
 
-[![PyPI Version](https://img.shields.io/badge/PyPI-0.2.3-orange)](https://pypi.org/project/PoreAna/)
+[![PyPI Version](https://img.shields.io/badge/PyPI-1.0.0-orange)](https://pypi.org/project/poreana/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/PoreMS/PoreAna/blob/main/LICENSE)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14056630.svg)](https://doi.org/10.5281/zenodo.14056630)
 [![Build Status](https://github.com/PoreMS/PoreAna/actions/workflows/workflow.yml/badge.svg)](https://github.com/PoreMS/PoreAna/actions/workflows/workflow.yml)
@@ -12,23 +12,29 @@
 
 Online documentation is available at [porems.github.io/PoreAna](https://porems.github.io/PoreAna/).
 
-The docs include an example for analyzing [density](https://porems.github.io/PoreAna/density.html) and [diffusion](http://porems.github.io/PoreAna/diffusion.html), and an [API reference](http://porems.github.io/PoreAna/api.html).
+The docs include examples for [density analysis](https://porems.github.io/PoreAna/density.html),
+[diffusion](https://porems.github.io/PoreAna/diffusion_mc.html), and an [API reference](https://porems.github.io/PoreAna/autoapi/index.html).
 
 
 ## Dependencies
 
-PoreAna supports Python 3.5+.
+PoreAna requires Python 3.12+.
 
-Installation requires [numpy](https://pypi.org/project/numpy/), [pandas](https://pypi.org/project/pandas/), [chemfiles 0.10.0](https://pypi.org/project/chemfiles/0.8.0/), [seaborn](https://pypi.org/project/seaborn/) and [porems](https://pypi.org/project/porems/).
+Installation requires [numpy](https://numpy.org/), [pandas](https://pandas.pydata.org/),
+[chemfiles](https://pypi.org/project/chemfiles/), [seaborn](https://seaborn.pydata.org/),
+[scipy](https://scipy.org/), [h5py](https://pypi.org/project/h5py/), and
+[porems](https://pypi.org/project/porems/) >= 1.0.0.
 
 
 ## Installation
 
-You may instead want to use the development version from GitHub:
+The latest stable release can be installed from PyPI:
 
-    pip install git+https://github.com/porems/PoreAna.git#egg=poreana
+    pip install poreana
 
-    pip install git+https://github.com/porems/PoreAna.git@develop#egg=poreana
+Or install the development version directly from GitHub:
+
+    pip install git+https://github.com/PoreMS/PoreAna.git#egg=poreana
 
 Or download the repository and install in the top directory via:
 
@@ -37,17 +43,23 @@ Or download the repository and install in the top directory via:
 
 ## Testing
 
-To test PoreAna, run the test in the test directory.
+Install in editable mode with test dependencies:
+
+    pip install -e ".[dev]"
+
+Then run the tests:
+
+    pytest tests/test_unit.py          # fast unit tests
+    pytest tests/test_integration.py   # full integration tests (requires data files, slow)
 
 
 ## Development
 
-PoreAna development takes place on Github: [www.github.com/porems/PoreAna](https://github.com/porems/PoreAna)
+PoreAna development takes place on GitHub: [www.github.com/PoreMS/PoreAna](https://github.com/PoreMS/PoreAna)
 
-Please submit any reproducible bugs you encounter to the [issue tracker](https://github.com/porems/PoreAna/issues).
+Please submit any reproducible bugs you encounter to the [issue tracker](https://github.com/PoreMS/PoreAna/issues).
 
 
 ## How to Cite PoreAna
 
 When citing PoreAna please use the current **Zenodo DOI** corresponding to the used PoreAna version. (Current DOI is listed in the badges.)
-
