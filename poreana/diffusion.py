@@ -2,6 +2,7 @@
 # Diffusion                                                                    #
 #                                                                              #
 """Analyse diffusion in a pore."""
+
 ################################################################################
 
 import itertools
@@ -655,6 +656,7 @@ def mc_profile(
     infty_profile=True,
     is_plot=True,
     is_legend=True,
+    is_error=False,
     kwargs={},
 ):
     r"""This function plots the diffusion profile for an infinity
@@ -689,6 +691,8 @@ def mc_profile(
         the selected lag times
     is_plot : bool, optional
         Show diffusion profile
+    is_error: bool, optional
+        Plot the error of intercept for every bin as a filled area
     is_legend : bool, optional
         Show legend
     kwargs: dict, optional
@@ -820,13 +824,14 @@ def mc_profile(
             sns.lineplot(x=bins, y=diff_profile_fit, **kwargs)  # m^2/s
             if "label" in kwargs:
                 del kwargs["label"]
-            plt.fill_between(
-                bins,
-                [f - e for f, e in zip(diff_profile_fit, diff_error_bin)],
-                [f + e for f, e in zip(diff_profile_fit, diff_error_bin)],
-                alpha=0.3,
-                **kwargs,
-            )
+            if is_error:
+                plt.fill_between(
+                    bins,
+                    [f - e for f, e in zip(diff_profile_fit, diff_error_bin)],
+                    [f + e for f, e in zip(diff_profile_fit, diff_error_bin)],
+                    alpha=0.3,
+                    **kwargs,
+                )
 
     # Set legend for lag times
     if is_plot:

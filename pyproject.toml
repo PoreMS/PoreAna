@@ -8,9 +8,11 @@ version = "1.0.0"
 description = "Pore system analysis tool."
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }
-authors = [{ name = "Hamzeh Kraus", email = "kraus@itt.uni-stuttgart.de" }]
+authors = [{ name = "Hamzeh Kraus", email = "kraus@itt.uni-stuttgart.de" },
+            { name = "Marc Högler", email = "hoegler@itt.uni-stuttgart.de" },
+            { name = "Karl Prokop", email = "st184141@stud.uni-stuttgart.de"}]
 requires-python = ">=3.12"
-dependencies = ["pandas", "seaborn", "scipy", "chemfiles", "porems>=1.0.0", "jinja2", "h5py>=3.0.0", "pyyaml"]
+dependencies = ["pandas", "seaborn", "scipy", "chemfiles", "porems>=0.3.0", "jinja2>=3.1.6", "h5py>=3.0.0", "pyyaml"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
