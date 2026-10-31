@@ -19,6 +19,9 @@ import poreana.geometry as geom
 import poreana.utils as utils
 
 
+__version__ = "0.3.0"
+
+
 __all__ = [
     "Sample",
     "Model", "CosineModel", "StepModel", "MC",

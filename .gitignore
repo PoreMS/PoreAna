@@ -1,10 +1,29 @@
-poreana.egg-info
+# Distribution / packaging
 build
 dist
+*.egg-info/
+poreana.egg-info
+uv.lock
+
+# Byte-compiled
 __pycache__
 *.pyc
+
+# Unit test / coverage reports
+.coverage
+.coverage.*
+coverage.xml
+.pytest_cache
+
+# Environments
+venv/
+.venv/
+
+# Linting
+.ruff_cache/
+
+# Editors / OS
+.vscode/
 .DS_Store
 ._.DS_Store
 .ipynb_checkpoints
-.coverage
-.pytest_cache
