@@ -754,7 +754,7 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
     return diffusion, diffusion_mean, diff_table, float(fit.intercept_stderr)
 
 
-def mc_profile(link, len_step=[], section=[], infty_profile=True, is_plot=True, is_error=True, is_legend=True, kwargs={}):
+def mc_profile(link, len_step=[], section=[], infty_profile=True, is_plot=True, is_error=False, is_legend=True, kwargs={}):
     """This function plots the diffusion profile for an infinity
     lag time (:math:`\\Delta t_{\\alpha} \\rightarrow \\infty`) over the box
     fitted with the specified :math:`\\mathrm{len}\\_\\mathrm{step}` list.
@@ -788,7 +788,7 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True, is_plot=True, 
     is_plot : bool, optional
         Show diffusion profile
     is_error : bool, optional
-        Show error area 
+        Plot the error of the intercept for every bin as a filled area
     is_legend : bool, optional
         Show legend
     kwargs: dict, optional
@@ -901,8 +901,6 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True, is_plot=True, 
 
     # Calculate diffusion profiles
     diff_profiles = {}
-    diff_profiles_error_up = {}
-    diff_profiles_error_down = {}
 
     for i in len_step:
         diff_profiles[i] = [np.exp(diff_bin_vec[i][j] + diff_unit) * 10 ** 3 for j in range(len(bins))]
@@ -915,8 +913,6 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True, is_plot=True, 
         if is_plot:
             for i in len_step:
                 plt.plot(bins, (diff_profiles[i]),**kwargs)       # Diffusion in m^2/s
-                if is_error:
-                    plt.fill_between(bins, diff_profiles_error_down[i], diff_profiles_error_up[i], alpha=0.3)
 
 
         # Plot the diffusion profiles for the different lag times
@@ -954,7 +950,7 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True, is_plot=True, 
     if is_plot:
         if not infty_profile and len(len_step) >= 2:
             legend.append("$\\Delta t_{\\alpha} \\rightarrow \\infty$ ps")
-        if (not is_error) and infty_profile:
+        if infty_profile:
             legend.append("$\\Delta t_{\\alpha} \\rightarrow \\infty$ ps")
         # Set plot properties
         # Plot axis title for a entire system
