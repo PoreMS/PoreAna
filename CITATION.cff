@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+message: "If you use PoreAna in your research, please cite it as below."
+title: "PoreAna"
+type: software
+version: 0.3.0
+date-released: 2025-10-23
+license: GPL-3.0-only
+repository-code: "https://github.com/PoreMS/PoreAna"
+url: "https://porems.github.io/PoreAna/"
+doi: "10.5281/zenodo.4588856"
+abstract: "Pore system analysis tool for molecular dynamics trajectories of nanoporous and bulk systems, providing density, diffusion, free energy, gyration and orientation angle profiles."
+keywords:
+  - pore
+  - nanopore
+  - molecular dynamics
+  - simulation
+  - analysis
+  - density
+  - diffusion
+  - GROMACS
+authors:
+  - family-names: Kraus
+    given-names: Hamzeh
+    email: kraus@itt.uni-stuttgart.de
+    affiliation: "University of Stuttgart"
+    orcid: "https://orcid.org/0000-0001-9643-4839"
+  - family-names: Högler
+    given-names: Marc
+    email: hoegler@itt.uni-stuttgart.de
+    affiliation: "University of Stuttgart"
+  - family-names: Prokop
+    given-names: Karl
+    email: st184141@stud.uni-stuttgart.de
+    affiliation: "University of Stuttgart"
+  - family-names: Hansen
+    given-names: Niels
+    email: hansen@itt.uni-stuttgart.de
+    affiliation: "University of Stuttgart"
+    orcid: "https://orcid.org/0000-0003-4366-6120"
