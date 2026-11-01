@@ -1,53 +1,98 @@
-<img src="https://github.com/PoreMS/PoreAna/blob/main/docsrc/pics/logo_text_sub.svg" width="60%">
+![PoreAna](docs/source/_static/logo_text_sub.svg)
 
---------------------------------------
+---
 
-[![PyPI Version](https://img.shields.io/badge/PyPI-0.2.3-orange)](https://pypi.org/project/PoreAna/)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/PoreMS/PoreAna/blob/main/LICENSE)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14056630.svg)](https://doi.org/10.5281/zenodo.14056630)
-[![Build Status](https://github.com/PoreMS/PoreAna/actions/workflows/workflow.yml/badge.svg)](https://github.com/PoreMS/PoreAna/actions/workflows/workflow.yml)
-[![codecov](https://codecov.io/gh/PoreMS/PoreAna/branch/main/graph/badge.svg)](https://codecov.io/gh/PoreMS/PoreAna)
+[![PyPI Version](https://img.shields.io/pypi/v/poreana?label=PyPI)](https://pypi.org/project/PoreAna/)
+[![CI](https://img.shields.io/github/actions/workflow/status/PoreMS/PoreAna/ci.yml?branch=main&label=CI)](https://github.com/PoreMS/PoreAna/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/github/actions/workflow/status/PoreMS/PoreAna/docs.yml?branch=main&label=docs)](https://porems.github.io/PoreAna/)
+[![CodeQL](https://img.shields.io/github/actions/workflow/status/PoreMS/PoreAna/codeql.yml?branch=main&label=CodeQL)](https://github.com/PoreMS/PoreAna/actions/workflows/codeql.yml)
+[![codecov](https://img.shields.io/codecov/c/github/PoreMS/PoreAna?label=coverage)](https://codecov.io/gh/PoreMS/PoreAna)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4588856.svg)](https://doi.org/10.5281/zenodo.4588856)
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/)
+[![License: GPLv3](https://img.shields.io/github/license/PoreMS/PoreAna)](LICENSE)
 
-## Documentation
+<!-- start elevator-pitch -->
 
-Online documentation is available at [porems.github.io/PoreAna](https://porems.github.io/PoreAna/).
+PoreAna is a Python package for analysing molecular dynamics trajectories of
+nanoporous and bulk systems. Trajectories are read with
+[chemfiles](https://pypi.org/project/chemfiles/), the pore geometry can be taken from
+a [PoreMS](https://porems.github.io/PoreMS/) system file, and the sampled data is
+stored in object files for repeated evaluation. Features include:
 
-The docs include an example for analyzing [density](https://porems.github.io/PoreAna/density.html) and [diffusion](http://porems.github.io/PoreAna/diffusion.html), and an [API reference](http://porems.github.io/PoreAna/api.html).
+- **Density** profiles inside and outside the pore, mean densities, and
+  adsorption as surface and volume concentration
+- **Diffusion** profiles by three independent methods
+    * the **bin** method of Cui
+    * a **Monte Carlo** method, which also yields **free energy profiles**
+    * the **velocity autocorrelation function**, axially, radially and
+      tangentially per bin
+- **Radius of gyration** and molecular **orientation angles**, density weighted
+- Result **tables** and plotting helpers for every routine
 
 
-## Dependencies
-
-PoreAna supports Python 3.5+.
-
-Installation requires [numpy](https://pypi.org/project/numpy/), [pandas](https://pypi.org/project/pandas/), [chemfiles 0.10.0](https://pypi.org/project/chemfiles/0.8.0/), [seaborn](https://pypi.org/project/seaborn/) and [porems](https://pypi.org/project/porems/).
-
+<!-- end elevator-pitch -->
 
 ## Installation
 
-You may instead want to use the development version from GitHub:
+<!-- start installation -->
 
-    pip install git+https://github.com/porems/PoreAna.git#egg=poreana
+PoreAna targets Python 3.12 or 3.13
 
-    pip install git+https://github.com/porems/PoreAna.git@develop#egg=poreana
+```bash
+python -m pip install poreana
+```
 
-Or download the repository and install in the top directory via:
+To install the current development version directly from GitHub instead:
 
-    pip install .
+```bash
+python -m pip install git+https://github.com/PoreMS/PoreAna.git
+```
 
+<!-- end installation -->
 
-## Testing
+## Usage
 
-To test PoreAna, run the test in the test directory.
+A detailed usage guide can be found in the
+[documentation](https://porems.github.io/PoreAna/). It gives further information
+on
 
+- [Sampling a trajectory](https://porems.github.io/PoreAna/sample.html)
+- [Density analysis](https://porems.github.io/PoreAna/density.html)
+- [Diffusion, bin method](https://porems.github.io/PoreAna/diffusion_bin.html)
+- [Diffusion, Monte-Carlo method](https://porems.github.io/PoreAna/diffusion_mc.html)
+- [Adsorption, radius of gyration and angle](https://porems.github.io/PoreAna/further_props.html)
+- [API reference](https://porems.github.io/PoreAna/api.html)
 
 ## Development
 
-PoreAna development takes place on Github: [www.github.com/porems/PoreAna](https://github.com/porems/PoreAna)
+PoreAna development takes place on GitHub:
+[github.com/PoreMS/PoreAna](https://github.com/PoreMS/PoreAna). Please submit any
+reproducible bugs you encounter to the
+[issue tracker](https://github.com/PoreMS/PoreAna/issues).
 
-Please submit any reproducible bugs you encounter to the [issue tracker](https://github.com/porems/PoreAna/issues).
+The project uses [uv](https://docs.astral.sh/uv/) for environment and dependency
 
+```bash
+uv sync --group dev          # create the environment with the test tools
+uv run pytest                # run the test suite
+uv run pytest --cov          # ... with a coverage report
+uv run ruff check            # lint
+```
 
-## How to Cite PoreAna
+To build the documentation locally:
 
-When citing PoreAna please use the current **Zenodo DOI** corresponding to the used PoreAna version. (Current DOI is listed in the badges.)
+```bash
+uv sync --group docs
+uv run sphinx-build -b html docs/source docs/build
+```
 
+## Citation
+
+If you use PoreAna in your research, please cite it using the metadata in
+[`CITATION.cff`](CITATION.cff) (GitHub's "Cite this repository" button) together
+with the corresponding [Zenodo DOI](https://doi.org/10.5281/zenodo.4588856) of the version you
+used.
+
+## License
+
+This project is licensed under GPL-3.0-only.
