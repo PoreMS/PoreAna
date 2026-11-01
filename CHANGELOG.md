@@ -14,6 +14,16 @@ and this project adheres to
   735 `dev` and `docs` dependency groups, pytest and ruff configuration).
 - `CITATION.cff` with machine-readable citation metadata, which drives GitHub's
   "Cite this repository" button.
+- Local diffusion analysis based on the velocity autocorrelation function.
+  `Sample.init_diffusion_vacf` samples the VACF along a box axis or, inside a
+  cylindrical pore, in radial, axial and tangential direction;
+  `diffusion.plot_correlation_per_bin`, `diffusion.diffusion_per_bin` and
+  `diffusion.integrate_bin_diffusion_vacf` evaluate the sampled file.
+- `Sample.init_numpy_file` to sample positions and velocities into an `.npz`
+  file, together with `diffusion.correlate_velocity_from_npz_file` and
+  `diffusion.diffusion_from_npy_file_vacf` to correlate them afterwards.
+- Density routines for the new sampling formats: `density.density_from_bins`,
+  `density.density_from_vacf` and `density.density_from_vacf_per_residue`.
 
 ### Changed
 
@@ -23,6 +33,9 @@ and this project adheres to
 - README refreshed: corrected badges, working links and uv-based installation
   instructions.
 - This changelog now follows Keep a Changelog, with dates and release links.
+- The sampling loop now evaluates whole frames with numpy masks instead of
+  iterating over single atoms.
+- `Sample.sample` renamed its `np` argument to `num_cores`.
 
 ### Fixed
 

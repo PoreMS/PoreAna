@@ -170,7 +170,7 @@ class CosineModel(Model):
         self._n_diff = n_diff
         self._n_diff_radial = n_diff_radial
         self._print_output = is_print
-        print(type(d0))
+
         if type(d0) == float:
             self._d0 = d0 * (10**9)/(10**12)                # guess init profile [A^2/ps]
         elif type(d0) == list:
@@ -206,7 +206,7 @@ class CosineModel(Model):
         # Create basis (for the free energy)
         self._create_basis_center()
 
-        # Create basis (for the free energy)
+        # Create basis (for the diffusion)
         self._create_basis_border()
 
         # Update diffusion profile
@@ -260,7 +260,7 @@ class CosineModel(Model):
 
     def _create_basis_border(self):
         """This function creates the basis part in every bin of the Fourier
-        series for the diffusion :math:`\\ln \\ (D)`.
+        series for the diffusion :math:`\\ln{(D)}`.
         At the bin border the basis is calculated with
 
         .. math::
@@ -400,14 +400,14 @@ class StepModel(Model):
         for the free energy and the radial diffusion profile. The following
         explanation is for the free energy profile. For the radial diffusion
         profile the number of free energy coefficients :math:`n_{\\mathrm{df}}` has to
-        exchange with :math:`n_{\\mathrm{diff\_radial}}`. The Dimension of the basis matrix
+        exchange with :math:`n_{\\mathrm{diff\\_radial}}`. The Dimension of the basis matrix
         is :math:`n_{\\mathrm{bin}} \\times n_{\\mathrm{df}}`. For a bin the
         basis is calculated with
 
         .. math::
 
             \\mathrm{basis} = \\begin{cases}
-                            1 & (\\mathrm{bin}+0.5)\\geq \\Delta x\ \\& \ (\\mathrm{bin}+0.5)\\leq n_{\\mathrm{bin}}-\\Delta x \\\\
+                            1 & (\\mathrm{bin}+0.5)\\geq \\Delta x\\; \\& \\; (\\mathrm{bin}+0.5)\\leq n_{\\mathrm{bin}}-\\Delta x \\\\
                             0 & \\mathrm{else}                                 \\
                     \\end{cases}
 
@@ -417,7 +417,7 @@ class StepModel(Model):
 
         .. math::
 
-            \\Delta x = \\left [ 0,i \\cdot \\frac{n_{\\mathrm{bin}}}{n_{\\mathrm{df}} \\cdot 2},\\frac{n_{\\mathrm{bin}}}{2} \\right ]
+            \\Delta x = \\left [ 0,i \\cdot \\frac{n_{\\mathrm{bin}}}{n_{\\mathrm{df}} \\cdot 2},\\frac{n_{\\mathrm{bin}}}{2} \\right ]
 
         with :math:`i = [1,...,n_{\\mathrm{df}}-1]`.
         """
@@ -447,7 +447,7 @@ class StepModel(Model):
 
         .. math::
 
-            \\Delta x = \\left [ 0,i \\cdot \\frac{n_{\\mathrm{bin}}}{n_{\\mathrm{diff}} \\cdot 2},\\frac{n_{\\mathrm{bin}}}{2} \\right ]
+            \\Delta x = \\left [ 0,i \\cdot \\frac{n_{\\mathrm{bin}}}{n_{\\mathrm{diff}} \\cdot 2},\\frac{n_{\\mathrm{bin}}}{2} \\right ]
 
         with :math:`i = [1,...,n_{\\mathrm{diff}}-1]`.
         """

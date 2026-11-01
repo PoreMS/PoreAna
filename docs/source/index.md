@@ -19,6 +19,7 @@ To see the code or report a bug, please visit the
    - [Density analysis](density.md)
    - [Diffusion, bin method](diffusion_bin.md)
    - [Diffusion, Monte-Carlo method](diffusion_mc.md)
+   - [Diffusion, VACF method](diffusion_vacf.md)
    - [Adsorption, radius of gyration and angle](further_props.md)
 
 The [API reference](api.rst) documents every module in full.
@@ -37,6 +38,7 @@ sample
 density
 diffusion_bin
 diffusion_mc
+diffusion_vacf
 further_props
 ```
 
