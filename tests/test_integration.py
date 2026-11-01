@@ -371,6 +371,15 @@ def test_parallel_sample(sample_output):
     for step in data_s:
         assert np.array_equal(data_s[step], data_p[step]), step
 
+    # Anchor both against a committed serial reference, so a change that moves
+    # serial and parallel together is caught as well
+    reference = pa.utils.load("data/check_output_sample.obj")
+    pore = pa.utils.load("data/pore_system_cylinder_new.yml", file_type="yml")
+    assert reference["inp"]["bins"][-1] == pore["system"]["dimensions"][2]
+    for step in reference["data"]:
+        assert np.array_equal(reference["data"][step], data_s[step]), step
+        assert np.array_equal(reference["data"][step], data_p[step]), step
+
 
 ###############
 # Free energy #
