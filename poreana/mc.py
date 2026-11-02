@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import multiprocessing as mp
 import numpy as numpy
+from threadpoolctl import threadpool_limits
 
 import poreana.utils as utils
 
@@ -229,6 +230,33 @@ class MC:
 
     def _run_helper(self, model, len_step, do_radial):
         """Helper function for MC run
+
+        Runs the MC cycle with BLAS pinned to a single thread. Every MC step
+        calls :func:`scipy.linalg.expm` on a
+        :math:`n_\\mathrm{bin} \\times n_\\mathrm{bin}` matrix, which is far too
+        small for a threaded BLAS to earn back its synchronisation cost, and
+        in a parallel run every worker would otherwise open a thread pool of
+        its own and oversubscribe the cores. The limit is applied here rather
+        than in :func:`run` so that it also takes effect in workers that
+        import numpy themselves.
+
+        Parameters
+        ----------
+        model : class
+            Model object which set before with the model class
+        len_step : list
+            List of step length
+        do_radial : bool, optional
+            True to calculate the radial diffusion
+
+        Returns : dictionary
+            Dictionary containing all MC results
+        """
+        with threadpool_limits(limits=1):
+            return self._run_cycle(model, len_step, do_radial)
+
+    def _run_cycle(self, model, len_step, do_radial):
+        """Run the MC cycle for every given lag time.
 
         Parameters
         ----------
