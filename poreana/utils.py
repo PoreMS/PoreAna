@@ -263,6 +263,37 @@ def load(link, file_type=""):
             return pickle.load(f)
 
 
+def _pore_table(pore):
+    """This function creates the system property table of a pore system for the
+    text export of function :func:`poreana.utils.file_to_text`.
+
+    The pore properties are nested, the box dimensions and the reservoir length
+    in ``pore["box"]`` and the shape properties in ``pore[shape_id]``.
+
+    Parameters
+    ----------
+    pore : dictionary
+        Pore properties dictionary of a sample data object
+
+    Returns
+    -------
+    df_system : DataFrame
+        Data frame of the pore system properties
+    """
+    # Read data of the first pore shape
+    shape_id = next(key for key in pore if key[:5]=="shape")
+    box = pore["box"]["dimensions"]
+    res = float(pore["box"]["res"])
+    diam = float(pore[shape_id]["diam"])
+    type = pore[shape_id]["type"]
+
+    # Set panda table for pore properties
+    data_system = [[["%.2f" % i for i in box]],[diam],[res],[type]]
+    df_system = pd.DataFrame(data_system, index=list(["Box dimension (nm)","Pore diameter (nm)","reservoir (nm)", "type"]),columns=list(["Value"]))
+
+    return df_system.rename_axis('# Identifier', axis=1)
+
+
 def file_to_text(link, link_output, link_dens=[]):
     """This function converts an output directory in txt file. For the bin diffusion
     result text file the density sampling file is additionally necessary.
@@ -291,17 +322,7 @@ def file_to_text(link, link_output, link_dens=[]):
 
         # If pore system
         if "pore" in data:
-            # Read data
-            pore = data["pore"]
-            res = float(pore["res"])
-            diam = float(pore["diam"])
-            box = pore["box"]
-            type = pore["type"]
-
-            # Set panda tables for pore properties
-            data_system = [[["%.2f" % i for i in box]],[diam],[res],[type]]
-            df_system = pd.DataFrame(data_system, index=list(["Box dimension (nm)","Pore diameter (nm)","reservoir (nm)", "type"]),columns=list(["Value"]))
-            df_system = df_system.rename_axis('# Identifier', axis=1)
+            df_system = _pore_table(data["pore"])
         # If box system
         elif "box" in data:
             box_group = data["box"]
@@ -364,28 +385,18 @@ def file_to_text(link, link_output, link_dens=[]):
 
         # If pore system
         if "pore" in data:
-            # Read data
-            pore = data["pore"]
-            res = float(pore["res"])
-            diam = float(pore["diam"])
-            box = pore["box"]
-            type = pore["type"]
-
-            # Set panda tables for pore properties
-            data_system = [[["%.2f" % i for i in box]],[diam],[res],[type]]
-            df_system = pd.DataFrame(data_system, index=list(["Box dimension (nm)","Pore diameter (nm)","reservoir (nm)", "type"]),columns=list(["Value"]))
-            df_system = df_system.rename_axis('# Identifier', axis=1)
-
+            df_system = _pore_table(data["pore"])
 
         # Set pandas table for input
         data_inp = [[data["inp"]["bin_num"]],[data["inp"]["entry"]],[data["inp"]["num_frame"]], [data["inp"]["mass"]], [bins["is_norm"]]]
         df_inputs = pd.DataFrame(data_inp,index = list(["Bin number","Entry","Frame number", "Mass", "is_norm"]), columns=list(["Value"]))
         df_inputs = df_inputs.rename_axis('# Identifier', axis=1)
 
-        # Set pandas table for bin diffusion profiles
+        # Set pandas table for bin diffusion profiles, one column pair per shape
         data = {}
-        data["# Width"] = bins["width"][1:]
-        data["D"] = bins["diff"]
+        for i, pore_id in enumerate(sorted(bins["diff"].keys())):
+            data[("# " if not i else "")+"Width "+pore_id] = bins["width"][pore_id][1:]
+            data["D "+pore_id] = bins["diff"][pore_id]
         df_data = pd.DataFrame(data)
 
         # Pandas table to string
@@ -412,7 +423,8 @@ def file_to_text(link, link_output, link_dens=[]):
 
             # Write diffusion coefficent
             file.write("\n\n[Diffusion]\n")
-            file.write(str("%.2f " % mean ) + "* 10^-9 m^2s^-1")
+            for pore_id in sorted(mean.keys()):
+                file.write(pore_id + ": " + str("%.2f " % mean[pore_id]) + "* 10^-9 m^2s^-1\n")
 
             # Write diffusion profile
             file.write("\n\n[Bin Diffusion Profiles]\n")
@@ -428,16 +440,7 @@ def file_to_text(link, link_output, link_dens=[]):
     elif data["type"] == "dens_bin":
         # If pore system
         if "pore" in data:
-            pore = data["pore"]
-            res = float(pore["res"])
-            diam = float(pore["diam"])
-            box = pore["box"]
-            type = pore["type"]
-
-            # Set panda table for pore properties
-            data_system = [[["%.2f" % i for i in box]],[diam],[res],[type]]
-            df_system = pd.DataFrame(data_system, index=list(["Box dimension (nm)","Pore diameter (nm)","reservoir (nm)", "type"]),columns=list(["Value"]))
-            df_system = df_system.rename_axis('# Identifier', axis=1)
+            df_system = _pore_table(data["pore"])
         # If box system
         elif "box" in data:
             box_group = data["box"]
@@ -460,7 +463,11 @@ def file_to_text(link, link_output, link_dens=[]):
         # Calculated density and set pandas table
         dens = pa.density.bins(link)
         if  "pore" in data:
-            df_mean = pd.DataFrame([[dens["mean"]["in"], dens["dens"]["in"]],[dens["mean"]["ex"], dens["dens"]["ex"]]],index = list(["Density inside pore","Density outside pore"]), columns=list(["Density (#/nm^3)", "Density (kg/m^3)"]))
+            shape_ids = sorted(key for key in dens["mean"] if key[:5]=="shape")
+            data_mean = [[dens["mean"][pore_id]["in"], dens["dens"][pore_id]["in"]] for pore_id in shape_ids]
+            data_mean += [[dens["mean"]["ex"], dens["dens"]["ex"]]]
+            index_mean = ["Density inside "+pore_id for pore_id in shape_ids]+["Density outside pore"]
+            df_mean = pd.DataFrame(data_mean, index=index_mean, columns=list(["Density (#/nm^3)", "Density (kg/m^3)"]))
         else:
             df_mean = pd.DataFrame([[dens["mean"]["ex"], dens["dens"]["ex"]]],index = list(["Density box"]), columns=list(["Density (#/nm^3)", "Density (kg/m^3)"]))
         df_mean = df_mean.rename_axis('# Identifier', axis=1)
@@ -470,8 +477,9 @@ def file_to_text(link, link_output, link_dens=[]):
         data_dens["# Ex width"] = dens["sample"]["data"]["ex_width"]
         data_dens["Density (Ex)"] = dens["num_dens"]["ex"]
         if "pore" in data:
-            data_dens["In width"] = dens["sample"]["data"]["in_width"][1:]
-            data_dens["Density (In)"] = dens["num_dens"]["in"]
+            for pore_id in shape_ids:
+                data_dens["In width ("+pore_id+")"] = dens["sample"]["data"][pore_id]["in_width"][1:]
+                data_dens["Density (In, "+pore_id+")"] = dens["num_dens"][pore_id]["in"]
         df_data = pd.DataFrame(data_dens)
 
         # Convert pandas table to string
@@ -520,15 +528,8 @@ def file_to_text(link, link_output, link_dens=[]):
     elif data["type"] == "mc":
         # If pore system
         if "pore" in data:
-            pore = data["pore"]
             t = data["model"]["len_frame"]
-            res = float(pore["res"])
-            diam = float(pore["diam"])
-            box = pore["box"]
-            type = pore["type"]
-            data = [[["%.2f" % i for i in box]],[diam],[res],[type]]
-            df_system = pd.DataFrame(data, index=list(["Box dimension (nm)","Pore diameter (nm)","reservoir (nm)", "type"]),columns=list(["Value"]))
-            df_system = df_system.rename_axis('# Identifier', axis=1)
+            df_system = _pore_table(data["pore"])
 
         # If box system
         elif "box" in data:
@@ -550,7 +551,7 @@ def file_to_text(link, link_output, link_dens=[]):
             data["D (t={})".format(t*i)] = diff[1][i]
         data["   D (t=∞)"]=diff[0]
         for i in free_energy[0].keys():
-            data["Free energy [-]"]= free_energy[0][i][1:]
+            data["Free energy [-]"]= free_energy[0][i]
         df_data = pd.DataFrame(data)
 
         # Set pandas tables

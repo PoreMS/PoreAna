@@ -146,7 +146,7 @@ def cui(link, pore_id="shape_00", z_dist=0, ax_area=[0.2, 0.8], intent="", is_fi
             return [c**2*(1-sum(s)) for s in sm]
 
         # Fit function
-        popt, pcov = sp.optimize.curve_fit(diff_rad, [x*1e12 for x in time_ax], msd_r_n, p0=[1, 20, float(pore["diam"])/2-0.2], bounds=(0, np.inf))
+        popt, pcov = sp.optimize.curve_fit(diff_rad, [x*1e12 for x in time_ax], msd_r_n, p0=[1, 20, float(pore[pore_id]["diam"])/2-0.2], bounds=(0, np.inf))
 
         print("Diffusion radial: "+"%.3f" % (popt[0]*1e3)+" 10^-9 m^2 s^-1; Number of zeros: "+"%2i" % (math.ceil(popt[1]))+"; Radius: "+"%5.2f" % popt[2])
 

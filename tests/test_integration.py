@@ -249,7 +249,6 @@ def test_diffusion_cui_axial(sample_output):
     plt.close("all")
 
 
-@pytest.mark.xfail(strict=True, reason="cui reads the pre-restructure pore keys")
 def test_diffusion_cui_radial(sample_output):
     """The radial fit must read the nested pore data model.
 
@@ -418,7 +417,6 @@ def test_tables(sample_output):
     assert pa.tables.mc_inputs("output/mc_fixture.obj", print_con=True) is not None
 
 
-@pytest.mark.xfail(strict=True, reason="mc_results reads the pre-restructure pore keys")
 def test_tables_mc_results(sample_output):
     """mc_results must read the nested pore data model.
 
@@ -433,7 +431,6 @@ def test_tables_mc_results(sample_output):
 ################
 # Text export  #
 ################
-@pytest.mark.xfail(strict=True, reason="file_to_text reads the pre-restructure pore keys")
 def test_file_to_text(sample_output):
     """All four export branches must read the nested pore data model.
 
