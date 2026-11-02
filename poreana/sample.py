@@ -589,7 +589,7 @@ class Sample:
                         normals[pore_id] = {}
                         if self._pore_props[pore_id]["type"]=="CYLINDER":
                             shape = pms.Cylinder({"centroid": self._pore_props[pore_id]["focal"], "central": [0, 0, 1], "length": self._pore_props["box"]["dimensions"][2], "diameter": self._pore_props[pore_id]["diam"]})
-                            def normal_in(pos): return shape.normal(pos)
+                            def normal_in(pos, shape=shape): return shape.normal(pos)
                             def normal_ex(pos): return [0, 0, -1] if pos[2] < (self._pore_props["box"]["dimensions"][2]-self._pore_props["box"]["res"]) else [0, 0, 1]
                             normals[pore_id] = {"in": normal_in}
                             normals["ex"] = normal_ex

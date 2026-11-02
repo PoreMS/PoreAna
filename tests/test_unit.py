@@ -127,7 +127,6 @@ def test_bin_in_const_A_per_shape(change_to_tests_dir):
     assert len(result["bins"]) == 13
 
 
-@pytest.mark.xfail(strict=True, reason="normal_in closes over the loop variable")
 def test_init_angle_normals_per_shape(change_to_tests_dir):
     """Each shape must get its own surface normal function.
 
