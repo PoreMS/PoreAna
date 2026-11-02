@@ -70,7 +70,6 @@ def test_geometry():
     assert round(pa.geom.angle(vec_a, vec_b), 4) == 37.5714
 
 
-@pytest.mark.xfail(strict=True, reason="acos is called on a cosine that can exceed 1")
 def test_geometry_angle_parallel():
     """Parallel and antiparallel vectors must not raise a math domain error.
 

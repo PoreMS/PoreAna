@@ -165,6 +165,9 @@ def angle(vec_a, vec_b, is_deg=True):
     angle : float
         Angle
     """
-    angle = math.acos(dot_product(vec_a, vec_b)/(length(vec_a)*length(vec_b)))
+    # Rounding can push the cosine of parallel vectors marginally outside
+    # [-1, 1], which acos rejects, so clamp it to the valid domain
+    cos = dot_product(vec_a, vec_b)/(length(vec_a)*length(vec_b))
+    angle = math.acos(max(-1.0, min(1.0, cos)))
 
     return angle*180/math.pi if is_deg else angle
