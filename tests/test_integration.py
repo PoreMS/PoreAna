@@ -359,7 +359,6 @@ def test_diffusion_mc_returns_coefficients(sample_output):
     assert len(out["diff_profile"][10]) == model._bin_num
 
 
-@pytest.mark.xfail(strict=True, reason="only worker 0 contributes the per-bin fluctuations")
 def test_diffusion_mc_parallel_fluctuations(sample_output):
     """Parallel MC must collect fluc_diff_bin / fluc_df_bin from every worker.
 

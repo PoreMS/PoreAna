@@ -180,6 +180,8 @@ class MC:
                     output["nacc_diff"][step] = out["nacc_diff"][step]
                     output["fluc_diff"][step] = out["fluc_diff"][step]
                     output["fluc_df"][step] = out["fluc_df"][step]
+                    output["fluc_diff_bin"][step] = out["fluc_diff_bin"][step]
+                    output["fluc_df_bin"][step] = out["fluc_df_bin"][step]
                     output["list_df_coeff"][step] = out["list_df_coeff"][step]
                     output["list_diff_coeff"][step] = out["list_diff_coeff"][step]
         else:
