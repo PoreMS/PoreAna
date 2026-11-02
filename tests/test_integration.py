@@ -58,7 +58,6 @@ def test_sample(sample_output):
     sample.init_angle("output/angle_cyl.obj", [0, 3])
 
 
-@pytest.mark.xfail(strict=True, reason="frames are reshaped by the selected atom count")
 def test_sample_partial_atom_selection(sample_output):
     """A subset of a molecule's atoms must be sampleable.
 

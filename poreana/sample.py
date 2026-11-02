@@ -73,6 +73,8 @@ class Sample:
         self._atoms = [atom_id for atom_id in range(mol.get_num()) if mol.get_atom_list()[atom_id].get_name() in self._atoms]
 
         self._num_atoms = len(self._atoms)
+        self._atoms_per_mol = mol.get_num()
+
         # Check masses
         if not self._masses:
             if self._num_atoms==mol.get_num():
@@ -1424,12 +1426,12 @@ class Sample:
         """
         # Add positions and velocities to data dictionary
         if self._numpy_inp["positions"]:
-            pos = np.array(positions).reshape((self.num_res, self._num_atoms, 3)) / 10 # Convert to nm
+            pos = np.array(positions).reshape((self.num_res, self._atoms_per_mol, 3))[:, self._atoms, :] / 10 # Convert to nm
             pos_com = np.sum(pos * self._masses[np.newaxis,: , np.newaxis], axis=1) / self._sum_masses
             data["positions"][frame_id] = pos_com
 
         if self._numpy_inp["velocities"]:
-            vel = np.array(velocities).reshape((self.num_res, self._num_atoms, 3)) * 100 # Convert to m/s
+            vel = np.array(velocities).reshape((self.num_res, self._atoms_per_mol, 3))[:, self._atoms, :] * 100 # Convert to m/s
             vel_com = np.sum(vel * self._masses[np.newaxis,: , np.newaxis], axis=1) / self._sum_masses
             data["velocities"][frame_id] = vel_com
 
@@ -1724,7 +1726,7 @@ class Sample:
             if self._is_diffusion_vacf or self._is_numpy:
                 velocities = frame.velocities
 
-            pos = np.array(positions).reshape((self.num_res, self._num_atoms, 3)) / 10 + shift # Convert to nm
+            pos = np.array(positions).reshape((self.num_res, self._atoms_per_mol, 3))[:, self._atoms, :] / 10 + shift # Convert to nm
             com_no_pbc = np.sum(pos * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
             if is_broken:
                 distances = pos - com_no_pbc[:, np.newaxis, :]
@@ -1740,7 +1742,7 @@ class Sample:
                 com = com_no_pbc
 
             if self._is_diffusion_vacf or self._is_numpy:
-                vel = np.array(velocities).reshape((self.num_res, self._num_atoms, 3)) * 100 # Convert A/ps to m/s
+                vel = np.array(velocities).reshape((self.num_res, self._atoms_per_mol, 3))[:, self._atoms, :] * 100 # Convert A/ps to m/s
                 vel_com = np.sum(vel * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
 
             # Create region and distance lists
