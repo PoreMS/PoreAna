@@ -148,7 +148,6 @@ def bins(link_data, area=[[10, 90], [10, 90]], target_dens=0, is_print=True):
             elif pore_props[pore_id]["pore_type"]=="SLIT" and inp["avg_slit"]:
                 volume[pore_id]["in"] = [box[0]*(pore_props[pore_id]["length"]-2*entry)*(width[pore_id]["in"][i+1]-width[pore_id]["in"][i])*2 for i in range(0, bin_num+1)]
             elif pore_props[pore_id]["pore_type"]=="SLIT" and not inp["avg_slit"]:
-                print(res,entry)
                 volume[pore_id]["in"] = [box[0]*(pore_props[pore_id]["length"]-2*entry)*(width[pore_id]["in"][i+1]-width[pore_id]["in"][i]) for i in range(0, bin_num+1)]
 
             ## Exterior  ###Update fehlt hier noch 
@@ -164,8 +163,8 @@ def bins(link_data, area=[[10, 90], [10, 90]], target_dens=0, is_print=True):
             direction = inp["direction"]
             directions = [i for i in range(3) if i!= direction]
             surface = box[directions[0]]*box[directions[1]]
-        # Except to ensure compliance with older calculations 
-        except:
+        # Older samples were written without a direction
+        except KeyError:
             surface = box[0]*box[1]
         volume["ex"] = [width["ex"][1]*surface for i in range(bin_num+1)]
 
@@ -451,7 +450,7 @@ def density_from_bins(link_data, convert="", plot_axis=None, **kwargs):
         )
         # Set axis labels
         plot_axis.set_xlabel("xyz"[inp["direction"]] + " / nm")
-        plot_axis.set_ylabel("Density / $\mathrm{" + fr'{convert}' + "}$")
+        plot_axis.set_ylabel(r"Density / $\mathrm{" + fr'{convert}' + "}$")
 
     return average_density_per_bin
 
@@ -555,7 +554,7 @@ def density_from_vacf(link_data, convert="", pore_id=None, plot_axis=None, **kwa
         )
         # Set axis labels
         plot_axis.set_xlabel("xyzr"[direction] + " / nm")
-        plot_axis.set_ylabel("Density / $\mathrm{" + fr'{convert}' + "}$")
+        plot_axis.set_ylabel(r"Density / $\mathrm{" + fr'{convert}' + "}$")
 
     return average_density_per_bin
 

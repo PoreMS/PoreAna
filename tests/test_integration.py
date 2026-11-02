@@ -134,6 +134,23 @@ def test_density(sample_output):
     assert dens_s["num_dens"]["shape_00"]["in"] == dens_p["num_dens"]["shape_00"]["in"]
 
 
+def test_density_legacy_sample_without_direction(sample_output):
+    """A sample written before inp["direction"] existed must still load.
+
+    bins() falls back to box[0]*box[1] for the bin surface. Every bundled
+    fixture carries a direction, so the fallback is otherwise never reached.
+    """
+    legacy = pa.utils.load("output/dens_box.obj")
+    del legacy["inp"]["direction"]
+    pa.utils.save(legacy, "output/dens_box_legacy.obj")
+
+    modern = pa.density.bins("output/dens_box.obj", is_print=False)
+    old = pa.density.bins("output/dens_box_legacy.obj", is_print=False)
+
+    # The box is discretized along z, so the fallback surface is the same one
+    assert old["mean"]["ex"] == modern["mean"]["ex"]
+
+
 def test_density_mean(sample_output):
     dens_s = pa.density.bins("output/dens_cyl_s.obj", is_print=False)
     mean = pa.density.mean(dens_s)
