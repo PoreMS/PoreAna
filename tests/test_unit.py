@@ -305,37 +305,23 @@ def _pore_geometry(sample):
 
 
 def test_diffusion_vacf_radial_bins_by_distance(change_to_tests_dir):
-    """Radial sampling must bin by the distance to the pore axis.
+    """Radial sampling bins by the first cylindrical component.
 
-    The binning coordinate was pos_list[..., 0], the raw x coordinate of the
-    box, so molecules were binned by x instead of by their distance from the
-    cylinder axis.
+    For direction="radial" _sample_helper converts the centre of mass to
+    (r, theta, z) before filling pos_list, so the sampler must read the
+    radial distance straight from component 0 and not recompute it from a
+    pair of coordinates that are no longer cartesian.
     """
     sample = _vacf_sample(bin_num=4)
     assert sample._diff_vacf_inp["direction"] == "radial_cylindrical"
     focal, radius, z_mid = _pore_geometry(sample)
 
-    # One molecule per radial bin; the second is offset along y, not x, so a
-    # binning that reads the x coordinate cannot place it in bin 1
-    com = [[focal[0] + (i + 0.5)/4*radius, focal[1], z_mid] for i in range(4)]
-    com[1] = [focal[0], focal[1] + 1.5/4*radius, z_mid]
+    # Cylindrical input, one molecule per radial bin, at assorted angles
+    com = [[(i + 0.5)/4*radius, i*0.7 - 1.0, z_mid] for i in range(4)]
     assert list(_run_vacf(sample, com)["density"][:, 0]) == [1, 1, 1, 1]
 
-
-def test_diffusion_vacf_wall_mask_uses_radial_distance(change_to_tests_dir):
-    """The pore wall test must use the distance to the shape's focal axis.
-
-    in_wall_mask compared the binning coordinate against diam/2. That
-    coordinate was an absolute box coordinate, so a molecule well inside the
-    pore was discarded whenever the pore itself sits far from the origin.
-    """
-    sample = _vacf_sample(bin_num=4)
-    focal, radius, z_mid = _pore_geometry(sample)
-
-    # Inside the pore, but at an x far larger than the pore radius
-    assert _run_vacf(sample, [[focal[0] + radius*0.5, focal[1], z_mid]])["density"].sum() == 1
-    # Beyond the wall
-    assert _run_vacf(sample, [[focal[0] + radius*2.0, focal[1], z_mid]])["density"].sum() == 0
+    # A molecule beyond the wall is dropped whatever its angle
+    assert _run_vacf(sample, [[radius*2.0, 2.5, z_mid]])["density"].sum() == 0
 
 
 def test_diffusion_vacf_pore_cartesian_direction(change_to_tests_dir):

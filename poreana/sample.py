@@ -1317,11 +1317,17 @@ class Sample:
                     z_max = res + self._pore_props[pore_id]["focal"][2]+self._pore_props[pore_id]["length"]/2-self._entry
 
                     # Distance to the focal axis of the shape, the pore wall sits at diam/2
-                    focal = np.array(self._pore_props[pore_id]["focal"][0:2])
-                    dist = np.linalg.norm(pos_frame[:, 0:2] - focal, axis=1)
-
-                    # Bin by the distance to the axis, or along the chosen box axis
-                    pos = dist if direction=="radial_cylindrical" else pos_frame[:, direction]
+                    if direction=="radial_cylindrical":
+                        # _sample_helper stored cylindrical coordinates, so the
+                        # first component is already the distance to the axis
+                        pos = pos_frame[:, 0]
+                        dist = pos
+                    else:
+                        # Bin along the chosen box axis, but keep the radial
+                        # distance for the wall, which is not that coordinate
+                        pos = pos_frame[:, direction]
+                        focal = np.array(self._pore_props[pore_id]["focal"][0:2])
+                        dist = np.linalg.norm(pos_frame[:, 0:2] - focal, axis=1)
 
                     # Filter all molecules that are inside the pore in z-direction
                     pore_mask = (z_min < pos_frame[:, 2]) & (pos_frame[:, 2] < z_max)
