@@ -55,6 +55,8 @@ def bins_plot(data_link_gyr, data_link_dens, intent="", pore_id = "shape_00", is
 
     if is_norm:
         for key, val in width.items():
+            if not val:
+                continue
             x_max = val[-1]
             width[key] = [x/x_max for x in val]
 
@@ -69,17 +71,19 @@ def bins_plot(data_link_gyr, data_link_dens, intent="", pore_id = "shape_00", is
 
     # Full plot
     if not intent:
-        plt.subplot(211)
-        sns.lineplot(x=width["in"], y=gyration["in"])
-        if is_mean:
-            sns.lineplot(x=width["in"], y=[mean["in"] for x in width["in"]])
+        # A box system has no pore interior, so only the exterior is plotted
+        if is_pore:
+            plt.subplot(211)
+            sns.lineplot(x=width["in"], y=gyration["in"])
+            if is_mean:
+                sns.lineplot(x=width["in"], y=[mean["in"] for x in width["in"]])
 
-        plt.xlim([0, width["in"][-1]])
-        plt.xlabel("Distance from pore center (nm)")
-        plt.ylabel(r"Radius (nm)")
-        plt.legend(["Gyration radius", "Mean"])
+            plt.xlim([0, width["in"][-1]])
+            plt.xlabel("Distance from pore center (nm)")
+            plt.ylabel(r"Radius (nm)")
+            plt.legend(["Gyration radius", "Mean"])
 
-        plt.subplot(212)
+            plt.subplot(212)
         sns.lineplot(x=width["ex"], y=gyration["ex"])
         if is_mean:
             sns.lineplot(x=width["ex"], y=[mean["ex"] for x in width["ex"]])
@@ -93,6 +97,9 @@ def bins_plot(data_link_gyr, data_link_dens, intent="", pore_id = "shape_00", is
     else:
         if intent not in ["in", "ex"]:
             print("Invalid intent. Check documentation for available options.")
+            return
+        if intent not in areas:
+            print("A box system has no pore interior. Only intent \"ex\" is available.")
             return
 
         sns.lineplot(x=width[intent], y=gyration[intent], **kwargs)

@@ -211,7 +211,6 @@ def test_angle(sample_output):
     assert "ex" in mean_a
 
 
-@pytest.mark.xfail(strict=True, reason="both plots read interior data unconditionally")
 def test_angle_gyration_box_system(sample_output):
     """angle and gyration must plot a box system, which has no interior.
 

@@ -55,6 +55,8 @@ def bins_plot(data_link_angle, data_link_dens, pore_id="shape_00", intent="", is
 
     if is_norm:
         for key, val in width.items():
+            if not val:
+                continue
             x_max = val[-1]
             width[key] = [x/x_max for x in val]
 
@@ -62,7 +64,7 @@ def bins_plot(data_link_angle, data_link_dens, pore_id="shape_00", intent="", is
 
     # Divide angle by density in bins
     angle = {"ex": [], "in": []}
-    angle["in"] = [agl["data"][pore_id]["in"][i]/dens["data"][pore_id]["in"][i] if dens["data"][pore_id]["in"][i] else 0 for i in range(len(agl["data"][pore_id]["in"]))]
+    angle["in"] = [agl["data"][pore_id]["in"][i]/dens["data"][pore_id]["in"][i] if dens["data"][pore_id]["in"][i] else 0 for i in range(len(agl["data"][pore_id]["in"]))] if is_pore else []
     angle["ex"] = [agl["data"]["ex"][i]/dens["data"]["ex"][i] if dens["data"]["ex"][i] else 0 for i in range(len(agl["data"]["ex"]))] 
 
     # Calculate mean angle
@@ -70,17 +72,19 @@ def bins_plot(data_link_angle, data_link_dens, pore_id="shape_00", intent="", is
 
     # Full plot
     if not intent:
-        plt.subplot(211)
-        sns.lineplot(x=width["in"], y=angle["in"])
-        if is_mean:
-            sns.lineplot(x=width["in"], y=[mean["in"] for x in width["in"]])
+        # A box system has no pore interior, so only the exterior is plotted
+        if is_pore:
+            plt.subplot(211)
+            sns.lineplot(x=width["in"], y=angle["in"])
+            if is_mean:
+                sns.lineplot(x=width["in"], y=[mean["in"] for x in width["in"]])
 
-        plt.xlim([0, width["in"][-1]])
-        plt.xlabel("Distance from pore center (nm)")
-        plt.ylabel(r"Angle (deg)")
-        plt.legend(["Angle", "Mean"])
+            plt.xlim([0, width["in"][-1]])
+            plt.xlabel("Distance from pore center (nm)")
+            plt.ylabel(r"Angle (deg)")
+            plt.legend(["Angle", "Mean"])
 
-        plt.subplot(212)
+            plt.subplot(212)
         sns.lineplot(x=width["ex"], y=angle["ex"])
         if is_mean:
             sns.lineplot(x=width["ex"], y=[mean["ex"] for x in width["ex"]])
@@ -94,6 +98,9 @@ def bins_plot(data_link_angle, data_link_dens, pore_id="shape_00", intent="", is
     else:
         if intent not in ["in", "ex"]:
             print("Invalid intent. Check documentation for available options.")
+            return
+        if intent not in areas:
+            print("A box system has no pore interior. Only intent \"ex\" is available.")
             return
 
         sns.lineplot(x=width[intent], y=angle[intent], **kwargs)
