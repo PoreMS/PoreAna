@@ -155,11 +155,25 @@ def test_adsorption(sample_output):
     assert round(ads_s["num"]["ex"], 4) == 28.6817
     assert round(ads_p["num"]["shape_00"]["in"], 4) == 10.5912
 
-    # calculate() must not mutate the sample file it loaded
+
+def test_adsorption_does_not_mutate_the_loaded_sample(sample_output, monkeypatch):
+    """Repeated calculations over one loaded sample must agree.
+
+    calculate subtracted the two reservoirs from pore["box"]["dimensions"]
+    in place. It reloads the file on every call, so the damage was invisible
+    from the outside, but any caller or loader that hands it the same
+    dictionary twice saw the box shrink on each call.
+    """
     sample = pa.utils.load("output/dens_cyl_s.obj")
     box_before = list(sample["pore"]["box"]["dimensions"])
-    pa.adsorption.calculate("output/dens_cyl_s.obj")
+    monkeypatch.setattr(pa.adsorption.utils, "load", lambda *args, **kwargs: sample)
+
+    first = pa.adsorption.calculate("output/dens_cyl_s.obj")
+    second = pa.adsorption.calculate("output/dens_cyl_s.obj")
+
     assert list(sample["pore"]["box"]["dimensions"]) == box_before
+    assert first["conc"]["shape_00"]["mumol_m2"] == second["conc"]["shape_00"]["mumol_m2"]
+    assert round(first["conc"]["shape_00"]["mumol_m2"], 4) == 0.1514
 
 
 ############

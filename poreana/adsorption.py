@@ -42,22 +42,20 @@ def calculate(link_data, res_cutoff=1, is_normalize=True):
     # Load data object
     sample = utils.load(link_data)
 
-    # Load pore properties
+    # Load pore properties, the pore length is the box without both reservoirs
     pore = sample["pore"]
     res = pore["box"]["res"]
-    box = pore["box"]["dimensions"]
+    box = list(pore["box"]["dimensions"])
     box[2] -= 2*res
 
     # Load bins
     bins = {}
     bins["ex"] = sample["data"]["ex"]
     bins["in"] = {}
-    print(sample["data"].keys())
     for pore_id in sample["pore"].keys():
         if pore_id[:5]=="shape":
-            print(sample["data"][pore_id].keys())
             bins["in"][pore_id] = sample["data"][pore_id]["in"]
-            
+
 
     # Load Width
     width = {}
