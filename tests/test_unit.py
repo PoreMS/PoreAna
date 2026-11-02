@@ -180,7 +180,6 @@ def test_model_accepts_float():
     assert np.array_equal(np.round(model._diff_bin, 4), np.array([-6.9078] * model._bin_num))
 
 
-@pytest.mark.xfail(strict=True, reason="type(d0) == float is False for np.float64")
 def test_model_accepts_numpy_float():
     """A numpy float guess must initialize the diffusion profile.
 

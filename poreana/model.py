@@ -32,7 +32,6 @@ class Model:
         self._type = sample["type"]
 
         self._sys_props = {}
-        self._sys_props = {}
         if "pore" in sample:
             for pore_id in sample["pore"].keys():
                 if pore_id[:5]=="shape":
@@ -66,12 +65,11 @@ class Model:
         self._diff_bin = np.float64(np.zeros(self._bin_num))  # in dz**2/dt
 
         # Initialize the diffusion profile
-        if type(self._d0) == float:
+        if isinstance(self._d0, float):
             self._diff_bin += (np.log(self._d0) - self._diff_unit)
-        elif type(self._d0) == list:
+        elif isinstance(self._d0, list):
             for i in range(len(self._d0)):
                 self._diff_bin[i] = np.log(self._d0[i]) - self._diff_unit
-            print(self._diff_bin[i])                    
     def _calc_profile(self, coeff, basis):
         """This function calculates the diffusion and free energy profile over
         the bins. It is used to initialize the system at the beginning of the
@@ -171,11 +169,10 @@ class CosineModel(Model):
         self._n_diff_radial = n_diff_radial
         self._print_output = is_print
 
-        if type(d0) == float:
+        if isinstance(d0, float):
             self._d0 = d0 * (10**9)/(10**12)                # guess init profile [A^2/ps]
-        elif type(d0) == list:
+        elif isinstance(d0, list):
             self._d0 = [d * (10**9)/(10**12) for d in d0]
-            print(self._d0)
         self._init_model()     # Initial model
         self._init_profiles()  # Initial Profiles
         self._cosine_model()   # Set basis of Fourier series
@@ -194,9 +191,9 @@ class CosineModel(Model):
         self._diff_coeff = np.zeros((self._n_diff), float)
 
         # Initialize diffusion profile with the guess value [A^2/ps]
-        if type(self._d0) == float:
+        if isinstance(self._d0, float):
             self._diff_coeff[0] += (np.log(self._d0) - self._diff_unit)
-        elif type(self._d0) == list:
+        elif isinstance(self._d0, list):
             self._diff_coeff = self._coeff
     def _cosine_model(self):
         """This function sets a Fourier Cosine Series Model for the MC Diffusion
@@ -216,7 +213,7 @@ class CosineModel(Model):
         self._df_bin = self._calc_profile(self._df_coeff, self._df_basis)
 
         # Print for console
-        if self._print_output == True:
+        if self._print_output:
             print("--------------------------------------------------------------------------------")
             print("-------------------------Initalize Cosine Model---------------------------------")
             print("--------------------------------------------------------------------------------\n")
@@ -375,7 +372,7 @@ class StepModel(Model):
         self._df_bin = self._calc_profile(self._df_coeff, self._df_basis)
 
         # Print for console
-        if self._print_output == True:
+        if self._print_output:
             print("\n")
             print("--------------------------------------------------------------------------------")
             print("-------------------------Initalize Step Model-----------------------------------")
