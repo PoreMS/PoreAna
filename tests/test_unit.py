@@ -244,7 +244,6 @@ def test_init_diffusion_vacf_rejects_bin_conflict(change_to_tests_dir):
     assert not sample._is_diffusion_vacf
 
 
-@pytest.mark.xfail(strict=True, reason="the direction guard can never be true")
 def test_init_diffusion_vacf_rejects_bad_direction(change_to_tests_dir):
     """An unusable direction must be refused.
 

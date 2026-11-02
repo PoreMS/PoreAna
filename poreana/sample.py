@@ -1176,7 +1176,7 @@ class Sample:
         if self._is_numpy:
             print("VACF-approaches cannot be run in parallel with numpy approaches.")
             return
-        if direction not in [0,1,2] and (direction=="radial" and not self._pore):
+        if direction not in [0,1,2,"radial"] or (direction=="radial" and not self._pore):
             print("Wrong directional input. Possible inputs are 0 (x-axis), 1 (y-axis), 2 (z-axis), and 'radial' (only for pore systems).")
             return
         if self._traj.split(".")[-1]!="trr":
