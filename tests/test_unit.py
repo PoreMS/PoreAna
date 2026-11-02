@@ -191,6 +191,40 @@ def test_model_accepts_numpy_float():
     assert np.array_equal(np.round(model._diff_bin, 4), np.array([-6.9078] * model._bin_num))
 
 
+def test_model_accepts_int_d0():
+    """An integer guess must give the same profile as the equal float.
+
+    StepModel's own default is the integer 1, so an integer is a natural
+    thing to hand CosineModel, but isinstance(1, float) is False.
+    """
+    link = _write_minimal_mc_sample("output/test/mc_minimal.obj")
+    reference = pa.CosineModel(link, 2, 2, d0=1.0)
+    model = pa.CosineModel(link, 2, 2, d0=1)
+    assert np.array_equal(model._diff_bin, reference._diff_bin)
+    assert np.array_equal(model._diff_coeff, reference._diff_coeff)
+
+
+def test_model_rejects_list_d0_without_coeff():
+    """A per-bin guess needs matching coefficients, and must say so.
+
+    The list branch assigns self._coeff to the diffusion coefficients, so an
+    omitted coeff used to fail far away in _calc_profile with
+    "operands could not be broadcast together with shapes (0,) (4,2)".
+    """
+    link = _write_minimal_mc_sample("output/test/mc_minimal.obj")
+    with pytest.raises(ValueError, match="coeff"):
+        pa.CosineModel(link, 2, 2, d0=[1.0, 1.0, 1.0, 1.0])
+
+    # A matching coeff is accepted
+    model = pa.CosineModel(link, 2, 2, d0=[1.0, 1.0, 1.0, 1.0], coeff=np.zeros(2))
+    assert isinstance(model._d0, list)
+
+    # And an outright unusable type is named rather than causing an
+    # AttributeError on self._d0 later
+    with pytest.raises(ValueError, match="d0"):
+        pa.CosineModel(link, 2, 2, d0="1.0")
+
+
 ########
 # VACF #
 ########
