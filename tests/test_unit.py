@@ -147,7 +147,6 @@ def test_init_angle_normals_per_shape(change_to_tests_dir):
 ################
 # MC diffusion #
 ################
-@pytest.mark.xfail(strict=True, reason="init_diffusion_mc sorts the caller's list")
 def test_init_diffusion_mc_keeps_len_step(change_to_tests_dir):
     """init_diffusion_mc must not reorder the list it was handed."""
     mol = pms.Molecule(inp="data/benzene.gro")

@@ -992,8 +992,8 @@ class Sample:
         # Calculate bins
         bins = self._bin_box(bin_num, direction)["bins"]
 
-        # Sort len_step list
-        len_step.sort()
+        # Sort len_step list, without reordering the caller's list
+        len_step = sorted(len_step)
 
         # Create input dictionalry
         self._diff_mc_inp = {"output": link_out, "bins": bins,
