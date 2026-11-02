@@ -1298,7 +1298,10 @@ def integrate_bin_diffusion_vacf(link_data, pore_id=None):
     print(f"Sampled {2*sample_datapoints:_} data points (including time reversal) for VACF calculation.")
 
     # Calculate the VACF per bin; the normalization by 'density' accounts for every timeorigin and the average number of residues in the bin
-    vacf_data = data["vacf_data"].copy() / data["density"][:, np.newaxis, :, np.newaxis] # 
+    # A bin that was never occupied has a density of zero and stays zero instead of becoming NaN
+    density = data["density"][:, np.newaxis, :, np.newaxis]
+    vacf_data = np.divide(data["vacf_data"], density,
+                          out=np.zeros(data["vacf_data"].shape, float), where=density!=0)
 
     # Integrate the VACF using the cumulative trapezoid rule
     integrated = sp.integrate.cumulative_trapezoid(

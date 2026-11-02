@@ -330,6 +330,50 @@ def test_diffusion_vacf_pore_cartesian_direction(change_to_tests_dir):
     assert list(density) == [0, 1, 1, 0]
 
 
+def _write_vacf_sample(link, bin_num=4):
+    """Write a VACF sample file whose first bin is occupied and the rest empty."""
+    sample = _vacf_sample(bin_num=bin_num)
+    data = sample._diffusion_vacf_data()
+
+    # Bin 0 saw two molecules with a constant correlation of 2, so the
+    # normalised vacf of that bin is exactly 1 in every direction
+    data["shape_00"]["vacf_data"][0, :, 0, :] = 2.0
+    data["shape_00"]["density"][0, 0] = 2
+
+    inp = dict(sample._diff_vacf_inp)
+    inp["num_frame"] = sample._num_frame
+    inp["mass"] = 1.0
+    pa.utils.mkdirp("output/test")
+    pa.utils.save({"type": "diff_vacf", "pore": sample._pore,
+                   "inp": inp, "data": data}, link)
+    return sample._diff_vacf_inp
+
+
+def test_integrate_bin_diffusion_vacf_unoccupied_bins_are_zero(change_to_tests_dir):
+    """An unoccupied bin must integrate to 0.0, not NaN.
+
+    The normalisation divided by the per-bin density without guarding
+    against an empty bin, so 0/0 put NaN in every direction of every bin no
+    molecule ever entered, and the NaN then spread through any mean.
+    """
+    link = "output/test/vacf_zero.obj"
+    inp = _write_vacf_sample(link, bin_num=4)
+    integrated = pa.diffusion.integrate_bin_diffusion_vacf(link, pore_id="shape_00")
+
+    # bins x residues x correlation steps x directions
+    assert integrated.shape == (4, 1, inp["corr_steps"], 3)
+    assert np.all(np.isfinite(integrated))
+
+    # The three empty bins contribute nothing at all
+    assert not np.any(integrated[1:])
+
+    # The occupied bin integrates a constant 1 over the correlation time
+    dt = inp["len_frame"]*inp["sample_step"]
+    expect = np.arange(inp["corr_steps"])*dt
+    for axis in range(3):
+        assert np.allclose(integrated[0, 0, :, axis], expect)
+
+
 def test_init_diffusion_vacf_rejects_bad_direction(change_to_tests_dir):
     """An unusable direction must be refused.
 
