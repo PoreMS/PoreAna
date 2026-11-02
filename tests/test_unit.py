@@ -244,15 +244,15 @@ def test_init_diffusion_vacf_rejects_bin_conflict(change_to_tests_dir):
     assert not sample._is_diffusion_vacf
 
 
-def _vacf_sample(bin_num=4):
-    """A radial VACF sample on the single-cylinder pore, without a trajectory."""
+def _vacf_sample(bin_num=4, direction="radial"):
+    """A VACF sample on the single-cylinder pore, without a trajectory."""
     mol = pms.Molecule(inp="data/benzene.gro")
     sample = pa.Sample("data/pore_system_cylinder_new.yml", "data/traj_cylinder.xtc", mol)
     sample._traj = "dummy.trr"
     sample.init_diffusion_vacf("output/test/vacf.obj", len_correration=1e-14,
                                new_time_origin=2e-15, sample_step=1, len_frame=1e-15,
-                               bin_num=bin_num, direction="radial")
-    assert sample._diff_vacf_inp["direction"] == "radial_cylindrical"
+                               bin_num=bin_num, direction=direction)
+    assert sample._is_diffusion_vacf
     return sample
 
 
@@ -282,6 +282,7 @@ def test_diffusion_vacf_radial_bins_by_distance(change_to_tests_dir):
     cylinder axis.
     """
     sample = _vacf_sample(bin_num=4)
+    assert sample._diff_vacf_inp["direction"] == "radial_cylindrical"
     focal, radius, z_mid = _pore_geometry(sample)
 
     # One molecule per radial bin; the second is offset along y, not x, so a
@@ -305,6 +306,28 @@ def test_diffusion_vacf_wall_mask_uses_radial_distance(change_to_tests_dir):
     assert _run_vacf(sample, [[focal[0] + radius*0.5, focal[1], z_mid]])["density"].sum() == 1
     # Beyond the wall
     assert _run_vacf(sample, [[focal[0] + radius*2.0, focal[1], z_mid]])["density"].sum() == 0
+
+
+def test_diffusion_vacf_pore_cartesian_direction(change_to_tests_dir):
+    """A pore system must also be sampleable along a box axis.
+
+    _bin_box returns one bin list shared by every shape while _bin_pore
+    returns one per shape, but the sampler indexed the bins by pore_id in
+    both cases, so a cartesian direction raised
+    TypeError: list indices must be integers or slices, not str.
+    """
+    sample = _vacf_sample(bin_num=4, direction=2)
+    bins = sample._diff_vacf_inp["bins"]
+    assert isinstance(bins, list)
+    focal, radius, z_mid = _pore_geometry(sample)
+
+    # Two molecules inside the pore, in the two z bins the pore spans, plus
+    # one at the same z but out in the pore wall
+    inside = focal[0] + radius*0.5
+    density = _run_vacf(sample, [[inside, focal[1], 7.0],
+                                 [inside, focal[1], 12.0],
+                                 [focal[0] + radius*2.0, focal[1], 7.0]])["density"][:, 0]
+    assert list(density) == [0, 1, 1, 0]
 
 
 def test_init_diffusion_vacf_rejects_bad_direction(change_to_tests_dir):

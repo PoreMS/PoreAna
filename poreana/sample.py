@@ -1310,7 +1310,8 @@ class Sample:
                     if pore_id[:5]!="shape":
                         continue
                     data_pore = data[pore_id]
-                    bin_pore = bins[pore_id]
+                    # Radial bins are per shape, box bins are shared by all shapes
+                    bin_pore = bins[pore_id] if direction=="radial_cylindrical" else bins
                     res = self._pore_props["box"]["res"]
                     z_min = res + self._pore_props[pore_id]["focal"][2]-self._pore_props[pore_id]["length"]/2+self._entry
                     z_max = res + self._pore_props[pore_id]["focal"][2]+self._pore_props[pore_id]["length"]/2-self._entry
