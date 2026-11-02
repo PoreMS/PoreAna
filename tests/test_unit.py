@@ -111,7 +111,6 @@ def test_density_mean_integrates_every_bin():
 ##############
 # Pore shapes #
 ##############
-@pytest.mark.xfail(strict=True, reason="bin_num accumulates over pore shapes")
 def test_bin_in_const_A_per_shape(change_to_tests_dir):
     """Every shape must get the same number of constant-area bins.
 
