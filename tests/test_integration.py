@@ -262,6 +262,123 @@ def test_angle_gyration_box_system(sample_output):
     plt.close("all")
 
 
+########
+# VACF #
+########
+VACF_BOX_Z = 9.9651          # box length along z, as written in traj_oxy.trr
+VACF_NUM_RES = 40            # O2 molecules in the trajectory
+VACF_EMPTY_BINS = 4          # lower 2 nm of the box holds no oxygen
+VACF_WINDOW = (2e-12, 4e-12) # the running integral is flat over this window
+
+
+def test_sample_vacf_box(sample_output):
+    """Sampling a box system from a trr, with the box taken from the frame."""
+    sample = pa.utils.load("output/vacf_oxy.obj")
+
+    assert sample["type"] == "diff_vacf"
+    assert "pore" not in sample
+    assert round(float(sample["box"]["length"][2]), 4) == VACF_BOX_Z
+    assert sample["inp"]["num_res"] == VACF_NUM_RES
+    assert sample["inp"]["direction"] == 2
+
+    # bins x correlation steps x residues x directions
+    corr_steps = sample["inp"]["corr_steps"]
+    assert sample["data"]["vacf_data"].shape == (20, corr_steps, 1, 3)
+    assert sample["data"]["density"].shape == (20, 1)
+
+    # A frame is 20 fs, so a 4 ps correlation window is 200 steps
+    assert round(sample["inp"]["len_frame"]*sample["inp"]["sample_step"]*1e15, 6) == 20.0
+    assert corr_steps == 200
+
+
+def test_density_from_vacf(sample_output):
+    """The per bin occupancy must account for every molecule."""
+    dens = pa.density.density_from_vacf("output/vacf_oxy.obj")
+
+    assert dens.shape == (20,)
+    # density_from_vacf counts residues per bin, so the bins hold every molecule
+    assert round(float(dens.sum()), 6) == VACF_NUM_RES
+    # The oxygen free region of the box
+    assert list(dens[:VACF_EMPTY_BINS]) == [0]*VACF_EMPTY_BINS
+    assert all(dens[VACF_EMPTY_BINS:] > 0)
+
+
+def test_diffusion_vacf_profile(sample_output):
+    """The z resolved diffusion profile of a two phase box.
+
+    Pins the density weighted mean as a regression anchor. The per bin values
+    are noisy at 40 molecules, so only the mean is pinned; what is asserted
+    per bin is that an unoccupied bin yields exactly 0.0 and never NaN.
+    """
+    plt.figure()
+    diff, mean = pa.diffusion.diffusion_per_bin("output/vacf_oxy.obj",
+                                                mean_over_time=VACF_WINDOW,
+                                                plot_axis=plt.gca())
+    plt.savefig("output/vacf_diffusion_z.pdf", format="pdf", dpi=100)
+    plt.close("all")
+
+    assert diff.shape == (20, 3)
+    assert np.all(np.isfinite(diff))
+
+    # The empty bins integrate to zero rather than poisoning the profile
+    assert not np.any(diff[:VACF_EMPTY_BINS])
+
+    # Every occupied bin has a positive, liquid like diffusion coefficient
+    occupied = diff[VACF_EMPTY_BINS:, 2]
+    assert np.all(occupied > 0)
+    assert np.all(occupied < 20)
+
+    # Diffusion in a box is isotropic, so the three directions must agree
+    assert max(mean)/min(mean) < 1.2
+
+    assert [round(float(x), 2) for x in mean] == [3.82, 4.19, 3.95]
+
+
+def test_diffusion_vacf_parallel(sample_output):
+    """Splitting the trajectory over workers must not change the VACF."""
+    data_s = pa.utils.load("output/vacf_oxy.obj")["data"]
+    data_p = pa.utils.load("output/vacf_oxy_p.obj")["data"]
+
+    assert np.array_equal(data_s["density"], data_p["density"])
+    assert np.allclose(data_s["vacf_data"], data_p["vacf_data"])
+
+    _, mean_s = pa.diffusion.diffusion_per_bin("output/vacf_oxy.obj", mean_over_time=VACF_WINDOW)
+    _, mean_p = pa.diffusion.diffusion_per_bin("output/vacf_oxy_p.obj", mean_over_time=VACF_WINDOW)
+    assert np.allclose(mean_s, mean_p)
+
+
+def test_diffusion_vacf_per_residue(sample_output):
+    """Per residue sampling must sum back to the aggregate.
+
+    sample_each_residue=True accumulates into vacf_data[bin, :, residue, :],
+    which needs the index applied after the slice because advanced indexing
+    would otherwise transpose the correlation and residue axes.
+    """
+    agg = pa.utils.load("output/vacf_oxy.obj")["data"]
+    per = pa.utils.load("output/vacf_oxy_res.obj")["data"]
+
+    corr_steps = pa.utils.load("output/vacf_oxy.obj")["inp"]["corr_steps"]
+    assert per["vacf_data"].shape == (20, corr_steps, VACF_NUM_RES, 3)
+    assert per["density"].shape == (20, VACF_NUM_RES)
+
+    assert np.array_equal(per["density"].sum(axis=1), agg["density"][:, 0])
+    assert np.allclose(per["vacf_data"].sum(axis=2), agg["vacf_data"][:, :, 0, :])
+
+
+def test_plot_correlation_per_bin(sample_output):
+    """The per bin correlation plot must accept a box system."""
+    plt.figure()
+    pa.diffusion.plot_correlation_per_bin("output/vacf_oxy.obj", plot_axis=plt.gca(),
+                                          direction="z", bin_selection=[6, 10, 14])
+    plt.savefig("output/vacf_correlation.pdf", format="pdf", dpi=100)
+    plt.close("all")
+
+    # A direction that does not exist is reported, not raised
+    assert pa.diffusion.plot_correlation_per_bin("output/vacf_oxy.obj", direction="q") is None
+    assert pa.diffusion.plot_correlation_per_bin("output/vacf_oxy.obj", bin_selection=3) is None
+    plt.close("all")
+
+
 #################
 # Bin diffusion #
 #################

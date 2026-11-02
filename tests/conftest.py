@@ -95,6 +95,30 @@ def sample_output(change_to_tests_dir):
     sample.init_diffusion_mc("output/diff_mc_cyl_p.obj", len_step=len_step_mc)
     sample.sample(is_parallel=True, is_pbc=True, num_cores=6)
 
+    # VACF needs velocities, so a trr. traj_oxy.trr holds 40 O2 molecules in a
+    # two phase box, 10001 frames written every 20 fs over 200 ps. The box is
+    # read from the trajectory, the lower quarter of it holds no oxygen at all.
+    mol_O = pms.Molecule("oxygen", "OXY")
+    mol_O.add("O", [0, 0, 0], name="O1")
+    mol_O.add("O", [0, 0, 0.1208], name="O2")
+
+    # len_frame is the md timestep and sample_step the md steps per written
+    # frame, so a frame is 20 fs apart and the correlation window is 4 ps
+    vacf_inp = {"len_correration": 4e-12, "new_time_origin": 4e-13,
+                "sample_step": 20, "len_frame": 1e-15, "bin_num": 20, "direction": 2}
+
+    sample = pa.Sample([], "data/traj_oxy.trr", mol_O)
+    sample.init_diffusion_vacf("output/vacf_oxy.obj", **vacf_inp)
+    sample.sample(is_parallel=False, is_pbc=True)
+
+    sample = pa.Sample([], "data/traj_oxy.trr", mol_O)
+    sample.init_diffusion_vacf("output/vacf_oxy_p.obj", **vacf_inp)
+    sample.sample(is_parallel=True, is_pbc=True)
+
+    sample = pa.Sample([], "data/traj_oxy.trr", mol_O)
+    sample.init_diffusion_vacf("output/vacf_oxy_res.obj", sample_each_residue=True, **vacf_inp)
+    sample.sample(is_parallel=False, is_pbc=True)
+
     # Small MC output for the file_to_text and table tests. Neither asserts a
     # physical value, so the step counts only have to produce a loadable file.
     model = pa.CosineModel("output/diff_mc_cyl_s.obj", 6, 10)
