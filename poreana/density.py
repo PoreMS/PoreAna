@@ -336,15 +336,14 @@ def mean(density, is_print=True, int_limit=2.5):
     # Loop over different pores
     for pore_id in density["sample"]["pore"].keys():     
             if pore_id[:5]=="shape":
-                bin_num = len(density["sample"]["data"][pore_id]["in_width"][:-1])
-                width = density["sample"]["data"][pore_id]["in_width"][:-1]
+                width = density["sample"]["data"][pore_id]["in_width"]
                 num_dens = density["num_dens"][pore_id]["in"]
                 mass = density["sample"]["inp"]["mass"]
 
-                # Integrate density
+                # Integrate density over every radial bin, bin i spans width[i] to width[i+1]
                 num_dens_int = 0
                 sum_surf = 0
-                for i in range(bin_num-1):
+                for i in range(len(num_dens)):
                     if num_dens[i]>0:
                         if (width[i]<int_limit):
                             num_dens_int += num_dens[i]*(width[i+1]**2-width[i]**2)

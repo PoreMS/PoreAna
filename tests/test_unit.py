@@ -86,7 +86,6 @@ def test_geometry_angle_parallel():
 ###########
 # Density #
 ###########
-@pytest.mark.xfail(strict=True, reason="the outermost radial bin is dropped")
 def test_density_mean_integrates_every_bin():
     """density.mean must integrate all radial bins, as its docstring states.
 
