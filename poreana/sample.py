@@ -1718,13 +1718,17 @@ class Sample:
         # Load trajectory
         traj = cf.Trajectory(self._traj)
         frame_form = "%"+str(len(str(self._num_frame)))+"i"
+
+        # Only read velocities if a sampling routine asks for them, a frame of a
+        # trajectory without velocity data raises on access
+        is_vel = self._is_diffusion_vacf or (self._is_numpy and self._numpy_inp["velocities"])
+
         # Run through frames
         for frame_id in frame_list:
             # Read frame
             frame = traj.read_step(frame_id)
             positions = frame.positions
-            if self._is_diffusion_vacf or self._is_numpy:
-                velocities = frame.velocities
+            velocities = frame.velocities if is_vel else None
 
             pos = np.array(positions).reshape((self.num_res, self._atoms_per_mol, 3))[:, self._atoms, :] / 10 + shift # Convert to nm
             com_no_pbc = np.sum(pos * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
@@ -1741,7 +1745,7 @@ class Sample:
             else:
                 com = com_no_pbc
 
-            if self._is_diffusion_vacf or self._is_numpy:
+            if is_vel:
                 vel = np.array(velocities).reshape((self.num_res, self._atoms_per_mol, 3))[:, self._atoms, :] * 100 # Convert A/ps to m/s
                 vel_com = np.sum(vel * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
 

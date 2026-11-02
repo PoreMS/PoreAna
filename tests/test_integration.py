@@ -73,6 +73,23 @@ def test_sample_partial_atom_selection(sample_output):
     assert os.path.isfile("output/dens_partial.obj")
 
 
+def test_sample_numpy_positions_only(sample_output):
+    """Sampling positions alone must not touch the velocities.
+
+    _sample_helper read frame.velocities for every numpy run regardless of
+    the velocities flag, so a positions-only run against an xtc raised
+    ChemfilesError: velocity data is not defined in this frame.
+    """
+    mol = pms.Molecule("benzene", "BEN", inp="data/benzene.gro")
+    sample = pa.Sample("data/pore_system_cylinder_new.yml", "data/traj_cylinder.xtc", mol)
+    sample.init_numpy_file("output/numpy_pos.npz", positions=True, velocities=False)
+    sample.sample(is_parallel=False, is_pbc=False)
+
+    data = np.load("output/numpy_pos.npz")
+    assert list(data.keys()) == ["positions"]
+    assert data["positions"].shape == (sample._num_frame, sample.num_res, 3)
+
+
 ###########
 # Density #
 ###########
