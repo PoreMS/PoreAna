@@ -282,11 +282,19 @@ def test_diffusion_mc_likelihood(sample_output):
         assert round(pa.MC()._log_likelihood_z(model), 2) == expected
 
 
-def test_diffusion_mc_run(sample_output):
+# nmc_eq=1000 is the shortest equilibration that keeps the 0.3 tolerance
+# meaningful. Over five repeats the fitted coefficient strays by at most 0.1;
+# halving the steps again triples that spread.
+MC_EQ = 1000
+MC_PROD = 2000
+
+
+def test_diffusion_mc_run_serial(sample_output):
     model = pa.CosineModel("output/diff_mc_cyl_s.obj", 6, 10)
     model._len_step = [10, 20, 40]
+    pa.MC().run(model, "output/diff_test_mc.yml", nmc_eq=MC_EQ, nmc=MC_PROD,
+                is_print=False, is_parallel=False)
 
-    pa.MC().run(model, "output/diff_test_mc.yml", nmc_eq=1000, nmc=2000, is_print=False, is_parallel=False)
     plt.figure()
     diff = pa.diffusion.mc_fit("output/diff_test_mc.yml")
     plt.savefig("output/mc_fit.pdf", format="pdf", dpi=100)
@@ -294,23 +302,34 @@ def test_diffusion_mc_run(sample_output):
     diff_pore = pa.diffusion.mc_fit("output/diff_test_mc.yml", section="pore")
     plt.savefig("output/mc_fit_pore.pdf", format="pdf", dpi=100)
     plt.close("all")
+
     assert abs(diff[0] - 1.6) < 0.3
     assert abs(diff_pore[0] - 1.2) < 0.3
 
-    pa.MC().run(model, "output/diff_test_mc.obj", nmc_eq=8000, nmc=2000, is_print=False, is_parallel=True)
+
+def test_diffusion_mc_run_parallel(sample_output):
+    model = pa.CosineModel("output/diff_mc_cyl_s.obj", 6, 10)
+    model._len_step = [10, 20, 40]
+    pa.MC().run(model, "output/diff_test_mc.obj", nmc_eq=MC_EQ, nmc=MC_PROD,
+                is_print=False, is_parallel=True)
+
     plt.figure()
     diff = pa.diffusion.mc_fit("output/diff_test_mc.obj")
     plt.figure()
     diff_pore = pa.diffusion.mc_fit("output/diff_test_mc.obj", section="pore")
     plt.close("all")
+
     assert abs(diff[0] - 1.6) < 0.3
     assert abs(diff_pore[0] - 1.2) < 0.3
 
-    # Printing models and a single lag time
+
+def test_diffusion_mc_print_output(sample_output):
+    """Cover the console output of both models and of a single lag time."""
     pa.StepModel("output/diff_mc_cyl_s.obj", 6, 10, is_print=True)
     model = pa.CosineModel("output/diff_mc_cyl_s.obj", 6, 10, is_print=True)
     model._len_step = [10]
-    pa.MC().run(model, "output/diff_test_mc_spline.obj", nmc_eq=100, nmc=2000, is_print=True, is_parallel=False)
+    pa.MC().run(model, "output/diff_test_mc_spline.obj", nmc_eq=50, nmc=100,
+                is_print=True, is_parallel=False)
 
 
 def test_diffusion_mc_box(sample_output):

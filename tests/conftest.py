@@ -95,9 +95,10 @@ def sample_output(change_to_tests_dir):
     sample.init_diffusion_mc("output/diff_mc_cyl_p.obj", len_step=len_step_mc)
     sample.sample(is_parallel=True, is_pbc=True, num_cores=6)
 
-    # Small MC output for the file_to_text and table tests
+    # Small MC output for the file_to_text and table tests. Neither asserts a
+    # physical value, so the step counts only have to produce a loadable file.
     model = pa.CosineModel("output/diff_mc_cyl_s.obj", 6, 10)
     model._len_step = [10, 20, 40]
-    pa.MC().run(model, "output/mc_fixture.obj", nmc_eq=500, nmc=500, is_print=False, is_parallel=False)
+    pa.MC().run(model, "output/mc_fixture.obj", nmc_eq=20, nmc=20, is_print=False, is_parallel=False)
 
     return True
