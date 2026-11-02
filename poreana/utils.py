@@ -16,6 +16,13 @@ import pandas as pd
 import poreana as pa
 
 
+# The libyaml based loader and dumper are several times faster on the large
+# profile lists of an MC result, but PyYAML only ships them when it was built
+# against libyaml
+_SafeLoader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+_SafeDumper = getattr(yaml, "CSafeDumper", yaml.SafeDumper)
+
+
 def mkdirp(directory):
     """Create directory if it does not exist.
 
@@ -91,6 +98,38 @@ def toc(t, message="", is_print=True):
         print(message+"%6.3f" % t_diff+" s")
 
     return t_diff
+
+
+def _to_python(obj):
+    """This function replaces every numpy type in an object by its plain
+    python equivalent, so that a data object can be written as plain yaml and
+    read back without yaml's unsafe loader.
+
+    Dictionaries, lists and tuples are walked recursively, keys included,
+    because the MC output is keyed by the step lengths which numpy produces as
+    :class:`numpy.int64`. Anything that is neither a numpy type nor one of
+    those containers is returned unchanged.
+
+    Parameters
+    ----------
+    obj : Object
+        Object to convert
+
+    Returns
+    -------
+    obj : Object
+        Object with every numpy type replaced by a python one
+    """
+    if isinstance(obj, dict):
+        return {_to_python(key): _to_python(val) for key, val in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_to_python(val) for val in obj]
+    if isinstance(obj, np.ndarray):
+        return _to_python(obj.tolist())
+    if isinstance(obj, np.generic):
+        return obj.item()
+
+    return obj
 
 
 def save(obj, link):
@@ -171,7 +210,7 @@ def save(obj, link):
 
     elif link.split(".")[-1]=="yml":
         with open(link, "w") as file_out:
-            file_out.write(yaml.dump(obj))
+            file_out.write(yaml.dump(_to_python(obj), Dumper=_SafeDumper))
     else:
         if link.split(".")[-1]!="obj":
             print("Wrong data type")
@@ -200,7 +239,13 @@ def load(link, file_type=""):
     # YAML file
     if file_type=="yml" or (not file_type and link.split(".")[-1]=="yml"):
         with open(link, "r") as file_in:
-            return yaml.load(file_in, Loader=yaml.UnsafeLoader)
+            try:
+                return yaml.load(file_in, Loader=_SafeLoader)
+            # Files written before PoreAna 0.3.0 carry python object tags
+            except yaml.YAMLError:
+                print("Reading "+link+" with yaml's unsafe loader, it was written before PoreAna 0.3.0. Save it again to get a plain yaml file.")
+                file_in.seek(0)
+                return yaml.load(file_in, Loader=yaml.UnsafeLoader)
 
     # Hd5 file
     elif file_type=="h5" or (not file_type and link.split(".")[-1]=="h5"):

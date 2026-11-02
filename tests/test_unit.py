@@ -38,7 +38,6 @@ def test_utils():
     assert round(pa.utils.toc(pa.utils.tic(), is_print=True)) == 0
 
 
-@pytest.mark.xfail(strict=True, reason="numpy types are dumped as python/object/apply tags")
 def test_utils_yaml_is_plain():
     """A saved .yml must be readable without yaml's unsafe loader."""
     pa.utils.mkdirp("output/test")
