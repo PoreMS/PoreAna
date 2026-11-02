@@ -244,6 +244,69 @@ def test_init_diffusion_vacf_rejects_bin_conflict(change_to_tests_dir):
     assert not sample._is_diffusion_vacf
 
 
+def _vacf_sample(bin_num=4):
+    """A radial VACF sample on the single-cylinder pore, without a trajectory."""
+    mol = pms.Molecule(inp="data/benzene.gro")
+    sample = pa.Sample("data/pore_system_cylinder_new.yml", "data/traj_cylinder.xtc", mol)
+    sample._traj = "dummy.trr"
+    sample.init_diffusion_vacf("output/test/vacf.obj", len_correration=1e-14,
+                               new_time_origin=2e-15, sample_step=1, len_frame=1e-15,
+                               bin_num=bin_num, direction="radial")
+    assert sample._diff_vacf_inp["direction"] == "radial_cylindrical"
+    return sample
+
+
+def _run_vacf(sample, com):
+    """Drive _diffusion_vacf once over a single frame of centres of mass."""
+    corr_steps = sample._diff_vacf_inp["corr_steps"]
+    com = np.asarray(com, float)
+    pos_list = np.repeat(com[np.newaxis, :, :], corr_steps, axis=0)
+    vel_list = np.ones((2*corr_steps-1, len(com), 3), float)
+    data = sample._diffusion_vacf_data()
+    sample._diffusion_vacf(data, corr_steps, pos_list, 0, vel_list, 0)
+    return data["shape_00"]
+
+
+def _pore_geometry(sample):
+    """Focal axis, radius and mid-pore z of the single shape."""
+    focal = sample._pore_props["shape_00"]["focal"]
+    return focal, sample._pore_props["shape_00"]["diam"]/2, \
+        focal[2] + sample._pore_props["box"]["res"]
+
+
+def test_diffusion_vacf_radial_bins_by_distance(change_to_tests_dir):
+    """Radial sampling must bin by the distance to the pore axis.
+
+    The binning coordinate was pos_list[..., 0], the raw x coordinate of the
+    box, so molecules were binned by x instead of by their distance from the
+    cylinder axis.
+    """
+    sample = _vacf_sample(bin_num=4)
+    focal, radius, z_mid = _pore_geometry(sample)
+
+    # One molecule per radial bin; the second is offset along y, not x, so a
+    # binning that reads the x coordinate cannot place it in bin 1
+    com = [[focal[0] + (i + 0.5)/4*radius, focal[1], z_mid] for i in range(4)]
+    com[1] = [focal[0], focal[1] + 1.5/4*radius, z_mid]
+    assert list(_run_vacf(sample, com)["density"][:, 0]) == [1, 1, 1, 1]
+
+
+def test_diffusion_vacf_wall_mask_uses_radial_distance(change_to_tests_dir):
+    """The pore wall test must use the distance to the shape's focal axis.
+
+    in_wall_mask compared the binning coordinate against diam/2. That
+    coordinate was an absolute box coordinate, so a molecule well inside the
+    pore was discarded whenever the pore itself sits far from the origin.
+    """
+    sample = _vacf_sample(bin_num=4)
+    focal, radius, z_mid = _pore_geometry(sample)
+
+    # Inside the pore, but at an x far larger than the pore radius
+    assert _run_vacf(sample, [[focal[0] + radius*0.5, focal[1], z_mid]])["density"].sum() == 1
+    # Beyond the wall
+    assert _run_vacf(sample, [[focal[0] + radius*2.0, focal[1], z_mid]])["density"].sum() == 0
+
+
 def test_init_diffusion_vacf_rejects_bad_direction(change_to_tests_dir):
     """An unusable direction must be refused.
 

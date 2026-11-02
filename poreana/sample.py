@@ -1293,11 +1293,8 @@ class Sample:
         new_time_origin_steps = self._diff_vacf_inp["new_time_origin_steps"]
         sample_each_residue = self._diff_vacf_inp["sample_each_residue"]
 
-        if direction=="radial_cylindrical":
-            direction = 0  # radial direction in cylindrical coordinates
-
         if (frame_id-corr_steps)%new_time_origin_steps==0:
-            pos = pos_list[pos_pointer, :, direction] # positions of v(0), shape: (num_molecules); Pos pointer is at t=0
+            pos_frame = pos_list[pos_pointer] # positions of v(0), shape: (num_molecules, 3); Pos pointer is at t=0
 
             # Vel pointer is at frame_id-(2*corr_steps-1) -> shift by +corr_steps-1 is middle of buffer which is t=0; mask is for t=0
             vel_pointer = (vel_pointer + corr_steps - 1) % vel_list.shape[0]  # Adjust pointer to t=0
@@ -1317,13 +1314,22 @@ class Sample:
                     res = self._pore_props["box"]["res"]
                     z_min = res + self._pore_props[pore_id]["focal"][2]-self._pore_props[pore_id]["length"]/2+self._entry
                     z_max = res + self._pore_props[pore_id]["focal"][2]+self._pore_props[pore_id]["length"]/2-self._entry
+
+                    # Distance to the focal axis of the shape, the pore wall sits at diam/2
+                    focal = np.array(self._pore_props[pore_id]["focal"][0:2])
+                    dist = np.linalg.norm(pos_frame[:, 0:2] - focal, axis=1)
+
+                    # Bin by the distance to the axis, or along the chosen box axis
+                    pos = dist if direction=="radial_cylindrical" else pos_frame[:, direction]
+
                     # Filter all molecules that are inside the pore in z-direction
-                    pore_mask = (z_min < pos_list[pos_pointer, :, 2]) & (pos_list[pos_pointer, :, 2] < z_max)
-                    in_wall_mask = (pos > (self._pore_props[pore_id]["diam"]*1.01)/2)
+                    pore_mask = (z_min < pos_frame[:, 2]) & (pos_frame[:, 2] < z_max)
+                    in_wall_mask = (dist > (self._pore_props[pore_id]["diam"]*1.01)/2)
                 # For box systems (all molecules are in the "pore" and not in the wall)
                 else:
                     data_pore = data
                     bin_pore = bins
+                    pos = pos_frame[:, direction]
                     pore_mask = np.ones(pos.shape, dtype=bool)
                     in_wall_mask = np.zeros(pos.shape, dtype=bool)
 
