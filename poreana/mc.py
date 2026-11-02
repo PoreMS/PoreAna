@@ -494,7 +494,7 @@ class MC:
 
 
         # Set output data
-        output = {"diff_profile": list_diff_profile, "df_profile": list_df_profile, "diff_coeff": list_diff_coeff,  "df_coeff": list_df_coeff, "nacc_df": nacc_df_mean, "nacc_diff": nacc_diff_mean, "fluc_df": list_df_fluc, "fluc_diff": list_diff_fluc,"fluc_diff_bin": diff_fluc_per_bin,"fluc_df_bin": df_fluc_per_bin,"list_diff_coeff": list_diff_profile, "list_df_coeff":  list_df_profile}
+        output = {"diff_profile": list_diff_profile, "df_profile": list_df_profile, "diff_coeff": list_diff_coeff,  "df_coeff": list_df_coeff, "nacc_df": nacc_df_mean, "nacc_diff": nacc_diff_mean, "fluc_df": list_df_fluc, "fluc_diff": list_diff_fluc,"fluc_diff_bin": diff_fluc_per_bin,"fluc_df_bin": df_fluc_per_bin,"list_diff_coeff": list_diff_coeff, "list_df_coeff":  list_df_coeff}
 
         return output
 

@@ -342,7 +342,6 @@ def test_diffusion_mc_box(sample_output):
     assert abs(diff[0] - 1.3) < 0.3
 
 
-@pytest.mark.xfail(strict=True, reason="list_diff_coeff is filled with the bin profile")
 def test_diffusion_mc_returns_coefficients(sample_output):
     """list_diff_coeff / list_df_coeff must hold the model coefficients.
 
