@@ -4,7 +4,6 @@ import scipy as sc
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
-import numpy as numpy
 from threadpoolctl import threadpool_limits
 
 import poreana.utils as utils
@@ -31,7 +30,7 @@ class MC:
     ##############
     # MC - Cylce #
     ##############
-    def run(self, model, link_out, nmc_eq=50000, nmc=100000, delta_df=0.05, delta_diff=0.05,  num_mc_update=10, temp=1, np=0, print_freq=100, is_print=False, do_radial=False, is_parallel=True):
+    def run(self, model, link_out, nmc_eq=50000, nmc=100000, delta_df=0.05, delta_diff=0.05,  num_mc_update=10, temp=1, n_proc=0, print_freq=100, is_print=False, do_radial=False, is_parallel=True):
         """This function do the MC Cycle to calculate the diffusion and free
         energy profile over the bins and save the results in an output hdf5
         file. This happens with the adjustment of the coefficient from the model
@@ -86,7 +85,7 @@ class MC:
             is required)
         temp : float, optional
             Temperature in Monte Carlo acceptance criterium
-        np : integer, optional
+        n_proc : integer, optional
             Number of cores to use
         print_freq : integer, optional
             Print MC step every print_freq
@@ -151,15 +150,15 @@ class MC:
 
 
         # Get number of cores
-        np = np if np and np<=mp.cpu_count() else mp.cpu_count()
+        n_proc = n_proc if n_proc and n_proc<=mp.cpu_count() else mp.cpu_count()
 
         # List for step times per cpu
-        len_step_cpu = numpy.array_split(model._len_step,np);
+        len_step_cpu = np.array_split(model._len_step,n_proc);
 
 
         # If is parallel is true, each lag time MC run is calculated on one CPU
         if is_parallel:
-            pool = mp.Pool(processes=np)
+            pool = mp.Pool(processes=n_proc)
             results = [pool.apply_async(self._run_helper, args=(model,list(step), do_radial)) for step in len_step_cpu]
             pool.close()
             pool.join()
