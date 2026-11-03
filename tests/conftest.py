@@ -119,6 +119,23 @@ def sample_output(change_to_tests_dir):
     sample.init_diffusion_vacf("output/vacf_oxy_res.obj", sample_each_residue=True, **vacf_inp)
     sample.sample(is_parallel=False, is_pbc=True)
 
+    # The same trajectory seen as a pore system, with two synthetic geometries.
+    # pore_oxy_enclosing.yml is a cylinder that spans the box and reaches around
+    # its corners, sampled with entry=0, so nothing is masked away as wall or
+    # reservoir and the z resolved run must reproduce the box run exactly.
+    sample = pa.Sample("data/pore_oxy_enclosing.yml", "data/traj_oxy.trr", mol_O, entry=0)
+    sample.init_diffusion_vacf("output/vacf_pore_z.obj", **vacf_inp)
+    sample.sample(is_parallel=False, is_pbc=True)
+
+    # pore_oxy.yml is a 3 nm cylinder with a reservoir on either side, so it has
+    # a wall and an entry region and most molecules are dropped. "radial" bins
+    # by the distance to the pore axis and resolves the diffusion into radial,
+    # tangential and axial; 8 bins keep enough molecules per bin to integrate.
+    sample = pa.Sample("data/pore_oxy.yml", "data/traj_oxy.trr", mol_O)
+    sample.init_diffusion_vacf("output/vacf_pore_r.obj",
+                               **{**vacf_inp, "direction": "radial", "bin_num": 8})
+    sample.sample(is_parallel=False, is_pbc=True)
+
     # Small MC output for the file_to_text and table tests. Neither asserts a
     # physical value, so the step counts only have to produce a loadable file.
     model = pa.CosineModel("output/diff_mc_cyl_s.obj", 6, 10)

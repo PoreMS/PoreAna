@@ -270,6 +270,33 @@ VACF_NUM_RES = 40            # O2 molecules in the trajectory
 VACF_EMPTY_BINS = 4          # lower 2 nm of the box holds no oxygen
 VACF_WINDOW = (2e-12, 4e-12) # the running integral is flat over this window
 
+# The z resolved diffusion profile in 10^-9 m^2/s, per bin and in x, y and z.
+# Sampling the same trajectory is deterministic, so these are exact down to the
+# two decimals they are rounded to; the pore run that masks nothing away has to
+# reproduce them bin for bin.
+VACF_BOX_DIFF = np.array([
+    [0.00, 0.00, 0.00],
+    [0.00, 0.00, 0.00],
+    [0.00, 0.00, 0.00],
+    [0.00, 0.00, 0.00],
+    [5.05, 7.33, 2.24],
+    [2.75, 5.47, 3.83],
+    [3.73, 3.79, 3.72],
+    [3.51, 5.65, 4.26],
+    [2.78, 3.92, 3.67],
+    [3.71, 3.55, 3.55],
+    [4.22, 2.61, 4.67],
+    [4.96, 3.40, 4.22],
+    [4.18, 4.10, 4.70],
+    [2.83, 2.70, 4.61],
+    [4.36, 4.43, 4.46],
+    [7.14, 5.91, 3.75],
+    [1.35, 2.71, 3.90],
+    [4.80, 2.72, 2.54],
+    [4.09, 2.36, 4.34],
+    [3.53, 3.63, 0.42],
+])
+
 
 def test_sample_vacf_box(sample_output):
     """Sampling a box system from a trr, with the box taken from the frame."""
@@ -306,9 +333,9 @@ def test_density_from_vacf(sample_output):
 def test_diffusion_vacf_profile(sample_output):
     """The z resolved diffusion profile of a two phase box.
 
-    Pins the density weighted mean as a regression anchor. The per bin values
-    are noisy at 40 molecules, so only the mean is pinned; what is asserted
-    per bin is that an unoccupied bin yields exactly 0.0 and never NaN.
+    Pins the profile per bin and the density weighted mean as regression
+    anchors. The per bin values are noisy at 40 molecules, so they say little
+    about the physics, but they are reproducible to the decimals pinned.
     """
     plt.figure()
     diff, mean = pa.diffusion.diffusion_per_bin("output/vacf_oxy.obj",
@@ -331,6 +358,7 @@ def test_diffusion_vacf_profile(sample_output):
     # Diffusion in a box is isotropic, so the three directions must agree
     assert max(mean)/min(mean) < 1.2
 
+    assert np.array_equal(np.round(diff, 2), VACF_BOX_DIFF)
     assert [round(float(x), 2) for x in mean] == [3.82, 4.19, 3.95]
 
 
@@ -377,6 +405,201 @@ def test_plot_correlation_per_bin(sample_output):
     assert pa.diffusion.plot_correlation_per_bin("output/vacf_oxy.obj", direction="q") is None
     assert pa.diffusion.plot_correlation_per_bin("output/vacf_oxy.obj", bin_selection=3) is None
     plt.close("all")
+
+
+##################
+# VACF in a pore #
+##################
+# Two synthetic geometries over the box of traj_oxy.trr. pore_oxy_enclosing.yml
+# is a cylinder that encloses the whole box, sampled with entry=0, so nothing is
+# masked away and the z resolved run is comparable to the box run. pore_oxy.yml
+# is a 3 nm cylinder with a reservoir on either side, so it has a wall and an
+# entry region and keeps only the molecules inside the pore.
+VACF_PORE_RADIUS = 1.5       # diam/2 of the pore, the last radial bin edge
+VACF_PORE_BINS = 8           # radial bins of the pore run
+VACF_PORE_POINTS = 4035      # molecules summed over all time origins, inside the pore
+VACF_BOX_POINTS = 19240      # the same count for the box run, where nothing is dropped
+VACF_ORIGINS = 481           # time origins of every run over this trajectory
+
+# The radial diffusion profile of the pore run in 10^-9 m^2/s, per bin and in
+# radial, tangential and axial direction. The innermost shells hold next to no
+# molecules, which is what their outliers are
+VACF_PORE_DIFF = np.array([
+    [-7.42, -0.43, 4.54],
+    [2.64, 10.80, 3.55],
+    [0.62, 1.39, 5.17],
+    [2.67, 1.78, 3.34],
+    [3.31, 6.04, 3.57],
+    [5.06, 3.66, 5.25],
+    [4.65, 5.30, 2.70],
+    [4.95, 3.28, 3.99],
+])
+
+
+def test_sample_vacf_pore(sample_output):
+    """Sampling the same trr as a pore system, binned in z and radially."""
+    z = pa.utils.load("output/vacf_pore_z.obj")
+    r = pa.utils.load("output/vacf_pore_r.obj")
+
+    for sample, bin_num in [(z, 20), (r, VACF_PORE_BINS)]:
+        assert sample["type"] == "diff_vacf"
+        assert "pore" in sample
+        assert "box" not in sample
+        # Pore data is keyed by shape, one entry per pore of the system
+        assert list(sample["data"].keys()) == ["shape_00"]
+        corr_steps = sample["inp"]["corr_steps"]
+        assert sample["data"]["shape_00"]["vacf_data"].shape == (bin_num, corr_steps, 1, 3)
+        assert sample["data"]["shape_00"]["density"].shape == (bin_num, 1)
+
+    # A cartesian direction keeps the flat bin list of the box
+    assert z["inp"]["direction"] == 2
+    assert isinstance(z["inp"]["bins"], list)
+    assert round(z["inp"]["bins"][-1], 4) == VACF_BOX_Z
+
+    # "radial" is resolved to the pore shape and bins per pore, from the pore
+    # axis out to the pore wall
+    assert r["inp"]["direction"] == "radial_cylindrical"
+    assert list(r["inp"]["bins"].keys()) == ["shape_00"]
+    assert len(r["inp"]["bins"]["shape_00"]) == VACF_PORE_BINS+1
+    assert round(float(r["inp"]["bins"]["shape_00"][-1]), 4) == VACF_PORE_RADIUS
+
+
+def test_sample_vacf_pore_z_matches_box(sample_output):
+    """A pore that masks nothing away must sample exactly like the box.
+
+    Same trajectory, same z bins, same molecules - the only difference is the
+    pore bookkeeping, which must not touch the sampled values.
+    """
+    box = pa.utils.load("output/vacf_oxy.obj")["data"]
+    pore = pa.utils.load("output/vacf_pore_z.obj")["data"]["shape_00"]
+
+    assert np.array_equal(box["density"], pore["density"])
+    assert np.array_equal(box["vacf_data"], pore["vacf_data"])
+
+
+def test_sample_vacf_pore_drops_wall_and_reservoir(sample_output):
+    """The pore wall and the entry region must keep molecules out of the VACF.
+
+    Both runs see the same 40 molecules; the 3 nm cylinder only counts the ones
+    that are inside it and away from the entry, which is a small fraction.
+    """
+    pore = pa.utils.load("output/vacf_pore_r.obj")["data"]["shape_00"]
+    box = pa.utils.load("output/vacf_oxy.obj")["data"]
+
+    assert int(box["density"].sum()) == VACF_BOX_POINTS
+    assert int(pore["density"].sum()) == VACF_PORE_POINTS
+
+    # The innermost bin is a thin cylinder around the axis and nearly empty,
+    # the outer bins carry the bulk of the statistics
+    assert pore["density"][0, 0] < pore["density"][-1, 0]
+
+
+def test_density_from_vacf_pore(sample_output):
+    """The radial occupancy profile of the pore run."""
+    dens = pa.density.density_from_vacf("output/vacf_pore_r.obj", pore_id="shape_00")
+
+    assert dens.shape == (VACF_PORE_BINS,)
+    assert np.all(dens > 0)
+    assert dens[0] == min(dens)
+
+    # Converting to a concentration divides by the volume of the bin shell
+    dens_vol = pa.density.density_from_vacf("output/vacf_pore_r.obj", convert="molecules/nm^3",
+                                            pore_id="shape_00")
+    sample = pa.utils.load("output/vacf_pore_r.obj")
+    bins = sample["inp"]["bins"]["shape_00"]
+    shell = np.pi*(bins[1]**2 - bins[0]**2)*sample["pore"]["shape_00"]["length"]
+    assert np.isclose(dens_vol[0], dens[0]/shell)
+
+
+def test_diffusion_vacf_pore_radial_profile(sample_output):
+    """The radial, tangential and axial diffusion profile of the pore run.
+
+    The geometry is synthetic, the trajectory is a plain box, so the axial
+    coefficient still has to be the bulk one of the box run. The radial and
+    tangential coefficients are a rotation of x and y per molecule; the profile
+    and its density weighted mean are pinned as regression anchors.
+    """
+    plt.figure()
+    diff, mean = pa.diffusion.diffusion_per_bin("output/vacf_pore_r.obj",
+                                                mean_over_time=VACF_WINDOW,
+                                                pore_id="shape_00",
+                                                plot_axis=plt.gca(),
+                                                plot_selection="rta")
+    plt.savefig("output/vacf_pore_diffusion_radial.pdf", format="pdf", dpi=100)
+    plt.close("all")
+
+    assert diff.shape == (VACF_PORE_BINS, 3)
+    assert np.all(np.isfinite(diff))
+
+    _, mean_box = pa.diffusion.diffusion_per_bin("output/vacf_oxy.obj", mean_over_time=VACF_WINDOW)
+    assert abs(mean[2]-mean_box[2])/mean_box[2] < 0.05
+
+    assert np.array_equal(np.round(diff, 2), VACF_PORE_DIFF)
+    assert [round(float(x), 2) for x in mean] == [3.42, 3.71, 3.92]
+
+    # The two innermost bins are thin shells around the pore axis and hold on
+    # average a quarter of a molecule or less, which is what
+    # remove_low_density_bins is for: they drop out as NaN
+    diff_cut, _ = pa.diffusion.diffusion_per_bin("output/vacf_pore_r.obj",
+                                                 mean_over_time=VACF_WINDOW,
+                                                 pore_id="shape_00",
+                                                 remove_low_density_bins=0.5)
+    assert list(np.where(np.isnan(diff_cut[:, 0]))[0]) == [0, 1]
+
+    # Every bin that is left has a positive, liquid like coefficient
+    occupied = diff_cut[~np.isnan(diff_cut[:, 0])]
+    assert np.all(occupied > 0)
+    assert np.all(occupied < 20)
+
+
+def test_plot_correlation_per_bin_pore(sample_output):
+    """The per bin correlation plot must accept a pore system."""
+    plt.figure()
+    pa.diffusion.plot_correlation_per_bin("output/vacf_pore_r.obj", plot_axis=plt.gca(),
+                                          direction="a", bin_selection=[3, 5, 7],
+                                          remove_low_density_bins=0.5, pore_id="shape_00")
+    plt.savefig("output/vacf_pore_correlation.pdf", format="pdf", dpi=100)
+    plt.close("all")
+
+
+def test_density_from_vacf_pore_occupancy(sample_output):
+    """A pore that drops molecules cannot hold all of them on average.
+
+    The occupancy is the sampled count over the number of time origins, which
+    the sampling counts, so a molecule dropped at the wall or in the entry
+    region lowers it instead of being normalised away.
+    """
+    pore = pa.utils.load("output/vacf_pore_r.obj")["data"]["shape_00"]
+    dens = pa.density.density_from_vacf("output/vacf_pore_r.obj", pore_id="shape_00")
+
+    assert pore["num_origins"] == VACF_ORIGINS
+    assert np.allclose(dens, pore["density"][:, 0]/VACF_ORIGINS)
+    assert round(float(dens.sum()), 2) == round(VACF_PORE_POINTS/VACF_ORIGINS, 2)
+    assert dens.sum() < VACF_NUM_RES
+
+
+def test_density_from_vacf_pore_cartesian(sample_output):
+    """A pore sampled in a cartesian direction must be readable, too."""
+    dens = pa.density.density_from_vacf("output/vacf_pore_z.obj", pore_id="shape_00")
+
+    assert dens.shape == (20,)
+    assert round(float(dens.sum()), 6) == VACF_NUM_RES
+
+
+def test_diffusion_vacf_pore_cartesian_profile(sample_output):
+    """The z profile of the pore run has to match the one of the box run."""
+    diff, mean = pa.diffusion.diffusion_per_bin("output/vacf_pore_z.obj",
+                                                mean_over_time=VACF_WINDOW,
+                                                pore_id="shape_00")
+    diff_box, mean_box = pa.diffusion.diffusion_per_bin("output/vacf_oxy.obj",
+                                                        mean_over_time=VACF_WINDOW)
+
+    assert np.array_equal(np.round(diff, 2), VACF_BOX_DIFF)
+    assert [round(float(x), 2) for x in mean] == [3.82, 4.19, 3.95]
+
+    # Not just the same values: the same floats, bin for bin
+    assert np.array_equal(diff, diff_box)
+    assert np.array_equal(mean, mean_box)
 
 
 #################

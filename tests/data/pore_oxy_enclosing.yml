@@ -1,0 +1,38 @@
+# Synthetic pore geometry for data/traj_oxy.trr, which is not a pore
+# trajectory. The cylinder uses the box of that trajectory, spans it completely
+# in z (reservoir 0, length = box z) and is wide enough to reach around the box
+# corners, so sampled with entry=0 no molecule is ever dropped as being in the
+# wall or in a reservoir. A z resolved VACF of this system therefore has to
+# reproduce the box run on the same trajectory exactly, while "radial" gives
+# the cylindrical (radial, tangential, axial) decomposition.
+shape_00:
+  diameter: 7.08
+  parameter:
+    central:
+    - 0
+    - 0
+    - 1
+    centroid:
+    - 2.491278886795044
+    - 2.491278886795044
+    - 4.982557773590088
+    diameter: 7.08
+    length: 9.965115547180176
+  roughness: 0.0
+  shape: CYLINDER
+  surface: 221.6627
+  volume: 392.3433
+system:
+  centroid:
+  - 2.491278886795044
+  - 2.491278886795044
+  - 4.982557773590088
+  dimensions:
+  - 4.982557773590088
+  - 4.982557773590088
+  - 9.965115547180176
+  reservoir: 0
+  surface:
+    ex: 0.0
+    in: 221.6627
+  volume: 392.3433
