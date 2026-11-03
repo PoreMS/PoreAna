@@ -1227,8 +1227,8 @@ class Sample:
         -------
         data : dictionary
             VACF diffusion data structure, containing vacf_data 
-            (bin_num, corr_steps, num_residues, 3) and 
-            density (bin_num, num_residues)
+            (bin_num, corr_steps, num_residues, 3), 
+            density (bin_num, num_residues) and the number of time origins
         """
         # Initialize
         bin_num = self._diff_vacf_inp["bin_num"]
@@ -1249,6 +1249,10 @@ class Sample:
                     else:
                         data[pore_id]["vacf_data"] = np.zeros((bin_num, corr_steps, 1, 3), float)
                         data[pore_id]["density"] = np.zeros((bin_num, 1), int)
+                    # A pore drops the molecules in its wall and entry region,
+                    # so the number of time origins cannot be recovered from
+                    # the density and has to be counted while sampling
+                    data[pore_id]["num_origins"] = 0
         # For box systems
         else:
             # Initialize vacf and density data
@@ -1258,6 +1262,7 @@ class Sample:
             else:
                 data["vacf_data"] = np.zeros((bin_num, corr_steps, 1, 3), float)
                 data["density"] = np.zeros((bin_num, 1), int)
+            data["num_origins"] = 0
 
         return data
 
@@ -1339,6 +1344,8 @@ class Sample:
                     pos = pos_frame[:, direction]
                     pore_mask = np.ones(pos.shape, dtype=bool)
                     in_wall_mask = np.zeros(pos.shape, dtype=bool)
+
+                data_pore["num_origins"] += 1
 
                 com_bins = np.digitize(pos, bin_pore) - 1  # bin indices for each molecule
                 # If there are molecules that should be in a bin, print a warning
@@ -1640,9 +1647,11 @@ class Sample:
                             continue
                         data_diff[pore_id]["density"] += out["diffusion_vacf"][pore_id]["density"]
                         data_diff[pore_id]["vacf_data"] += out["diffusion_vacf"][pore_id]["vacf_data"]
+                        data_diff[pore_id]["num_origins"] += out["diffusion_vacf"][pore_id]["num_origins"]
                     else:
                         data_diff["density"] += out["diffusion_vacf"]["density"]
                         data_diff["vacf_data"] += out["diffusion_vacf"]["vacf_data"]
+                        data_diff["num_origins"] += out["diffusion_vacf"]["num_origins"]
 
             # Save results in dictionary
             results = {system["sys"]: system["props"], "inp": inp_diff, "data": data_diff, "type": "diff_vacf"}

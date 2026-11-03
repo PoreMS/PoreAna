@@ -454,6 +454,29 @@ def density_from_bins(link_data, convert="", plot_axis=None, **kwargs):
 
     return average_density_per_bin
 
+def _num_time_origins(data, num_res):
+    """Read the number of time origins a VACF sampling ran over.
+
+    Parameters
+    ----------
+    data : dictionary
+        VACF data of one pore or of the box, created by
+        :func:`poreana.sample.Sample.init_diffusion_vacf`
+    num_res : integer
+        Number of residues in the system
+
+    Returns
+    -------
+    num_origins : float
+        Number of sampled time origins
+    """
+    # Sampling files written before the count was stored fall back to the
+    # sampled total, which is only the number of time origins for a box, where
+    # every residue is inside some bin at every time origin
+    if "num_origins" in data:
+        return data["num_origins"]
+    return np.sum(data["density"]) / num_res
+
 def density_from_vacf(link_data, convert="", pore_id=None, plot_axis=None, **kwargs):
     """
     Calculate the density from given VACF data. The density is returned as the 
@@ -521,7 +544,7 @@ def density_from_vacf(link_data, convert="", pore_id=None, plot_axis=None, **kwa
         box = sample["box"]["length"]
     num_res = sample["inp"]["num_res"]
 
-    num_new_time_origins = np.sum(data["density"]) / num_res
+    num_new_time_origins = _num_time_origins(data, num_res)
     average_density_per_bin = data["density"].sum(axis=1) / num_new_time_origins
 
     # Calculate volume per bin
@@ -600,6 +623,6 @@ def density_from_vacf_per_residue(link_data, pore_id=None):
         data = sample["data"]
     num_res = sample["inp"]["num_res"]
 
-    num_new_time_origins = np.sum(data["density"]) / num_res
+    num_new_time_origins = _num_time_origins(data, num_res)
     avg_res_per_bin = data["density"] / num_new_time_origins
     return avg_res_per_bin
