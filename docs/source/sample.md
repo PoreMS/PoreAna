@@ -53,9 +53,9 @@ sampling process using the initialize functions with their corresponding
 inputs
 
 ```python
-sample.init_density("output/dens.h5")
-sample.init_gyration("output/gyr.h5")
-sample.init_diffusion_bin("output/diff.h5")
+sample.init_density("output/dens.obj")
+sample.init_gyration("output/gyr.obj")
+sample.init_diffusion_bin("output/diff.obj")
 ```
 
 If you would like to calculated the diffusion and the free energy profile
@@ -63,9 +63,9 @@ you have to set the MC Diffusion initalize function instead of the Bin Diffusion
 Attention currently only the initialization of one diffusion calculation method is possible.
 
 ```python
-sample.init_density("output/dens.h5")
-sample.init_gyration("output/gyr.h5")
-sample.init_diffusion_mc("output/diff.h5")
+sample.init_density("output/dens.obj")
+sample.init_gyration("output/gyr.obj")
+sample.init_diffusion_mc("output/diff.obj")
 ```
 
 Finally, the sample function is initiated with the

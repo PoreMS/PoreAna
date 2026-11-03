@@ -7,7 +7,6 @@
 
 import os
 import time
-import h5py
 import yaml
 import pickle
 import datetime
@@ -193,7 +192,8 @@ def _to_python(obj):
 
 
 def save(obj, link):
-    """Save an object files, yaml files, and hd5 files using pickle in the specified link.
+    """Save an object as a pickled obj file or as a yaml file in the specified
+    link.
 
     Parameters
     ----------
@@ -202,73 +202,8 @@ def save(obj, link):
     link : string
         Specific link to save object
     """
-    # Pickle object file
-
-
-    # Hd5 file
-    if link.split(".")[-1]=="h5":
-        print("This version not support h5 files.")
-        # # Save results in a hdf5 file
-        # f = h5py.File(link, 'w')
-
-        # # Create input groupe
-        # groups = {}
-        # data_base = {}
-
-        # # Create groups for the keys in the obj file
-        # for key in obj.keys():
-        #     groups[key] = f.create_group(key)
-        #     # If key "box" only a value is on frist key level
-        #     if not key in ["box","type"]:
-        #     # For all other key read the second level keys
-        #         data_base[key] = obj[key].keys()
-
-        # for gkey in groups:
-        #     # Write the box length on data base
-        #     if gkey =="box":
-        #         groups[gkey].create_dataset("length",data=obj[gkey]["length"])
-        #     # Write the type of calculation on data base
-        #     elif gkey =="type":
-        #         dt = h5py.special_dtype(vlen=str)
-        #         type = groups[gkey].create_dataset("type", (1), dtype=dt)
-        #         type[0] = obj[gkey]
-        #     # Loop over second level keys
-        #     else:
-        #         for base in data_base[gkey]:
-        #             print(base)
-        #             # Check if a third level exists
-        #             if isinstance(obj[gkey][base], dict):
-        #                 # If a third level exists create new group in first level groups
-        #                 data = groups[gkey].create_group(base)
-        #                 # Loop over thrid level keys
-        #                 for base2 in obj[gkey][base]:
-        #                     print("base2",base2)
-        #                     # Check if third level key is a matrix
-        #                     if isinstance(obj[gkey][base][base2], (list, np.ndarray)):
-        #                         data.create_dataset(str(base2), data=obj[gkey][base][base2])
-        #                     elif isinstance(obj[gkey][base][base2],str):
-        #                         dt = h5py.special_dtype(vlen=str)
-        #                         string = groups[gkey].create_dataset(str(base2), (1), dtype=dt)
-        #                         string[0] = obj[gkey][base][base2]
-        #                     # Else is a vlaue (int/float)
-        #                     else:
-        #                         value = data.create_dataset(str(base2), shape=(1,1))
-        #                         value[0] = obj[gkey][base][base2]
-        #             # Check If second level is value/list or string
-        #             # If string
-        #             elif isinstance(obj[gkey][base],str):
-        #                 dt = h5py.special_dtype(vlen=str)
-        #                 string = groups[gkey].create_dataset(str(base), (1), dtype=dt)
-        #                 string[0] = obj[gkey][base]
-        #             # If list
-        #             elif isinstance(obj[gkey][base], (list, np.ndarray)):
-        #                 data = groups[gkey].create_dataset(str(base), data=obj[gkey][base])
-        #             # If value
-        #             else:
-        #                 data = groups[gkey].create_dataset(str(base), shape=(1,1))
-        #                 data[0] = obj[gkey][base]
-
-    elif link.split(".")[-1]=="yml":
+    # Yaml file
+    if link.split(".")[-1]=="yml":
         with open(link, "w") as file_out:
             file_out.write(yaml.dump(_to_python(obj), Dumper=_SafeDumper))
     else:
@@ -281,14 +216,14 @@ def save(obj, link):
 
 
 def load(link, file_type=""):
-    """Load pickled object files, yaml files, and hd5 files.
+    """Load pickled object files and yaml files.
 
     Parameters
     ----------
     link : string
         Specific link to load object
     file_type : string, optional
-        Specify filetype - **obj**, **yml**, **h5**  leave empty for automatic
+        Specify filetype - **obj**, **yml**, leave empty for automatic
         determination
 
     Returns
@@ -307,59 +242,6 @@ def load(link, file_type=""):
                 file_in.seek(0)
                 return yaml.load(file_in, Loader=yaml.UnsafeLoader)
 
-    # Hd5 file
-    elif file_type=="h5" or (not file_type and link.split(".")[-1]=="h5"):
-        print("This version not support h5 files.")
-        # data = h5py.File(link, 'r')
-        # data_load = {}
-
-        # # Check keys in hdf5 file
-        # for keys in data.keys():
-        #     print("keys",keys)
-        #     data_load[keys] = {}
-        #     # If sample file is load
-        #     if keys=="output":
-        #         for keys2 in data[keys].keys():
-        #             print("keys2",keys2)
-        #             if keys2 in ["nacc_df","nacc_diff","list_df_coeff","list_diff_coeff","df_coeff","df_profile", "diff_coeff","diff_profile", "fluc_df","fluc_diff", "fluc_diff_bin", "fluc_df_bin"]:
-        #                 print("keys2",keys2)
-        #                 for keys3 in data[keys][keys2].keys():
-        #                     data_load[keys][keys2] = {}
-        #                     try:
-        #                         data_load[keys][keys2][int(keys3)] = {}
-        #                         data_load[keys][keys2][int(keys3)] = data[keys][keys2][keys3][:]
-        #                         print(data_load[keys][keys2].keys())
-        #                     except(ValueError):
-        #                         data_load[keys][keys2][int(keys3)] = data[keys][keys2][keys3][:]
-        #             # If key type only a string has to be load
-        #             elif keys=="type":
-        #                 data_load[keys] = str(data[keys][keys2][0], 'utf-8') #data[keys][keys][0].encode().decode("utf-8")
-        #             else:
-        #                 try:
-        #                     data_load[keys][int(keys2)] = data[keys][keys2][:]
-        #                 except(ValueError):
-        #                     data_load[keys][keys2] = data[keys][keys2][:]
-
-        #     # other keys
-        #     else:
-        #         # Load second level keys
-        #         for keys2 in data[keys].keys():
-        #             data_load[keys][keys2] = {}
-        #             # Try if a thrid level exist
-        #             try:
-        #                 # load thrid level
-        #                 for keys3 in data[keys][keys2].keys():
-        #                     data_load[keys][keys2][keys3] = data[keys][keys2][keys3][:]
-        #             # Save second level data
-        #             except(AttributeError):
-        #                 if len(data[keys][keys2][:])==1:
-        #                     try:
-        #                         data_load[keys][keys2] = float(data[keys][keys2][0])
-        #                     except(ValueError):
-        #                         data_load[keys][keys2] = str(data[keys][keys2][0], 'utf-8') #.encode().decode("utf-8")
-        #                 else:
-        #                     data_load[keys][keys2] = data[keys][keys2][:]
-        # return data_load
     else:
         if link.split(".")[-1]!="obj":
             print("Wrong data type")
@@ -406,11 +288,11 @@ def file_to_text(link, link_output, link_dens=[]):
     Parameters
     ----------
     link : string
-        Link to output hdf5 or obj file
+        Link to output obj or yml file
     link_output : String
         Link to an output text file
     link_dens : optional
-        Link to density output hdf5 or obj file. Only necessary for the bin
+        Link to density output obj or yml file. Only necessary for the bin
         diffusion and gyration text ouput.
     """
 

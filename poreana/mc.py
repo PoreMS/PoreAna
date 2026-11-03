@@ -32,8 +32,8 @@ class MC:
     ##############
     def run(self, model, link_out, nmc_eq=50000, nmc=100000, delta_df=0.05, delta_diff=0.05,  num_mc_update=10, temp=1, n_proc=0, print_freq=100, is_print=False, do_radial=False, is_parallel=True, start_method=None):
         """This function do the MC Cycle to calculate the diffusion and free
-        energy profile over the bins and save the results in an output hdf5
-        file. This happens with the adjustment of the coefficient from the model
+        energy profile over the bins and save the results in an output obj or
+        yml file. This happens with the adjustment of the coefficient from the model
         which is set with the appropriate model class. The code determines the
         results for all lag times for which a transition matrix was calculated.
         The results can be displayed with the post process functions.
@@ -71,7 +71,7 @@ class MC:
         model : class
             Model object which set before with the model class
         link_out : string
-            Link to output hdf5 data file
+            Link to output obj or yml data file
         nmc_eq : integer, optional
             Number of equilibrium MC steps
         nmc : integer, optional
@@ -216,10 +216,7 @@ class MC:
         # Print MC Calculation is done
         print("MC Calculation Done.")
 
-        # Save inp and output data (remove if hdf5 is ready)
-        #utils.save({"inp": inp, "model": model_inp, model._system: model._sys_props, "output": output}, link_out)
-
-        # pickle directory to save late in hdf5
+        # Collect inp and output data
         results = {"inp": inp, "model": model_inp, model._system: model._sys_props, "output": output, "type": "mc"}
 
         utils.save(results,link_out)

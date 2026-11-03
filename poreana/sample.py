@@ -351,7 +351,7 @@ class Sample:
         Parameters
         ----------
         link_out : string
-            Link to output hdf5, obj or yml data file
+            Link to output obj or yml data file
         bin_num : integer, optional
             Number of bins to be used
         remove_pore_from_res : bool, optional
@@ -464,7 +464,7 @@ class Sample:
         Parameters
         ----------
         link_out : string
-            Link to output hdf5, obj or yml data file
+            Link to output obj or yml data file
         bin_num : integer, optional
             Number of bins to be used
         """
@@ -568,7 +568,7 @@ class Sample:
         Parameters
         ----------
         link_out : string
-            Link to output hdf5, obj or yml data file
+            Link to output obj or yml data file
         vector_atoms : list
             List of two atom ids to define the molecule vector
         bin_num : integer, optional
@@ -698,7 +698,7 @@ class Sample:
         Parameters
         ----------
         link_out : string
-            Link to hdf5, obj or yml data file
+            Link to obj or yml data file
         bin_num : integer, optional
             Number of bins to be used
         len_obs : float, optional
@@ -960,7 +960,7 @@ class Sample:
         Parameters
         ----------
         link_out : string
-            Link to hdf5, obj or yml data file
+            Link to obj or yml data file
         len_step : list
             Length of the step size between frames
         bin_num : integer, optional
@@ -1026,7 +1026,7 @@ class Sample:
         calculation with the Monte Carlo diffusion methode for a cubic
         simulation box. The sample of the transition matrix is to be run on
         the cluster due to a high time and resource consumption. The output,
-        a h5 data file, is then used to calculate the self-diffusion using
+        an obj or yml data file, is then used to calculate the self-diffusion using
         further calculation functions for the MC Diffusion methode.
 
         It is necessary to caculate the transition matrix for different step
@@ -1642,7 +1642,7 @@ class Sample:
             # Save results in dictionary
             results = {system["sys"]: system["props"], "inp": inp_diff, "data": data_diff, "type": "diff_mc"}
 
-            # Save dictionary to h5-file
+            # Save dictionary to file
             utils.save(results, self._diff_mc_inp["output"])
 
         if self._is_diffusion_vacf:
