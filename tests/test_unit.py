@@ -1,5 +1,8 @@
 """Fast tests that do not run a full sampling pass."""
 
+import os
+import multiprocessing as mp
+
 import numpy as np
 import pytest
 import yaml
@@ -403,3 +406,25 @@ def test_init_diffusion_vacf_rejects_bad_direction(change_to_tests_dir):
         sample._traj = "dummy.trr"
         sample.init_diffusion_vacf("output/test/vacf.obj", direction=direction)
         assert not sample._is_diffusion_vacf, direction
+
+
+def test_mp_context_default_avoids_fork():
+    """The default start method must not be fork.
+
+    Forking a parent that holds threads is unsafe, and numpy and scipy pull in
+    a threaded BLAS backend, so the default is forkserver on POSIX and spawn on
+    Windows.
+    """
+    expected = "spawn" if os.name == "nt" else "forkserver"
+    assert pa.utils.mp_context().get_start_method() == expected
+
+
+def test_mp_context_honours_an_explicit_method():
+    """An available method has to be passed through, fork included."""
+    for method in mp.get_all_start_methods():
+        assert pa.utils.mp_context(method).get_start_method() == method
+
+
+def test_mp_context_rejects_an_unavailable_method():
+    """An unusable method must be refused instead of silently falling back."""
+    assert pa.utils.mp_context("threads") is None

@@ -77,3 +77,34 @@ sample.sample(is_parallel=True, is_pbc=False)
 ```
 
 `Finished frame 2001/2001...`
+
+## Parallel runs from a script
+
+The worker processes of a parallel `sample()` or `MC().run()` are started with
+the `forkserver` method on Linux and macOS and with `spawn` on Windows. Both
+start every worker from a fresh interpreter, which re-imports the script that
+started the run. A script calling either routine in parallel therefore has to
+be import-safe, which means guarding the call with
+
+```python
+if __name__ == "__main__":
+    sample.sample(is_parallel=True)
+```
+
+Without the guard each worker runs the script again, reaches the parallel call
+while it is still importing, and dies on a `RuntimeError` about the
+bootstrapping phase. The pool keeps replacing the dead workers, so the run
+never finishes and instead repeats that traceback until it is interrupted.
+Notebooks and the interactive interpreter are unaffected, as they have no
+script to re-import.
+
+The start method is selectable, and `fork` copies the running process instead
+of re-importing it, so it needs no guard
+
+```python
+sample.sample(is_parallel=True, start_method="fork")
+```
+
+This is an escape hatch rather than the default: forking a process that holds
+threads is unsafe, and the threaded BLAS backend behind numpy and scipy means
+PoreAna cannot assume there are none.

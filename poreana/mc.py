@@ -30,7 +30,7 @@ class MC:
     ##############
     # MC - Cylce #
     ##############
-    def run(self, model, link_out, nmc_eq=50000, nmc=100000, delta_df=0.05, delta_diff=0.05,  num_mc_update=10, temp=1, n_proc=0, print_freq=100, is_print=False, do_radial=False, is_parallel=True):
+    def run(self, model, link_out, nmc_eq=50000, nmc=100000, delta_df=0.05, delta_diff=0.05,  num_mc_update=10, temp=1, n_proc=0, print_freq=100, is_print=False, do_radial=False, is_parallel=True, start_method=None):
         """This function do the MC Cycle to calculate the diffusion and free
         energy profile over the bins and save the results in an output hdf5
         file. This happens with the adjustment of the coefficient from the model
@@ -95,6 +95,11 @@ class MC:
             True to calculate the radial diffusion
         is_parallel : bool, optional
             True to run parallelized sampling
+        start_method : string, None, optional
+            Start method for the worker processes - "forkserver", "spawn" or
+            "fork", None for the platform default. Note that the two default
+            methods require the calling script to be import-safe, see
+            :func:`poreana.utils.mp_context`
         """
 
         # Set MC step width
@@ -158,7 +163,11 @@ class MC:
 
         # If is parallel is true, each lag time MC run is calculated on one CPU
         if is_parallel:
-            pool = mp.Pool(processes=n_proc)
+            context = utils.mp_context(start_method)
+            if context is None:
+                return
+
+            pool = context.Pool(processes=n_proc)
             results = [pool.apply_async(self._run_helper, args=(model,list(step), do_radial)) for step in len_step_cpu]
             pool.close()
             pool.join()

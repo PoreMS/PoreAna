@@ -13,6 +13,7 @@ import pickle
 import datetime
 import numpy as np
 import pandas as pd
+import multiprocessing as mp
 import poreana as pa
 
 
@@ -33,6 +34,65 @@ def mkdirp(directory):
     """
     if not os.path.exists(directory):
         os.makedirs(directory)
+
+
+def mp_context(start_method=None):
+    """Create the multiprocessing context the worker pools are started from.
+
+    The default is *forkserver* on POSIX systems and *spawn* on Windows. Both
+    start the workers from a fresh interpreter, which re-imports the module
+    that called the sampling or MC routine. A script using a parallel routine
+    therefore has to be import-safe, meaning the call has to be guarded by
+
+    .. code-block:: python
+
+        if __name__ == "__main__":
+            ...
+
+    Without the guard every worker re-runs the script, hits the parallel call
+    again while still importing, and dies on a RuntimeError about the
+    bootstrapping phase. The pool replaces each dead worker, so the run does
+    not fail cleanly - it loops, printing that traceback until it is
+    interrupted. A script that hangs this way is missing the guard.
+
+    The *fork* method needs no guard, because it copies the running parent
+    process instead of re-importing it. That copy is only safe while the
+    parent holds no threads, which cannot be assumed here - numpy and scipy
+    pull in a threaded BLAS backend - so *fork* is available as an escape
+    hatch but is not the default.
+
+    Parameters
+    ----------
+    start_method : string, None, optional
+        Start method for the worker processes - "forkserver", "spawn" or
+        "fork", None for the platform default
+
+    Returns
+    -------
+    context : class, None
+        Multiprocessing context of the requested start method, None if the
+        method is not available on this platform
+    """
+    # Platform default
+    if start_method is None:
+        start_method = "spawn" if os.name=="nt" else "forkserver"
+
+    # Reject a method this platform does not provide
+    if start_method not in mp.get_all_start_methods():
+        methods = ", ".join(["'"+method+"'" for method in mp.get_all_start_methods()])
+        print("Wrong start method input. Possible inputs are "+methods
+              +", and None for the platform default.")
+        return None
+
+    context = mp.get_context(start_method)
+
+    # Import the package in the fork server instead of in every worker, which
+    # the workers then inherit. Without this each worker pays for pulling in
+    # numpy, scipy, porems and chemfiles on its own.
+    if start_method=="forkserver":
+        context.set_forkserver_preload(["poreana"])
+
+    return context
 
 
 def column(data):

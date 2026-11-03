@@ -1458,7 +1458,7 @@ class Sample:
     ############
     # Sampling #
     ############
-    def sample(self, shift=[0, 0, 0], num_cores=0, is_pbc=True, is_broken=False, is_parallel=True):
+    def sample(self, shift=[0, 0, 0], num_cores=0, is_pbc=True, is_broken=False, is_parallel=True, start_method=None):
         """This function runs all enabled sampling routines. The output is
         stored in form of pickle files for later calculation using methods
         provided in the package.
@@ -1478,6 +1478,11 @@ class Sample:
             True to check for broken molecules during sampling
         is_parallel : bool, optional
             True to run parallelized sampling
+        start_method : string, None, optional
+            Start method for the worker processes - "forkserver", "spawn" or
+            "fork", None for the platform default. Note that the two default
+            methods require the calling script to be import-safe, see
+            :func:`poreana.utils.mp_context`
         """
         # Process input
         if not len(shift)==3:
@@ -1504,6 +1509,11 @@ class Sample:
 
         # Run sampling helper
         if is_parallel:
+            # Get the context the worker pool is started from
+            context = utils.mp_context(start_method)
+            if context is None:
+                return
+
             # Divide number of frames on processors
             frame_num = math.floor(self._num_frame/num_cores)
 
@@ -1532,7 +1542,7 @@ class Sample:
             frame_np = [list(range(frame_start[i], frame_end[i])) for i in range(num_cores)]
 
             # Run parallel search
-            pool = mp.Pool(processes=num_cores)
+            pool = context.Pool(processes=num_cores)
             results = [pool.apply_async(self._sample_helper, args=(frame_list, np.array(shift), is_pbc, is_broken,)) for frame_list in frame_np]
             pool.close()
             pool.join()
