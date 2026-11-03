@@ -601,7 +601,7 @@ class Sample:
                 def normal_ex(pos): return [0, 0, 1]
                 normals = {"in": normal_in, "ex": normal_ex}
         self._angle_normals = normals
-        print(self._angle_normals)
+
         # Global input
         self._angle_inp = {"output": link_out, "vector_atoms": vector_atoms, "bin_num": bin_num}
 
@@ -680,7 +680,6 @@ class Sample:
             # Only consider reservoir space in vicinity of crystobalit
             # Remove an extended pore volume from the reservoir
             if self._pore and pore_id!=0:
-                print(self._pore_props, pore_id)
                 is_add = index <= bin_num and dist > self._pore_props[pore_id]["diam"]/2 and com[2]<=self._pore_props["box"]["dimensions"][2]
             else:
                 is_add = index <= bin_num
