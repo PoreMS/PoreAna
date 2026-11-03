@@ -1428,30 +1428,30 @@ class Sample:
 
         return data
     
-    def _numpy(self, data, positions, velocities, frame_id):
-        """This function samples the positions and velocities of the molecules
-        in the system. The output is stored in a numpy data file.
+    def _numpy(self, data, com, vel_com, frame_id):
+        """This function samples the centre of mass positions and velocities of
+        the molecules in the system. The output is stored in a numpy data file.
+
+        Both centres of mass are the ones :func:`_sample_helper` has already
+        computed for the frame, so they are not recomputed here.
 
         Parameters
         ----------
         data : dictionary
             Data dictionary containing positions and velocities
-        positions : numpy.ndarray
-            List of atom positions of current frame
-        velocities : numpy.ndarray
-            List of atom velocities of current frame
+        com : numpy.ndarray
+            Centre of mass of every molecule of the current frame in nm
+        vel_com : numpy.ndarray
+            Centre of mass velocity of every molecule of the current frame in
+            m/s, None if no velocities are sampled
         frame_id : integer
             Current frame id
         """
         # Add positions and velocities to data dictionary
         if self._numpy_inp["positions"]:
-            pos = np.array(positions).reshape((self.num_res, self._atoms_per_mol, 3))[:, self._atoms, :] / 10 # Convert to nm
-            pos_com = np.sum(pos * self._masses[np.newaxis,: , np.newaxis], axis=1) / self._sum_masses
-            data["positions"][frame_id] = pos_com
+            data["positions"][frame_id] = com
 
         if self._numpy_inp["velocities"]:
-            vel = np.array(velocities).reshape((self.num_res, self._atoms_per_mol, 3))[:, self._atoms, :] * 100 # Convert to m/s
-            vel_com = np.sum(vel * self._masses[np.newaxis,: , np.newaxis], axis=1) / self._sum_masses
             data["velocities"][frame_id] = vel_com
 
     ############
@@ -1779,6 +1779,8 @@ class Sample:
             if is_vel:
                 vel = np.array(velocities).reshape((self.num_res, self._atoms_per_mol, 3))[:, self._atoms, :] * 100 # Convert A/ps to m/s
                 vel_com = np.sum(vel * self._masses[np.newaxis, :, np.newaxis], axis=1) / self._sum_masses
+            else:
+                vel_com = None
 
             # Create region and distance lists
             dist = np.zeros(self.num_res, float)
@@ -1910,7 +1912,7 @@ class Sample:
                 if filled_up:
                     self._diffusion_vacf(output["diffusion_vacf"], frame_id, pos_list, pos_pointer, vel_list, vel_pointer)
             elif self._is_numpy:
-                self._numpy(output["numpy"], positions, velocities, frame_id)
+                self._numpy(output["numpy"], com_no_pbc, vel_com, frame_id)
 
             # Progress
             if frame_list[0] == 0 and (frame_id)%100==0 or frame_id==0:
