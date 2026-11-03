@@ -500,8 +500,14 @@ def density_from_vacf(link_data, convert="", pore_id=None, plot_axis=None, **kwa
     sample = utils.load(link_data)
     if pore_id and "pore" in sample:
         data = sample["data"][pore_id]
-        bins = sample["inp"]["bins"][pore_id]
-        direction = 3
+        # A radial run bins every pore on its own, a cartesian one shares the
+        # bins of the box with all of them
+        if sample["inp"]["direction"] == "radial_cylindrical":
+            bins = sample["inp"]["bins"][pore_id]
+            direction = 3
+        else:
+            bins = sample["inp"]["bins"]
+            direction = sample["inp"]["direction"]
     else:
         data = sample["data"]
         bins = sample["inp"]["bins"]
@@ -521,9 +527,17 @@ def density_from_vacf(link_data, convert="", pore_id=None, plot_axis=None, **kwa
     # Calculate volume per bin
     if pore_id and "pore" in sample:
         pore_props = sample["pore"][pore_id]
-        if pore_props["type"] == "CYLINDER":
+        if pore_props["type"] == "CYLINDER" and direction == 3:
             area = np.array([math.pi * (bins[i+1]**2 - bins[i]**2) for i in range(len(bins)-1)])
             volume = area * pore_props["length"]
+        elif pore_props["type"] == "CYLINDER":
+            # Cartesian bins are slabs of the pore, and only molecules inside
+            # the pore are sampled, so the cross section is the one of the pore
+            area = math.pi * (pore_props["diam"]/2)**2
+            volume = area * np.array([bins[i+1] - bins[i] for i in range(len(bins) - 1)])
+        else:
+            print(f"Density conversion is not available for a {pore_props['type']} pore. Using residues per bin without conversion.")
+            convert = ""
     else:
         area = np.prod([box[i] for i in range(3) if i != sample["inp"]["direction"]])
         volume = area * np.array([bins[i+1] - bins[i] for i in range(len(bins) - 1)])

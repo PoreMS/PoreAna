@@ -1457,7 +1457,9 @@ def diffusion_per_bin(link_data, section=[], mean_over_time=None, remove_low_den
     sample = utils.load(link_data)
     integrated = integrate_bin_diffusion_vacf(link_data, pore_id=pore_id)
     density = pa.density.density_from_vacf(link_data, pore_id=pore_id)
-    if "pore" in sample:
+    if "pore" in sample and sample["inp"]["direction"] == "radial_cylindrical":
+        # A radial run bins every pore on its own and resolves the diffusion in
+        # the coordinates of the pore shape
         bins = sample["inp"]["bins"][pore_id]
         directions = ['r', 't', 'a']
     else:
