@@ -145,7 +145,7 @@ class MC:
         n_proc = n_proc if n_proc and n_proc<=mp.cpu_count() else mp.cpu_count()
 
         # List for step times per cpu
-        len_step_cpu = np.array_split(model._len_step,n_proc);
+        len_step_cpu = np.array_split(model._len_step,n_proc)
 
 
         # If is parallel is true, each lag time MC run is calculated on one CPU

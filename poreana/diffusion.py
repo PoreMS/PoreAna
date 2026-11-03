@@ -573,7 +573,6 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
 
     # Set vector
     diff_bin_vec = {}
-    diff_fluc_bin_vec = {}
 
     # Pore
     if isinstance(section, str) and section== "pore":
@@ -585,7 +584,7 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
         # If only the pore area should be considered
         else:
             print("obj.-file includes results of a simple box")
-            return;
+            return
 
     # Reservoir
     elif isinstance(section, str) and section == "reservoir":
@@ -598,15 +597,15 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
         # If only the pore area should be considered
         else:
             print("obj.-file includes results of a simple box")
-            return;
+            return
 
     elif isinstance(section, str) and section not in ["reservoir", "pore"]:
         print("Wrong input for section! Check documentation for available options")
-        return;
+        return
 
     elif isinstance(section, list) and len(section)>=3:
         print("Wrong input for section! Check documentation for available options")
-        return;
+        return
 
     #Area section
     elif isinstance(section, list):
@@ -807,7 +806,6 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True, is_plot=True, 
     """
     # Load data
     data = utils.load(link)
-    directions = ['x', 'y', 'z']
     # Load results
     results = data["output"]
     diff_bin = results["diff_profile"]
@@ -831,10 +829,7 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True, is_plot=True, 
     # Set dictionaries
     legend = []
     diff_bin_vec = {}
-    diff_fluc_bin_vec = {}
     diff_profile_fit = []
-    diff_fluc_profile_fit_up = []         
-    diff_fluc_profile_fit_down = []   
     diff_error_bin = []
 
 
@@ -850,7 +845,7 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True, is_plot=True, 
         # If only the pore area should be considered
         else:
             print("obj.-file includes results of a simple box")
-            return;
+            return
 
     # Reservoir
     elif isinstance(section, str) and section== "reservoir":
@@ -863,15 +858,15 @@ def mc_profile(link, len_step=[], section=[], infty_profile=True, is_plot=True, 
         # If only the pore area should be considered
         else:
             print("obj.-file includes results of a simple box")
-            return;
+            return
 
     elif isinstance(section, str) and section not in ["reservoir", "pore"]:
         print("Wrong input for section! Check documentation for available options")
-        return;
+        return
 
     elif isinstance(section, list) and len(section)>=3:
         print("Wrong input for section! Check documentation for available options")
-        return;
+        return
 
     #Area section
     elif isinstance(section, list):
@@ -1117,18 +1112,8 @@ def integrate_bin_diffusion_vacf(link_data, pore_id=None):
         data = sample["data"]
 
     inp = sample["inp"]
-    num_frame = inp["num_frame"]
-    mass = inp["mass"]
-    bins = inp["bins"]
-    len_correration = inp["len_correration"]
-    new_time_origin = inp["new_time_origin"]
     sample_step = inp["sample_step"]
     len_frame = inp["len_frame"]
-    bin_num = inp["bin_num"]
-    direction = inp["direction"]
-    corr_steps = inp["corr_steps"]
-    new_time_origin_steps = inp["new_time_origin_steps"]
-    num_res = inp["num_res"]
 
     # Calculate total number of sampled datapoints (good for estimating statistics)
     sample_datapoints = np.sum(data["density"])
@@ -1321,7 +1306,7 @@ def diffusion_per_bin(link_data, section=[], mean_over_time=None, remove_low_den
         # If only the pore area should be considered
         else:
             print("obj.-file includes results of a simple box")
-            return;
+            return
 
     # Reservoir
     elif isinstance(section, str) and section== "reservoir":
@@ -1334,15 +1319,15 @@ def diffusion_per_bin(link_data, section=[], mean_over_time=None, remove_low_den
         # If only the pore area should be considered
         else:
             print("obj.-file includes results of a simple box")
-            return;
+            return
 
     elif isinstance(section, str) and section not in ["reservoir", "pore"]:
         print("Wrong input for section! Check documentation for available options")
-        return;
+        return
 
     elif isinstance(section, list) and len(section)>=3:
         print("Wrong input for section! Check documentation for available options")
-        return;
+        return
 
     #Area section
     elif isinstance(section, list):

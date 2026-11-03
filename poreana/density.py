@@ -406,14 +406,11 @@ def density_from_bins(link_data, convert="", plot_axis=None, **kwargs):
     is_pore = "pore" in sample
     data = sample["data"]
 
-    pore_props = {}
     if is_pore:
         pore = sample["pore"]
         box = pore["box"]["dimensions"]
-        res = pore["box"]["res"]
     else:
         box = sample["box"]["length"]
-        res = None
     inp = sample["inp"]
 
     average_density_per_bin = np.array(data['ex'][:-1]) / inp['num_frame']
@@ -538,7 +535,6 @@ def density_from_vacf(link_data, convert="", pore_id=None, plot_axis=None, **kwa
 
     if "pore" in sample:
         pore = sample["pore"]
-        res = pore["box"]["res"]
         box = pore["box"]["dimensions"]
     else:
         box = sample["box"]["length"]
