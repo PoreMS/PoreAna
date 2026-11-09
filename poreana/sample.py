@@ -1612,14 +1612,14 @@ class Sample:
                 if self._pore:
                     for pore_id in output[0]["diffusion_bin"].keys():
                         if pore_id[:5]=="shape":
-                            for i in range(self._diff_bin_inp["bin_num"]):
-                                for j in range(self._diff_bin_inp["len_window"]):
-                                    data_diff[pore_id]["z"][i][j] += out["diffusion_bin"][pore_id]["z"][i][j]
-                                    data_diff[pore_id]["r"][i][j] += out["diffusion_bin"][pore_id]["r"][i][j]
-                                    data_diff[pore_id]["n"][i][j] += out["diffusion_bin"][pore_id]["n"][i][j]
-                                    data_diff[pore_id]["z_tot"][i][j] += out["diffusion_bin"][pore_id]["z_tot"][i][j]
-                                    data_diff[pore_id]["r_tot"][i][j] += out["diffusion_bin"][pore_id]["r_tot"][i][j]
-                                    data_diff[pore_id]["n_tot"][i][j] += out["diffusion_bin"][pore_id]["n_tot"][i][j]
+                            # Bin lists are bin_num+1 long, the last bin holding
+                            # the tolerance shell the wall mask still admits
+                            for bin in ["z", "r", "n", "z_tot", "r_tot", "n_tot"]:
+                                bins_sum = data_diff[pore_id][bin]
+                                bins_add = out["diffusion_bin"][pore_id][bin]
+                                for i in range(len(bins_sum)):
+                                    for j in range(len(bins_sum[i])):
+                                        bins_sum[i][j] += bins_add[i][j]
 
             # Pickle
             results = {system["sys"]: system["props"], "inp": inp_diff, "data": data_diff, "type": "diff_bin"}

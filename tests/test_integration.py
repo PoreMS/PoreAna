@@ -628,6 +628,43 @@ def test_diffusion_bin(sample_output):
     assert round(mean_p["shape_00"], 2) == 1.13
 
 
+def test_diffusion_bin_parallel_outermost_bin(sample_output):
+    """The parallel merge must collect every bin, including the last one.
+
+    The bin lists are bin_num+1 long: _diffusion_bin accepts idx_ref == bin_num,
+    which is the tolerance shell between the nominal radius and the 1.01*radius
+    the wall mask still admits. The merge loop ran over range(bin_num), so that
+    last bin kept only the first worker's contribution.
+
+    traj_cylinder.xtc never reaches it - the benzene com stays below 0.81 of the
+    radius - so the diameter is narrowed here until the shell is populated.
+    """
+    mol = pms.Molecule("benzene", "BEN", inp="data/benzene.gro")
+
+    def run(is_parallel):
+        sample = pa.Sample("data/pore_system_cylinder_new.yml",
+                           "data/traj_cylinder.xtc", mol)
+        sample._pore_props["shape_00"]["diam"] = 2.7403
+        link = f"output/diff_shell_{is_parallel}.obj"
+        sample.init_diffusion_bin(link)
+        sample._num_frame = 400
+        sample.sample(is_parallel=is_parallel, is_pbc=True, num_cores=4)
+        return pa.utils.load(link)
+
+    data_s = run(False)["data"]["shape_00"]
+    out_p = run(True)
+    data_p = out_p["data"]["shape_00"]
+
+    bin_num = out_p["inp"]["bin_num"]
+    assert len(data_s["n_tot"]) == bin_num+1
+
+    # The shell has to carry something, or the test cannot fail
+    assert sum(data_s["n_tot"][bin_num]) > 0
+
+    for bin in ["z", "r", "n", "z_tot", "r_tot", "n_tot"]:
+        assert np.allclose(data_s[bin], data_p[bin]), bin
+
+
 def test_diffusion_cui_axial(sample_output):
     plt.figure()
     pa.diffusion.cui("output/diff_cyl_s.obj", intent="axial", is_fit=True)
