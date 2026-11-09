@@ -383,22 +383,29 @@ class Sample:
         data = {}
 
         # Fill dictionary
-        data["ex_width"] = self._bin_ex(bin_num)["width"]
-        data["ex"] = self._bin_ex(bin_num)["bins"]
+        bin_ex = self._bin_ex(bin_num)
+        data["ex_width"] = bin_ex["width"]
+        data["ex"] = bin_ex["bins"]
 
         if self._pore:
+            # Build the interior bins once, not once per shape - the widths of
+            # every shape are in the same result and _bin_in_const_A solves for
+            # all of them on each call
+            bin_in = None
+            if self._dens_inp["bin_const_A"]:
+                bin_in = self._bin_in_const_A(bin_num)
+            elif self._dens_inp["avg_slit"]==False:
+                bin_in = self._bin_in_slit(bin_num)
+            elif self._dens_inp["avg_slit"]==True:
+                bin_in = self._bin_in(bin_num)
+
             for pore_id in self._pore.keys():
                 if pore_id[:5]=="shape":
                     data[pore_id]={}
-                    if self._dens_inp["bin_const_A"]:
-                        data[pore_id]["in_width"] = self._bin_in_const_A(bin_num)["width"][pore_id]
-                        data[pore_id]["in"] = self._bin_in_const_A(bin_num)["bins"]
-                    elif self._dens_inp["avg_slit"]==False:
-                        data[pore_id]["in_width"] = self._bin_in_slit(bin_num)["width"][pore_id]
-                        data[pore_id]["in"] = self._bin_in_slit(bin_num)["bins"]
-                    elif self._dens_inp["avg_slit"]==True:
-                        data[pore_id]["in_width"] = self._bin_in(bin_num)["width"][pore_id]
-                        data[pore_id]["in"] = self._bin_in(bin_num)["bins"]
+                    if bin_in is not None:
+                        data[pore_id]["in_width"] = bin_in["width"][pore_id]
+                        # Each shape needs its own counter list
+                        data[pore_id]["in"] = list(bin_in["bins"])
 
         return data
 
@@ -485,15 +492,18 @@ class Sample:
         data = {}
 
         # Fill dictionary
-        data["ex_width"] = self._bin_ex(bin_num)["width"]
-        data["ex"] = self._bin_ex(bin_num)["bins"]
+        bin_ex = self._bin_ex(bin_num)
+        data["ex_width"] = bin_ex["width"]
+        data["ex"] = bin_ex["bins"]
 
         if self._pore:
+            bin_in = self._bin_in(bin_num)
             for pore_id in self._pore.keys():
                 if pore_id[:5]=="shape":
                     data[pore_id] = {}
-                    data[pore_id]["in_width"] = self._bin_in(bin_num)["width"][pore_id]
-                    data[pore_id]["in"] = self._bin_in(bin_num)["bins"]
+                    data[pore_id]["in_width"] = bin_in["width"][pore_id]
+                    # Each shape needs its own counter list
+                    data[pore_id]["in"] = list(bin_in["bins"])
 
         return data
 
@@ -618,15 +628,18 @@ class Sample:
         data = {}
 
         # Fill dictionary
-        data["ex_width"] = self._bin_ex(bin_num)["width"]
-        data["ex"] = self._bin_ex(bin_num)["bins"]
+        bin_ex = self._bin_ex(bin_num)
+        data["ex_width"] = bin_ex["width"]
+        data["ex"] = bin_ex["bins"]
 
         if self._pore:
+            bin_in = self._bin_in(bin_num)
             for pore_id in self._pore.keys():
                 if pore_id[:5]=="shape":
                     data[pore_id] = {}
-                    data[pore_id]["in_width"] = self._bin_in(bin_num)["width"][pore_id]
-                    data[pore_id]["in"] = self._bin_in(bin_num)["bins"]
+                    data[pore_id]["in_width"] = bin_in["width"][pore_id]
+                    # Each shape needs its own counter list
+                    data[pore_id]["in"] = list(bin_in["bins"])
         return data
 
     def _angle(self, data, region, dist, com, pos, pore_id):
