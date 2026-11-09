@@ -6,6 +6,7 @@
 
 
 import math
+from operator import mul
 
 
 def dot_product(vec_a, vec_b):
@@ -31,7 +32,9 @@ def dot_product(vec_a, vec_b):
     dot : float
         Dot product value
     """
-    return sum((a*b) for a, b in zip(vec_a, vec_b))
+    # map is noticeably faster than a generator expression for the three
+    # element vectors this is almost always called with
+    return sum(map(mul, vec_a, vec_b))
 
 
 def length(vec):
@@ -165,9 +168,17 @@ def angle(vec_a, vec_b, is_deg=True):
     angle : float
         Angle
     """
+    # This is the hot path of the angle sampling, so the three dot products
+    # are taken here rather than through dot_product and length, which costs
+    # three function calls per angle. The sum(map(mul)) form is kept because
+    # it is what dot_product does, down to the summation order
+    dot = sum(map(mul, vec_a, vec_b))
+    sq_a = sum(map(mul, vec_a, vec_a))
+    sq_b = sum(map(mul, vec_b, vec_b))
+
     # Rounding can push the cosine of parallel vectors marginally outside
     # [-1, 1], which acos rejects, so clamp it to the valid domain
-    cos = dot_product(vec_a, vec_b)/(length(vec_a)*length(vec_b))
+    cos = dot/(math.sqrt(sq_a)*math.sqrt(sq_b))
     angle = math.acos(max(-1.0, min(1.0, cos)))
 
     return angle*180/math.pi if is_deg else angle
