@@ -507,7 +507,7 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
     :math:`\\langle D \\rangle`, all :math:`D_\\mathrm{mean}({\\Delta t_{\\alpha}})`
     are on a straight line. The standard deviation also can be used to check
     if the result fluctuates strongly at the choice of other lag times. This
-    error estimate is calculated if :math:`\\mathrm{is}\_{\\mathrm{std}}=True`.
+    error estimate is calculated if :math:`\\mathrm{is}\\_{\\mathrm{std}}=True`.
 
     Parameters
     ----------
@@ -539,14 +539,14 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
     Returns
     -------
     diffusion: float
-        Diffusion coefficient :math:`D \ \\left( 10^{-9} \\frac{m^2}{s}\\right)` for the
-        calculated system
+        Diffusion coefficient :math:`D \\ \\left( 10^{-9} \\frac{m^2}{s}\\right)`
+        for the calculated system
     diffusion_mean: float
-        Mean diffusion coefficient :math:`\\langle D \\rangle \ \\left(10^{-9} \\frac{m^2}{s}\\right)`
+        Mean diffusion coefficient :math:`\\langle D \\rangle \\ \\left(10^{-9} \\frac{m^2}{s}\\right)`
         for the calculated system
     diff_table : obj
         Table of used lag times with the associated
-        :math:`D_{\\mathrm{mean}}({\\Delta t_{\\alpha}}) \ \\left(10^{-9} \\frac{m^2}{s}\\right)`
+        :math:`D_{\\mathrm{mean}}({\\Delta t_{\\alpha}}) \\ \\left(10^{-9} \\frac{m^2}{s}\\right)`
     res : float
         error of intercept :math:`\\left(10^{-9} \\frac{m^2}{s}\\right)` for fitting the selected lag times
     """
@@ -724,7 +724,7 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
 
     # Set data frame for the used lag times
     data = [str("%.2f" % D_mean[i] ) for i in range(len(len_step))]
-    diff_table = pd.DataFrame(data, index=list(len_step), columns=list(['$D_\mathrm{mean} \ (10^{-9} \mathrm{m^2s^{-1}})$']))
+    diff_table = pd.DataFrame(data, index=list(len_step), columns=list(['$D_\\mathrm{mean} \\ (10^{-9} \\mathrm{m^2s^{-1}})$']))
     diff_table = pd.DataFrame(diff_table.rename_axis('Step Length', axis=1))
     styler = diff_table.style.set_caption('Selected step length')
     diff_table = styler.set_properties(**{'text-align': 'right'})
@@ -745,7 +745,7 @@ def mc_fit(link, len_step=[], section=[], is_std=False, is_print=True, is_plot=T
         sns.scatterplot(x=lag_time_vec, y=D_mean_vec, **kwargs_scatter)
         #plt.errorbar(x=lag_time_vec, y=D_mean_vec, yerr=[D_mean_vec[i]-diff_profiles_error_up[i] for i in range(len(D_mean_vec))], fmt="o", **kwargs_scatter)
         sns.lineplot(x=x_vec, y=(fit.intercept + fit.slope*x_vec), **kwargs_line)
-        legend = ["$D_{\mathrm{fit}}$", "$D_{\mathrm{mean}}(\\Delta t_{\\alpha})$"]
+        legend = ["$D_{\\mathrm{fit}}$", "$D_{\\mathrm{mean}}(\\Delta t_{\\alpha})$"]
         plt.legend(legend)
         plt.xlabel(r"Inverse lag time ($10^{12} \ \mathrm{s^{-1}})$")
         plt.ylabel(r"Diff. coeff. ($10^{-9} \ \mathrm{m^2s^{-1}}$)")

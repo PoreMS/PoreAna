@@ -44,7 +44,7 @@ def length(vec):
     .. math::
 
         \\text{length}(\\boldsymbol{a})=|\\boldsymbol{a}|
-        =\\sqrt{\\boldsymbol{a}\cdot\\boldsymbol{a}}
+        =\\sqrt{\\boldsymbol{a}\\cdot\\boldsymbol{a}}
 
     Parameters
     ----------
@@ -151,7 +151,7 @@ def angle(vec_a, vec_b, is_deg=True):
 
     .. math::
 
-        \\text{angle}=\\cos^{-1}\\frac{\\boldsymbol{a}\cdot\\boldsymbol{b}}
+        \\text{angle}=\\cos^{-1}\\frac{\\boldsymbol{a}\\cdot\\boldsymbol{b}}
         {|\\boldsymbol{a}||\\boldsymbol{a}|}
 
     Parameters

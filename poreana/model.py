@@ -414,9 +414,9 @@ class StepModel(Model):
         .. math::
 
             \\mathrm{basis} = \\begin{cases}
-                            1 & (\\mathrm{bin}+0.5)\\geq \\Delta x\\; \\& \\; (\\mathrm{bin}+0.5)\\leq n_{\\mathrm{bin}}-\\Delta x \\\\
-                            0 & \\mathrm{else}                                 \\
-                    \\end{cases}
+                1 & (\\mathrm{bin}+0.5)\\geq \\Delta x\\; \\& \\; (\\mathrm{bin}+0.5)\\leq n_{\\mathrm{bin}}-\\Delta x \\\\
+                0 & \\mathrm{else}
+            \\end{cases}
 
         hereby is :math:`\\mathrm{bin} = [0,...,n_{bin}]` with
         :math:`n_{\\mathrm{bin}}` as the number of the bins. The variable
@@ -444,9 +444,9 @@ class StepModel(Model):
         .. math::
 
             \\mathrm{basis} = \\begin{cases}
-                            1 & (\\mathrm{bin}+1)\\geq \\Delta x\ \\& \ (\\mathrm{bin}+1)\\leq n_{\\mathrm{bin}}-\\Delta x \\\\
-                            0 &  \\mathrm{else}                                 \\
-                    \\end{cases}
+                1 & (\\mathrm{bin}+1)\\geq \\Delta x\\ \\& \\ (\\mathrm{bin}+1)\\leq n_{\\mathrm{bin}}-\\Delta x \\\\
+                0 & \\mathrm{else}
+            \\end{cases}
 
         hereby is :math:`bin = [0,...,n_{\\mathrm{bin}}]` with
         :math:`n_{\\mathrm{bin}}` as the number of the bins. The variable

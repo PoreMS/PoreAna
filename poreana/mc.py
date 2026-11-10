@@ -32,7 +32,7 @@ class MC:
         The results can be displayed with the post process functions.
         The MC Algorithm is divided in two parts. Frist ab equilibrium MC run starts
         to adjust the profile. The number of the equilibrium runs can be set with
-        :math:`\\text{nmc\_eq}`. After the equilibrium phase the sampling of the diffusion
+        :math:`\\text{nmc\\_eq}`. After the equilibrium phase the sampling of the diffusion
         profile can start. In this part the MC Algorithm calculates in every step
         a new diffusion profile. The average over all profiles which are yields in
         MC production will be determined. The received profile gives the final
@@ -568,7 +568,7 @@ class MC:
 
         .. math::
 
-            R_{i,i+1} = \\exp \\left( \\ln \\left( \\frac{D_{i+\\frac{1}{2}}}{\Delta z^2}\\right) \\right) + 0.5(\\beta(F(\\Delta z_{i+1})-F(\\Delta z_{i})
+            R_{i,i+1} = \\exp \\left( \\ln \\left( \\frac{D_{i+\\frac{1}{2}}}{\\Delta z^2}\\right) \\right) + 0.5(\\beta(F(\\Delta z_{i+1})-F(\\Delta z_{i})
 
         with :math:`\\Delta z` as the bin width, :math:`D_{i+\\frac{1}{2}}`
         as the diffusion between to bins and :math:`F_i` as free energy in
@@ -648,7 +648,7 @@ class MC:
 
         .. math::
 
-            \\ln \ L = \\sum_{j \\rightarrow i} \\ln \\left ( \\left[ \\left( e^{\\mathbf{R}\\Delta_{ij}t_{\\alpha}} \\right)_{ij}\\right]^{N_{ij}(\\Delta_{ij}t_{\\alpha})} \\right)
+            \\ln \\ L = \\sum_{j \\rightarrow i} \\ln \\left ( \\left[ \\left( e^{\\mathbf{R}\\Delta_{ij}t_{\\alpha}} \\right)_{ij}\\right]^{N_{ij}(\\Delta_{ij}t_{\\alpha})} \\right)
 
         with :math:`R` as the rate matrix from :func:`_init_rate_matrix_pbc`,
         :math:`\\Delta_{ij}t_{\\alpha}` as the current lag time and
