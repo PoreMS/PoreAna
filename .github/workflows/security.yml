@@ -1,0 +1,52 @@
+name: Security
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/*'
+  pull_request:
+  workflow_dispatch:
+  # New advisories are published against unchanged code, so audit on a timer
+  # as well as on a change
+  schedule:
+    - cron: "0 6 * * 1"  # every Monday at 06:00 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pip-audit:
+    name: Audit dependencies (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      # pip-audit has to be pointed at a dependency set. Run bare it audits
+      # whatever environment it can see, which under uvx is its own isolated
+      # one -- 28 packages of pip-audit's own dependencies, none of PoreAna's.
+      # That reports "No known vulnerabilities found" while checking nothing.
+      #
+      # pip-audit --locked would read uv.lock, but uv.lock is deliberately not
+      # committed, so export the freshly resolved set instead. --no-emit-project
+      # drops poreana itself, which is the thing being audited, not a dependency.
+      #
+      # This audits the runtime dependencies, which is what installing PoreAna
+      # puts on a user's machine. Drop --no-dev to cover the test and lint
+      # tooling as well.
+      - name: Resolve runtime dependencies
+        run: >
+          uv export --format requirements-txt --no-emit-project --no-dev
+          -o "${{ runner.temp }}/requirements.txt"
+
+      - name: Audit dependencies
+        run: uvx pip-audit -r "${{ runner.temp }}/requirements.txt"
