@@ -49,5 +49,6 @@ exclude_patterns = []
 
 html_theme = "furo"
 html_static_path = ["_static"]
+html_css_files = ["style.css"]
 html_logo = "_static/logo_text.svg"
 html_favicon = "_static/logo.svg"

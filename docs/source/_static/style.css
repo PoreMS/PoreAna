@@ -1,0 +1,14 @@
+/* The generated plots are matplotlib output with black text, axes and labels
+   on a transparent background: the svg figure patch is fill:none and the png
+   is RGBA with its background at alpha 0. On a dark page background that text
+   is unreadable, so give the content images a white plate.
+
+   The selector is scoped to <article> because the only <img> outside it is the
+   sidebar logo, which is drawn for both themes and must keep its transparency.
+   The padding is set in both themes so that toggling the theme does not reflow
+   the page; in light mode the plate itself is transparent. */
+article img {
+    background-color: #ffffff;
+    border-radius: 4px;
+    padding: 2px;
+}
