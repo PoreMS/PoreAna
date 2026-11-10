@@ -1320,6 +1320,12 @@ class Sample:
             forward_index = (np.arange(corr_steps) + vel_pointer) % vel_list.shape[0]  # Indices for backward velocities
             backward_index = (np.arange(corr_steps)[::-1] + vel_pointer + corr_steps) % vel_list.shape[0]  # Indices for forward velocities
 
+            # Gather the two time series once per time origin, not once per bin.
+            # Both indices are the same for every bin and shape, while the
+            # gather copies the whole (corr_steps, num_molecules, 3) buffer
+            forward_velos_all = vel_list[forward_index]
+            backward_velos_all = vel_list[backward_index]
+
             # Loop over all pores or just the box
             for pore_id in self._pore.keys() if self._pore else [None]:
                 # For pore systems
@@ -1376,9 +1382,9 @@ class Sample:
                     # Get filtered velocities for molecules in this bin (v_l(0) part in the equation)
                     vel0 = vel_list[vel_pointer, mask, :]  # shape: (num_mol_in_bin, 3)
                     # Build the velocity forward time series for these molecules (v(t) part in the equation)
-                    forward_velos = vel_list[forward_index][:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3); It is not the same as vel_list[forward_index, :, mask]
+                    forward_velos = forward_velos_all[:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3); It is not the same as vel_list[forward_index, :, mask]
                     # Build the velocity backward time series for these molecules (v(t) part in the equation)
-                    backward_velos = vel_list[backward_index][:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3)
+                    backward_velos = backward_velos_all[:, mask, :]  # shape: (corr_steps, num_mol_in_bin, 3)
                     # Concatenate forward and backward
                     vacf = (vel0[np.newaxis, :, :] * forward_velos + vel0[np.newaxis, :, :] * backward_velos) / 2 # shape: (corr_steps, num_mol_in_bin, 3)
 
