@@ -59,13 +59,12 @@ jobs:
       - name: Run pytest
         run: uv run pytest --cov --cov-branch --cov-report=xml
 
-      # No `files:` — the test suite chdirs into tests/ and never returns, so the
-      # report location depends on pytest-cov internals. Let the action search.
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: PoreMS/PoreAna
+          files: ./coverage.xml
           fail_ci_if_error: false
 
   build:
