@@ -148,8 +148,6 @@ class CosineModel(Model):
         Number of the Fourier coefficients for the diffusion profile
     n_df : integer, optional
         Number of the Fourier coefficients for the free energy profile
-    n_diff_radial : integer, optional
-        Number of the Fourier coefficients for the radial diffusion profile
     d0 : double or list, optional
         Initial guess of diffusion coefficient :math:`\\left( 10^{-9} \\frac{m^2}{s}\\right)`.
         A list holds one guess per bin and has to be combined with **coeff**
@@ -160,7 +158,7 @@ class CosineModel(Model):
         **n_diff**. Only used, and then required, if **d0** is a list
     """
 
-    def __init__(self, data_link, n_diff=6, n_df=10, n_diff_radial=6, d0=1.0, is_print=False, coeff = []):
+    def __init__(self, data_link, n_diff=6, n_df=10, d0=1.0, is_print=False, coeff = []):
 
         # Inherit the variables from Model class
         super(CosineModel, self).__init__(data_link)
@@ -170,7 +168,6 @@ class CosineModel(Model):
         self._coeff = coeff
         self._n_df = n_df
         self._n_diff = n_diff
-        self._n_diff_radial = n_diff_radial
         self._print_output = is_print
 
         # A single guess is cast to a plain float, so that the profile
@@ -178,11 +175,11 @@ class CosineModel(Model):
         if isinstance(d0, (int, float, np.number)):
             self._d0 = float(d0) * (10**9)/(10**12)         # guess init profile [A^2/ps]
         elif isinstance(d0, list):
-            if len(coeff) != n_diff:
-                raise ValueError("A list of initial guesses for d0 needs one coeff per n_diff, got "+str(len(coeff))+" coeff for n_diff="+str(n_diff)+".")
+            if len(d0) != self._bin_num:
+                raise ValueError("A list of initial guesses for d0 has to be same length as number of bins.")
             self._d0 = [float(d) * (10**9)/(10**12) for d in d0]
         else:
-            raise ValueError("Unsupported type for d0: "+type(d0).__name__+". Use a number, or a list of numbers together with coeff.")
+            raise ValueError("Unsupported type for d0: "+type(d0).__name__+". Use a number, or a list of numbers.")
         self._init_model()     # Initial model
         self._init_profiles()  # Initial Profiles
         self._cosine_model()   # Set basis of Fourier series

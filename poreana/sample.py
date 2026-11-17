@@ -1808,7 +1808,8 @@ class Sample:
             # Determine region and distance
             if self._pore:
                 for pore_id in self._pore.keys():
-                    if pore_id[:5]=="shape":
+                     if pore_id[:5]=="shape":
+                        
                         # Determine pore properties
                         pore_center = np.array(self._pore_props[pore_id]["focal"][0:2])
                         z_min = res + self._pore_props[pore_id]["focal"][2]-self._pore_props[pore_id]["length"]/2+self._entry
@@ -1820,17 +1821,16 @@ class Sample:
                             dist[pore_mask] = np.linalg.norm(pore_center - com[pore_mask,:2], axis=1)
                         elif self._pore_props[pore_id]["type"]=="SLIT":
                             dist[pore_mask] = abs(self._pore_props[pore_id]["focal"][1]-com[pore_mask,1])
-                        
-                        # Filter all residues in pore wall
-                        in_wall_mask = (dist > (self._pore_props[pore_id]["diam"]*1.01)/2)
-                        if np.any(in_wall_mask):
-                            dist[in_wall_mask] = 0
-                        
-                        # Not in wall and not in reservoir -> in pore
+
+                        # Wall mask nur für Residuen dieser Pore, dist bleibt unverändert
+                        in_wall_mask = pore_mask & (dist > (self._pore_props[pore_id]["diam"]*1.01)/2)
+
+                        # In this pore = in z-range and not in wall
                         in_pore_mask = pore_mask & (~in_wall_mask)
                         for res_id in np.where(in_pore_mask)[0]:
                             region[res_id] = "in"
                             pore_in[res_id] = pore_id
+
                 # FIlter all residues in reservoir region
                 mask_ex = (com[:,2] < res) | (com[:,2] > box[2]-res)
                 for res_id in np.where(mask_ex)[0]:
