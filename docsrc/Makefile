@@ -9,7 +9,7 @@ else
    SPHINXBUILD   = python3 -msphinx
 endif
 # SPHINXBUILD   = python3 -msphinx
-SPHINXPROJ    = PoreAna
+SPHINXPROJ    = MolDyn
 SOURCEDIR     = .
 BUILDDIR      = _build
 

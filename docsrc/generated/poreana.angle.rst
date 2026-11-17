@@ -4,26 +4,9 @@
 .. automodule:: poreana.angle
 
    
-   
-   
-
-   
-   
    .. rubric:: Functions
 
    .. autosummary::
    
       bins_plot
    
-   
-
-   
-   
-   
-
-   
-   
-   
-
-
-
